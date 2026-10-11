@@ -8,6 +8,13 @@
 //   node --env-file=.env.local scripts/invite.mjs revoke <invite id> [--hide] stop the code; --hide also hides all it ran
 //   node --env-file=.env.local scripts/invite.mjs x <invite id> <handle|->     their X handle on /contributors ("-" clears it)
 //
+// Applications from /apply (each also emails the operator a link to decide it;
+// deciding here leaves that link working, and it then shows the outcome):
+//   node --env-file=.env.local scripts/invite.mjs applications [--all]   the waiting ones (--all: every one)
+//   node --env-file=.env.local scripts/invite.mjs approve <application id> makes their invite and emails them the code
+//   node --env-file=.env.local scripts/invite.mjs decline <application id> sends nothing
+// An application id can be shortened to its first few characters.
+//
 // A code is shown once, when it's made (or rotated). Needs CUBE_OPERATOR_TOKEN.
 import { parseArgs } from 'node:util';
 
@@ -17,6 +24,7 @@ const { values: opt, positionals } = parseArgs({
     note: { type: 'string' },
     expires: { type: 'string' },
     hide: { type: 'boolean', default: false },
+    all: { type: 'boolean', default: false },
     url: { type: 'string', default: 'https://cube.krnl.studio' },
   },
 });
@@ -26,8 +34,8 @@ if (!token) {
   process.exit(2);
 }
 
-async function api(body) {
-  const res = await fetch(`${opt.url}/api/admin/invites`, {
+async function api(body, path = '/api/admin/invites') {
+  const res = await fetch(`${opt.url}${path}`, {
     method: body ? 'POST' : 'GET',
     headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
     body: body ? JSON.stringify(body) : undefined,
@@ -65,6 +73,26 @@ if (command === 'create') {
   if (!arg || !arg2) throw new Error('x <invite id> <handle>, or "-" to clear it');
   const { x_handle } = await api({ id: arg, x_handle: arg2 === '-' ? '' : arg2 });
   console.log(x_handle ? `X handle set to @${x_handle}.` : 'X handle cleared.');
+} else if (command === 'applications') {
+  const { applications } = await api(null, `/api/admin/applications${opt.all ? '?all=1' : ''}`);
+  if (!applications.length) console.log(opt.all ? 'No applications yet.' : 'Nobody is waiting.');
+  for (const a of applications) {
+    const when = a.created_at.slice(0, 16).replace('T', ' ');
+    console.log(`${a.id.slice(0, 8)}  ${when}  ${a.status.padEnd(8)} ${a.name} (@${a.x_handle})${a.note ? `: ${a.note.replace(/\s+/g, ' ')}` : ''}`);
+  }
+} else if (command === 'approve' || command === 'decline') {
+  if (!arg) throw new Error(`${command} <application id> (see: invite.mjs applications)`);
+  const { applications } = await api(null, '/api/admin/applications?all=1');
+  const matches = applications.filter((a) => a.id.startsWith(arg.toLowerCase()));
+  if (matches.length !== 1) {
+    console.error(matches.length ? `"${arg}" matches ${matches.length} applications; give more of the id.` : `No application starts with "${arg}".`);
+    process.exit(1);
+  }
+  const { application: a } = await api({ id: matches[0].id, approve: command === 'approve' }, '/api/admin/applications');
+  if (a.status === 'pending') console.log(`${a.name} (@${a.x_handle}) is still waiting.`);
+  else if (a.status === (command === 'approve' ? 'approved' : 'declined'))
+    console.log(command === 'approve' ? `Approved ${a.name} (@${a.x_handle}): their invite code is on its way to ${a.email}.` : `Declined ${a.name} (@${a.x_handle}). Nothing was sent.`);
+  else console.log(`${a.name} (@${a.x_handle}) was already ${a.status}${a.decided_at ? ` on ${a.decided_at.slice(0, 10)}` : ''}; nothing changed.`);
 } else {
-  console.log('Usage: invite.mjs create "Name" | list | rotate <id> | revoke <id> [--hide] | x <id> <handle|->');
+  console.log('Usage: invite.mjs create "Name" | list | rotate <id> | revoke <id> [--hide] | x <id> <handle|-> | applications [--all] | approve <id> | decline <id>');
 }

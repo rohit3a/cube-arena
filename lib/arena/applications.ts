@@ -2,7 +2,9 @@
 // (CUBE_APPLY_TO) gets an email with a link to approve or decline; approving
 // makes their invite, with their name and X handle, and emails them the code.
 // The link carries a secret of which only a hash is kept, and it opens a page
-// with buttons, so a mail scanner that follows links decides nothing.
+// with buttons, so a mail scanner that follows links decides nothing. The
+// operator can also decide by id (scripts/invite.mjs approve), and the link
+// then shows the outcome.
 
 import { createHash, randomBytes, timingSafeEqual } from 'node:crypto';
 import { RUNNER_INSTALL, SITE_URL } from '../site';
@@ -77,28 +79,54 @@ export async function apply(input: { name?: unknown; x_handle?: unknown; email?:
 /** The application behind a decision link, or null if the link is wrong. */
 export async function applicationFor(id: string, token: string): Promise<Application | null> {
   if (!UUID.test(id) || !token) return null;
-  const [row] = await withDb((sql) => sql<(Application & { token_hash: string })[]>`select * from cube_arena.applications where id = ${id}`);
+  const [row] = await withDb((sql) => sql<{ token_hash: string }[]>`select token_hash from cube_arena.applications where id = ${id}`);
   if (!row) return null;
   const [a, b] = [Buffer.from(row.token_hash, 'hex'), Buffer.from(hash(token), 'hex')];
   if (a.length !== b.length || !timingSafeEqual(a, b)) return null;
-  const { token_hash: _t, ...app } = row;
-  return app;
+  return applicationById(id);
+}
+
+async function applicationById(id: string): Promise<Application | null> {
+  if (!UUID.test(id)) return null;
+  const [row] = await withDb((sql) => sql<Application[]>`
+    select id, created_at, name, x_handle, email, note, status, decided_at from cube_arena.applications where id = ${id}`);
+  return row ?? null;
+}
+
+/** Operator only: applications, newest first (just the waiting ones unless `all`). */
+export async function listApplications(all = false): Promise<Application[]> {
+  return withDb((sql) => sql<Application[]>`
+    select id, created_at, name, x_handle, email, note, status, decided_at from cube_arena.applications
+    where ${all} or status = 'pending' order by created_at desc limit 100`);
+}
+
+/** Approves or declines from the email's link. Null if the link is wrong. */
+export async function decide(id: string, token: string, approve: boolean): Promise<Application | null> {
+  const app = await applicationFor(id, token);
+  return app && settle(app, approve);
+}
+
+/** Operator only: the same decision by id, leaving the email's link working (it then shows the outcome). */
+export async function decideById(id: string, approve: boolean): Promise<Application | null> {
+  const app = await applicationById(id);
+  return app && settle(app, approve);
 }
 
 /**
- * Approves or declines. Approving makes the invite (named, with the X handle)
- * and emails the code; if that email fails, the invite is withdrawn and the
- * application waits again, so the button can simply be pressed again.
- * Declining sends nothing. Returns the application as it now stands.
+ * Approving makes the invite (named, with the X handle) and emails the code;
+ * if that email fails, the invite is withdrawn and the application waits
+ * again, so the decision can simply be made again. Declining sends nothing.
+ * Returns the application as it now stands.
  */
-export async function decide(id: string, token: string, approve: boolean): Promise<Application | null> {
-  const app = await applicationFor(id, token);
-  if (!app || app.status !== 'pending') return app;
+async function settle(app: Application, approve: boolean): Promise<Application> {
+  if (app.status !== 'pending') return app;
   // Claim it first, so two clicks can't make two invites.
   const [claimed] = await withDb((sql) => sql<Application[]>`
     update cube_arena.applications set status = ${approve ? 'approved' : 'declined'}, decided_at = now()
-    where id = ${id} and status = 'pending' returning *`);
-  if (!claimed || !approve) return claimed ?? (await applicationFor(id, token));
+    where id = ${app.id} and status = 'pending'
+    returning id, created_at, name, x_handle, email, note, status, decided_at`);
+  if (!claimed) return (await applicationById(app.id)) ?? app;
+  if (!approve) return claimed;
 
   const { invite, code } = await createInvite(app.name, `applied ${new Date().toISOString().slice(0, 10)}: ${app.email}`, null);
   try {
@@ -110,10 +138,10 @@ export async function decide(id: string, token: string, approve: boolean): Promi
     });
   } catch (e) {
     await revokeInvite(invite.id, false).catch(() => {});
-    await withDb((sql) => sql`update cube_arena.applications set status = 'pending', decided_at = null where id = ${id}`);
+    await withDb((sql) => sql`update cube_arena.applications set status = 'pending', decided_at = null where id = ${app.id}`);
     throw e;
   }
-  await withDb((sql) => sql`update cube_arena.applications set invite_id = ${invite.id} where id = ${id}`);
+  await withDb((sql) => sql`update cube_arena.applications set invite_id = ${invite.id} where id = ${app.id}`);
   return claimed;
 }
 
