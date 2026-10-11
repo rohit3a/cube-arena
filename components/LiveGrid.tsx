@@ -56,7 +56,7 @@ export default function LiveGrid({ initial, at }: { initial: LiveCard[]; at: num
   return (
     <div className="live-grid">
       {items.map((a) => (
-        <Link key={a.id} href={`/replay/${a.id}`} className="tv">
+        <Link key={a.id} prefetch={false} href={`/replay/${a.id}`} className="tv">
           <span className="tv-screen">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src={`/api/image/${a.id}?m=${a.move_count}`} alt={`${a.size}×${a.size} cube being solved by ${a.model_name}`} width={1400} height={800} loading="lazy" />

@@ -22,7 +22,7 @@ export default function Ticker({ items }: { items: FeedItem[] }) {
       ? base.map((a, i) => {
           const hidden = pass > 0 || i >= items.length;
           return (
-            <Link key={`${pass}-${i}`} href={`/replay/${a.id}`} className="tick" aria-hidden={hidden || undefined} tabIndex={hidden ? -1 : undefined}>
+            <Link key={`${pass}-${i}`} prefetch={false} href={`/replay/${a.id}`} className="tick" aria-hidden={hidden || undefined} tabIndex={hidden ? -1 : undefined}>
               <span className={`tick-icon ${a.status === 'solved' ? 'ok' : 'no'}`} aria-hidden>
                 {a.status === 'solved' ? '✓' : '✗'}
               </span>

@@ -74,7 +74,7 @@ export function LadderTable({ rows, maxLevel, compact = false }: { rows: LadderR
                   {r.display_name} · via {r.via} <BoardBadge board={r.board} />
                 </span>
                 {r.best_attempt && (
-                  <Link href={`/replay/${r.best_attempt}`} className="cell-replay">
+                  <Link prefetch={false} href={`/replay/${r.best_attempt}`} className="cell-replay">
                     Best solve →
                   </Link>
                 )}
@@ -93,7 +93,7 @@ export function LadderTable({ rows, maxLevel, compact = false }: { rows: LadderR
                   {ago(r.last)}
                 </td>
               )}
-              {!compact && <td className="opt">{r.best_attempt ? <Link href={`/replay/${r.best_attempt}`}>best solve →</Link> : <span className="faint">–</span>}</td>}
+              {!compact && <td className="opt">{r.best_attempt ? <Link prefetch={false} href={`/replay/${r.best_attempt}`}>best solve →</Link> : <span className="faint">–</span>}</td>}
             </tr>
           ))}
         </tbody>
@@ -137,7 +137,7 @@ export function ScrambleTable({ rows }: { rows: ScrambleRow[] }) {
                   {r.display_name} · via {r.via} <BoardBadge board={r.board} />
                 </span>
                 {r.best_attempt && (
-                  <Link href={`/replay/${r.best_attempt}`} className="cell-replay">
+                  <Link prefetch={false} href={`/replay/${r.best_attempt}`} className="cell-replay">
                     Best solve →
                   </Link>
                 )}
@@ -154,7 +154,7 @@ export function ScrambleTable({ rows }: { rows: ScrambleRow[] }) {
               <td className="faint opt opt-md" suppressHydrationWarning>
                 {ago(r.last)}
               </td>
-              <td className="opt">{r.best_attempt ? <Link href={`/replay/${r.best_attempt}`}>best solve →</Link> : <span className="faint">–</span>}</td>
+              <td className="opt">{r.best_attempt ? <Link prefetch={false} href={`/replay/${r.best_attempt}`}>best solve →</Link> : <span className="faint">–</span>}</td>
             </tr>
           ))}
         </tbody>

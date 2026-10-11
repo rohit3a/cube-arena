@@ -17,18 +17,29 @@ import postgres from 'postgres';
 // platform limit). The transaction pooler is built for short-lived clients, so
 // each operation opens its own connection, closes it after, and is cut off if
 // the database has not answered within DEADLINE_MS.
+//
+// cube_app may hold only a few server connections (db/003), fewer than the
+// pooler will try to open, so in a burst the pooler answers "too many
+// connections" instead of queueing. withDb waits a moment and tries again,
+// but only when nothing has run yet, so a write is never repeated.
 const DEADLINE_MS = 15_000;
+const BUSY = '53300';
+const BUSY_WAITS_MS = [100, 250, 500, 1000, 2000];
 
-function connect(): postgres.Sql {
+function connect(onQuery: () => void): postgres.Sql {
   const url = process.env.CUBE_DATABASE_URL;
   if (!url) throw new Error('CUBE_DATABASE_URL is not set');
+  const log = !!process.env.CUBE_DB_DEBUG;
   return postgres(url, {
     prepare: false,
     max: 1,
     connect_timeout: 10,
     ssl: 'require',
     onnotice: () => {},
-    debug: process.env.CUBE_DB_DEBUG ? (conn, query) => console.log(`[db ${conn}] ${query.replace(/\s+/g, ' ').slice(0, 110)}`) : undefined,
+    debug: (conn, query) => {
+      onQuery();
+      if (log) console.log(`[db ${conn}] ${query.replace(/\s+/g, ' ').slice(0, 110)}`);
+    },
   });
 }
 
@@ -36,13 +47,29 @@ export type Tx = postgres.Sql;
 
 /** Runs fn on a connection of its own. Await each query in turn: never run two at once on it. */
 export async function withDb<T>(fn: (sql: Tx) => Promise<T>): Promise<T> {
-  const client = connect();
+  for (let i = 0; ; i++) {
+    let sent = 0;
+    try {
+      return await once(fn, () => sent++);
+    } catch (e) {
+      // Queries go one at a time, so with at most one sent, none has finished.
+      if ((e as { code?: string }).code !== BUSY || sent > 1 || i >= BUSY_WAITS_MS.length) throw e;
+      await new Promise((r) => setTimeout(r, BUSY_WAITS_MS[i] * (0.5 + Math.random())));
+    }
+  }
+}
+
+async function once<T>(fn: (sql: Tx) => Promise<T>, onQuery: () => void): Promise<T> {
+  const client = connect(onQuery);
   let timer: ReturnType<typeof setTimeout> | undefined;
   const deadline = new Promise<never>((_, reject) => {
     timer = setTimeout(() => reject(new Error(`database did not answer within ${DEADLINE_MS / 1000}s`)), DEADLINE_MS);
   });
+  const work = client.reserve().then(fn);
+  // If the deadline wins, the abandoned work still fails later: nobody is waiting for it.
+  work.catch(() => {});
   try {
-    return await Promise.race([client.reserve().then(fn), deadline]);
+    return await Promise.race([work, deadline]);
   } finally {
     clearTimeout(timer);
     // Closes the socket either way; on a timeout this also abandons the query

@@ -11,7 +11,7 @@ export function Feed({ items }: { items: FeedItem[] }) {
         const won = a.status === 'solved';
         const what = a.level ? `level ${a.level}` : 'full scramble';
         return (
-          <Link key={a.id} href={`/replay/${a.id}`} className="feed-item">
+          <Link key={a.id} prefetch={false} href={`/replay/${a.id}`} className="feed-item">
             <MiniFace n={a.size} solved={won} seed={a.id} />
             <span className="txt">
               <span className="who">

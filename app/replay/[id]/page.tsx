@@ -173,7 +173,7 @@ export default async function ReplayPage({ params }: Props) {
             </p>
             <div className="sibs">
               {siblings.map((s) => (
-                <Link key={s.id} href={`/replay/${s.id}`} className={`chip ${s.id === a.id ? 'on' : ''}`}>
+                <Link key={s.id} prefetch={false} href={`/replay/${s.id}`} className={`chip ${s.id === a.id ? 'on' : ''}`}>
                   {s.level ? `L${s.level}` : `#${s.seq}`} {s.status === 'solved' ? '✓' : s.status === 'active' ? '…' : s.status === 'stopped' ? '–' : '✗'}
                 </Link>
               ))}

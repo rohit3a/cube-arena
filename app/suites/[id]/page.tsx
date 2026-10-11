@@ -124,7 +124,7 @@ export default async function SuitePage(props: { params: Promise<{ id: string }>
                           {r.replay && (
                             <>
                               {' · '}
-                              <Link href={`/replay/${r.replay}`}>replay</Link>
+                              <Link prefetch={false} href={`/replay/${r.replay}`}>replay</Link>
                             </>
                           )}
                         </span>
