@@ -3,9 +3,10 @@
 // locked down to the cube tools, and post them to the Verified board with an
 // invite code. https://cube.krnl.studio/wanted
 //
-//   npx cube-arena-runner login AB12-CD34
-//   npx cube-arena-runner wanted
-//   npx cube-arena-runner play --model gemini-3-1-pro-preview --effort high
+//   npm install -g https://cube.krnl.studio/runner/cube-arena-runner-<version>.tgz
+//   cube-arena-runner login AB12-CD34
+//   cube-arena-runner wanted
+//   cube-arena-runner play --model gemini-3-1-pro-preview --effort high
 
 import { execFileSync } from 'node:child_process';
 import { chmodSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
@@ -16,7 +17,7 @@ import { parseArgs } from 'node:util';
 import { operator } from './agent.mjs';
 import { playSuite } from './play-suite.mjs';
 
-const VERSION = '0.1.0';
+const VERSION = '0.1.1';
 const DEFAULT_URL = 'https://cube.krnl.studio/mcp';
 const HOME = process.env.CUBE_ARENA_HOME || join(homedir(), '.cube-arena');
 const CONFIG = join(HOME, 'config.json');
@@ -45,7 +46,8 @@ play options:
   --no-transcript          don't upload the session logs (they help us check results)
 
 Your keys stay on your machine: the runner talks to the model provider directly,
-and only sends Cube Arena the moves, token counts and a text log of each session.`;
+and only sends Cube Arena the moves, token counts and a text log of each session.
+Install or update it from https://cube.krnl.studio/wanted.`;
 
 const fail = (msg) => {
   console.error(msg);
@@ -93,6 +95,11 @@ async function get(site, path, token, body) {
   const json = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(json.error ?? `${path}: ${res.status}`);
   return json;
+}
+
+/** Says so when the site has a newer runner than this one. */
+function newer(runner) {
+  if (runner?.version && runner.version !== VERSION) console.error(`cube-arena-runner ${runner.version} is out (this is ${VERSION}). Update with:\n  ${runner.install}\n`);
 }
 
 /** Sets the X handle shown on the contributors board ("" clears it). */
@@ -156,22 +163,23 @@ if (!command || command === 'help' || command === '--help' || command === '-h') 
     const { profile } = handle ? await setX(code, handle) : await get(site, '/api/me', code);
     console.log(`Once a suite finishes, you're on ${site}/contributors (your page: ${profile}).`);
   }
-  console.log('Next: npx cube-arena-runner wanted');
+  console.log('Next: cube-arena-runner wanted');
 } else if (command === 'logout') {
   if (existsSync(CONFIG)) rmSync(CONFIG);
   console.log('Forgot your invite code.');
 } else if (command === 'whoami') {
-  if (!token) fail('No invite code yet: npx cube-arena-runner login AB12-CD34');
+  if (!token) fail('No invite code yet: cube-arena-runner login AB12-CD34');
   const me = await get(site, '/api/me', token).catch((e) => fail(e.message));
   console.log(`${me.name} (${me.role}), names ${config.credit ? 'shown' : 'hidden'}${me.x_handle ? `, @${me.x_handle} on X` : ''}, ${site}`);
   if (me.profile && config.credit) console.log(`Your page: ${me.profile}`);
 } else if (command === 'profile') {
-  if (!token) fail('No invite code yet: npx cube-arena-runner login AB12-CD34');
+  if (!token) fail('No invite code yet: cube-arena-runner login AB12-CD34');
   const me = opt['no-x'] ? await setX(token, '') : opt.x ? await setX(token, opt.x) : await get(site, '/api/me', token).catch((e) => fail(e.message));
   if (!opt.x && !opt['no-x']) console.log(`${me.name}${me.x_handle ? ` (@${me.x_handle})` : ', no X handle yet (add one: profile --x yourhandle)'}`);
   if (me.profile) console.log(config.credit ? `Your page: ${me.profile}` : 'Your name is hidden on results, so you are not on the contributors board. To show it: login <code> --show-name');
 } else if (command === 'models') {
-  const { models } = await get(site, '/api/catalog');
+  const { models, runner } = await get(site, '/api/catalog');
+  newer(runner);
   for (const m of models.filter((x) => opt.all || x.wanted)) {
     console.log(`${m.id.padEnd(28)} ${m.name.padEnd(28)} ${m.maker.padEnd(18)} ${(m.efforts.join(' ') || '-').padEnd(30)} via ${Object.keys(m.via).join(', ')}`);
   }
@@ -191,12 +199,13 @@ if (!command || command === 'help' || command === '--help' || command === '-h') 
 }
 
 async function play() {
-  if (!token) fail('No invite code yet. Run: npx cube-arena-runner login AB12-CD34');
-  if (!opt.model) fail('--model is required. See: npx cube-arena-runner wanted');
+  if (!token) fail('No invite code yet. Run: cube-arena-runner login AB12-CD34');
+  if (!opt.model) fail('--model is required. See: cube-arena-runner wanted');
   if (!['fast', 'thorough'].includes(opt.suite)) fail('--suite must be fast or thorough');
-  const { models } = await get(site, '/api/catalog');
+  const { models, runner } = await get(site, '/api/catalog');
+  newer(runner);
   const model = models.find((m) => m.id === opt.model);
-  if (!model) fail(`"${opt.model}" isn't in the catalog. See: npx cube-arena-runner models`);
+  if (!model) fail(`"${opt.model}" isn't in the catalog. See: cube-arena-runner models`);
   const effort = opt.effort ?? null;
   if (model.efforts.length && !model.efforts.includes(effort)) fail(`${model.name} takes --effort ${model.efforts.join(', ')}`);
   if (!model.efforts.length && effort) fail(`${model.name} has no effort setting; leave out --effort`);
@@ -251,7 +260,7 @@ async function play() {
     // Someone else on it already? Then pick another row, unless --force.
     const { claims } = await get(site, '/api/claims', token);
     const held = claims.find((c) => c.model_id === model.id && (c.effort ?? null) === effort && c.kind === opt.suite && !c.mine);
-    if (held && !opt.force) fail(`${held.by ?? 'Someone'} claimed this one until ${new Date(held.expires_at).toLocaleString()}. Pick another (npx cube-arena-runner wanted), or add --force.`);
+    if (held && !opt.force) fail(`${held.by ?? 'Someone'} claimed this one until ${new Date(held.expires_at).toLocaleString()}. Pick another (cube-arena-runner wanted), or add --force.`);
     ({ suite, tests } = await call('/api/admin/suites', { kind: opt.suite, model_id: model.id, effort, harness, credit: !!config.credit }).catch((e) => fail(e.message)));
   }
 

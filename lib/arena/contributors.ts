@@ -36,6 +36,8 @@ export interface ContributorBoard {
   anonymous: number;
   /** Finished suites Cube Arena ran itself. */
   ours: number;
+  /** Suites contributors are playing right now: they join the board when one finishes. */
+  running: SuiteEntry[];
 }
 
 const testsPlayed = (e: SuiteEntry) => e.tests.filter((t) => t.played > 0).length;
@@ -95,6 +97,7 @@ export function buildBoard(entries: SuiteEntry[]): ContributorBoard {
     people: ranked,
     anonymous: done.filter((e) => !e.contributor && !e.run_by.includes('Cube Arena')).length,
     ours: done.filter((e) => e.run_by.includes('Cube Arena')).length,
+    running: entries.filter((e) => e.board === 'verified' && e.status === 'active' && e.contributor),
   };
 }
 

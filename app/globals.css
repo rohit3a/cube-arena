@@ -3708,3 +3708,19 @@ table.wanted td.cmd {
     padding: 0;
   }
 }
+
+.people-running {
+  display: block;
+  margin-top: 24px;
+  line-height: 1.7;
+}
+
+.people-running .person-name a:first-child {
+  font-weight: 700;
+}
+
+.people-running .live-dot {
+  display: inline-block;
+  margin-right: 4px;
+  vertical-align: 1px;
+}

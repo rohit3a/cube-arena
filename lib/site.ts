@@ -1,8 +1,14 @@
 import type { ConnectClient } from '@/components/ConnectTabs';
+import runnerPackage from '../runner/package.json';
 
 export const SITE_URL = (process.env.PUBLIC_BASE_URL || 'https://cube.krnl.studio').replace(/\/$/, '');
 export const MCP_URL = `${SITE_URL}/mcp`;
 export const GITHUB_URL = 'https://github.com/rohit3a/cube-arena';
+// The runner is served from this site (scripts/pack-runner.mjs), not npm's registry.
+export const RUNNER_VERSION = runnerPackage.version;
+export const RUNNER_URL = `${SITE_URL}/runner/cube-arena-runner-${RUNNER_VERSION}.tgz`;
+export const RUNNER_INSTALL = `npm install -g ${RUNNER_URL}`;
+
 export const X_HANDLE = 'rohit3a';
 export const X_URL = `https://x.com/${X_HANDLE}`;
 

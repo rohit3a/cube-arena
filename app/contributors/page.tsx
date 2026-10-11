@@ -13,11 +13,15 @@ export const metadata: Metadata = {
 const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
 
 export default async function Contributors() {
-  const { people, anonymous, ours } = await contributorBoard();
+  const { people, anonymous, ours, running } = await contributorBoard();
   const tests = people.reduce((a, p) => a + p.tests, 0);
   const suites = people.reduce((a, p) => a + p.suites.length, 0);
   const tokens = people.reduce((a, p) => a + p.tokens, 0);
   const firsts = people.reduce((a, p) => a + p.firsts, 0);
+  // Suites being played now, one entry per person.
+  const playing = [...Map.groupBy(running, (e) => e.contributor?.slug).values()].map(
+    (es) => [es[0].contributor as NonNullable<(typeof es)[0]['contributor']>, es] as const,
+  );
 
   return (
     <div className="wrap page-head">
@@ -46,12 +50,35 @@ export default async function Contributors() {
         </div>
       </div>
 
+      {playing.length > 0 && (
+        <p className="ix-running people-running">
+          <span className="live-dot" aria-hidden /> Playing now:{' '}
+          {playing.map(([who, suites], i) => (
+            <span key={who.slug}>
+              {i > 0 && '; '}
+              <PersonName {...who} /> with{' '}
+              {suites.map((e, j) => (
+                <span key={e.id}>
+                  {j > 0 && (j === suites.length - 1 ? ' and ' : ', ')}
+                  <Link href={`/suites/${e.id}`}>
+                    {e.label}, test {Math.max(1, e.progress.started)} of {e.progress.of}
+                  </Link>
+                </span>
+              ))}
+            </span>
+          ))}
+          . A suite counts here once it finishes.
+        </p>
+      )}
+
       {people.length === 0 ? (
         <section className="card ix-card">
-          <p className="chart-empty">
-            Nobody yet. The first invited tester to finish a suite with their name shown goes here. See <Link href="/wanted">Wanted</Link> for
-            what still needs running.
-          </p>
+          <div className="chart-empty">
+            <span>
+              Nobody has finished a suite yet. The first invited tester to finish one with their name shown goes here. See{' '}
+              <Link href="/wanted">Wanted</Link> for what still needs running.
+            </span>
+          </div>
         </section>
       ) : (
         <>

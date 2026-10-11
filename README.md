@@ -87,6 +87,7 @@ node --env-file=.env.local scripts/invite.mjs revoke <invite id> --hide
 node --env-file=.env.local scripts/invite.mjs x <invite id> priya_runs   # set (or "-" to clear) someone's X handle
 node --env-file=.env.local scripts/moderate.mjs transcript <run id>
 node scripts/build-catalog.mjs   # refresh data/catalog.json from data/aa-models.json and OpenRouter
+node scripts/pack-runner.mjs     # runs before every build: public/runner/cube-arena-runner-<version>.tgz, served for npm install -g
 ```
 
 ## How it works

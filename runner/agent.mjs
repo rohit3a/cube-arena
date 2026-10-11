@@ -142,7 +142,12 @@ function playCli(s) {
   const out = { runId: null, runOver: false, last: null, calls: 0, breach: null, stopReason: null, final: null, usage: {}, code: null, minutes: 0, events: [] };
   // The audit digest: what the model said and called, no pictures.
   const note = (kind, text, tool) => out.events.push({ t: Math.round((Date.now() - started) / 1000), kind, ...(tool && { tool }), text: String(text ?? '') });
+  // Claude Code's session totals come with its result event. Each assistant
+  // event carries its message's usage from before it streamed (output near
+  // zero, thinking not counted), so those only stand in when the runner
+  // stopped the session and no result came.
   const claudeUsage = new Map(); // message id → usage (stream-json repeats a message per content block)
+  let claudeTotal = null;
 
   function stop(reason) {
     if (out.stopReason) return;
@@ -203,6 +208,7 @@ function playCli(s) {
     if (ev.type === 'result') {
       out.final = String(ev.result ?? '');
       if (Number.isFinite(ev.total_cost_usd)) out.usage.cost_usd = ev.total_cost_usd;
+      if (ev.usage) claudeTotal = ev.usage;
     }
   }
 
@@ -278,12 +284,14 @@ function playCli(s) {
       out.minutes = (Date.now() - started) / 60_000;
       if (s.agent === 'claude') {
         // Input counted the way OpenAI does: everything read, cached reads included.
-        for (const u of claudeUsage.values()) {
+        for (const u of claudeTotal ? [claudeTotal] : claudeUsage.values()) {
           const read = (u.input_tokens ?? 0) + (u.cache_creation_input_tokens ?? 0) + (u.cache_read_input_tokens ?? 0);
           out.usage.input_tokens = (out.usage.input_tokens ?? 0) + read;
           out.usage.cached_input_tokens = (out.usage.cached_input_tokens ?? 0) + (u.cache_read_input_tokens ?? 0);
           out.usage.output_tokens = (out.usage.output_tokens ?? 0) + (u.output_tokens ?? 0);
         }
+        const thinking = claudeTotal?.output_tokens_details?.thinking_tokens;
+        if (Number.isFinite(thinking)) out.usage.reasoning_tokens = thinking;
       }
       resolve(out);
     });

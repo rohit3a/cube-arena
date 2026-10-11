@@ -8,3 +8,5 @@ next-env.d.ts
 .vercel
 coverage/
 runner/out/
+# Packed by scripts/pack-runner.mjs before each build
+public/runner/

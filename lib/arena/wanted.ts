@@ -22,7 +22,7 @@ export interface WantedRow {
 }
 
 export const commandFor = (id: string, effort: string | null, kind: SuiteKind) =>
-  `npx cube-arena-runner play --model ${id}${effort ? ` --effort ${effort}` : ''}${kind === 'thorough' ? ' --suite thorough' : ''}`;
+  `cube-arena-runner play --model ${id}${effort ? ` --effort ${effort}` : ''}${kind === 'thorough' ? ' --suite thorough' : ''}`;
 
 const key = (id: string, effort: string | null, kind: SuiteKind) => `${id}|${effort ?? ''}|${kind}`;
 

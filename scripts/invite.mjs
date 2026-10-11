@@ -40,7 +40,7 @@ async function api(body) {
 }
 
 const [command, arg, arg2] = positionals;
-const howTo = (code) => `\nSend them:\n  npx cube-arena-runner login ${code}\n  then pick something from ${opt.url}/wanted`;
+const howTo = (code) => `\nSend them:\n  their code, ${code}, and ${opt.url}/wanted (how to install the runner and what to run)`;
 
 if (command === 'create') {
   if (!arg) throw new Error('Who is it for? create "Name"');

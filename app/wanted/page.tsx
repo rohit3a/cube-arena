@@ -7,6 +7,7 @@ import { CLAIM_HOURS } from '@/lib/arena/claims';
 import { sweepExpired } from '@/lib/arena/service';
 import { SUITES } from '@/lib/arena/suites';
 import { THOROUGH_TOP, type WantedRow, wantedRows } from '@/lib/arena/wanted';
+import { RUNNER_INSTALL } from '@/lib/site';
 
 export const dynamic = 'force-dynamic';
 export const metadata: Metadata = {
@@ -35,7 +36,7 @@ export default async function Wanted() {
   const done = fast.filter((r) => r.runs > 0).length;
   const claimed = rows.filter((r) => r.claim).length;
   const models = new Set(fast.map((r) => r.model.id)).size;
-  const login = 'npx cube-arena-runner login AB12-CD34';
+  const setup = `${RUNNER_INSTALL}\ncube-arena-runner login AB12-CD34`;
 
   return (
     <div className="wrap page-head">
@@ -74,10 +75,11 @@ export default async function Wanted() {
         </header>
         <ol className="steps">
           <li>
-            <strong>Save your invite code</strong> (once, needs Node 20+). It asks whether to show your name next to your results.
+            <strong>Install the runner and save your invite code</strong> (once, needs Node 20+). Login asks whether to show your name next to
+            your results. The runner comes from this site, not npm&apos;s registry; it tells you when there&apos;s a newer one.
             <div className="codebox">
-              <pre>{login}</pre>
-              <CopyButton text={login} />
+              <pre>{setup}</pre>
+              <CopyButton text={setup} />
             </div>
           </li>
           <li>
@@ -89,7 +91,7 @@ export default async function Wanted() {
             <strong>That&apos;s it.</strong> The result shows up on <Link href="/benchmark">the Index</Link>. If two people run the same thing, the
             Index shows the average. The runner also uploads a text log of each session (no pictures) so we can check it. If you show your name,
             you go on the <Link href="/contributors">contributors board</Link>, with your X handle if you add one (
-            <code>npx cube-arena-runner profile --x yourhandle</code>).
+            <code>cube-arena-runner profile --x yourhandle</code>).
           </li>
         </ol>
         <p className="ix-foot">

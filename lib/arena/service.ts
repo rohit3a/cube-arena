@@ -257,10 +257,17 @@ async function endAttempt(tx: Tx, a: AttemptRow, status: AttemptRow['status'], d
   await tx`update cube_arena.attempts set status = ${status}, detail = ${detail}, finished_at = now() where id = ${a.id}`;
 }
 
+/** Why an attempt ran out: its own clock, or the run's (a suite test's) clock, which caps it. */
+function lateReason(run: RunRow, a: AttemptRow): string {
+  if (!run.deadline_at || a.deadline_at.getTime() < run.deadline_at.getTime()) return `no result within ${ATTEMPT_MINUTES[a.mode]} minutes`;
+  const minutes = Math.round((run.deadline_at.getTime() - run.created_at.getTime()) / 60_000);
+  return run.suite_id ? `the test's ${minutes} minutes ran out` : `the run's ${minutes} minutes ran out`;
+}
+
 /** Expired attempts end as timeouts, whoever touches them first. */
 async function expireIfLate(tx: Tx, run: RunRow, a: AttemptRow): Promise<boolean> {
   if (a.status !== 'active' || a.deadline_at.getTime() > Date.now()) return false;
-  await endAttempt(tx, a, 'timeout', `no result within ${ATTEMPT_MINUTES[a.mode]} minutes`);
+  await endAttempt(tx, a, 'timeout', lateReason(run, a));
   await tx`insert into cube_arena.events (attempt_id, kind, move_count) values (${a.id}, 'timeout', ${a.move_count})`;
   await advance(tx, run, a);
   return true;
@@ -315,7 +322,7 @@ async function checkRate(caller: Caller) {
 // Invite codes are for suites the runner sets up (names come from the model
 // catalog), not for one-off runs or suites a model starts itself.
 function noInvite(caller: Caller) {
-  if (caller.invite) throw new ArenaError('invite_suites_only', 'An invite code only plays suites set up by the Cube Arena runner (npx cube-arena-runner). Remove it to play on the Community board.');
+  if (caller.invite) throw new ArenaError('invite_suites_only', 'An invite code only plays suites set up by the Cube Arena runner (cube-arena-runner; see /wanted). Remove it to play on the Community board.');
 }
 
 export async function startRun(input: StartInput, caller: Caller): Promise<Reply> {
