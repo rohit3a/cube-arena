@@ -1,81 +1,131 @@
 #!/usr/bin/env node
-// Plays one Verified run per model, one after another, by calling run.mjs.
-// Models that already have a finished, visible Verified run on that board
-// (same name, effort, size, mode and challenge) are skipped, so a sweep can be
-// stopped and started again. Without --go it only prints the plan.
+// Plays a suite (Fast or Thorough) for many models at many efforts, by calling
+// suite.mjs. Claude and Codex models run in two lanes side by side, one suite
+// at a time in each. A model and effort that already has a finished, visible
+// Verified suite of the current version is skipped, and one left half played
+// is resumed, so a sweep can be stopped and started again. Without --go it
+// only prints the plan.
 //
-//   node --env-file=.env.local runner/sweep.mjs [--models claude-opus-5-5,gpt-6-astra] [--effort high] \
-//     [--size 3] [--mode interactive] [--challenge ladder] [--max-minutes 90] [--go]
+//   node --env-file=.env.local runner/sweep.mjs --suite fast [--models claude-opus-5-5,gpt-6-astra] [--efforts all] [--go]
+//   node --env-file=.env.local runner/sweep.mjs --suite thorough --top 5 [--go]
 //
-// Each run uses the subscription of the CLI it runs on (Claude Code or Codex).
-import { spawnSync } from 'node:child_process';
+// --efforts: all (every level the model takes, low to max), top (only its
+// highest), or a list like high,max. Fast defaults to all, Thorough to top.
+// --top N (Thorough): the N models with the best Verified Fast score.
+// Each suite uses the subscription of the CLI it runs on (Claude Code or Codex).
+import { spawn } from 'node:child_process';
 import { homedir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseArgs } from 'node:util';
-import { SWEEP_MODELS, agentFor, boardLabel, claudeName, codexModels, codexName, effortFor } from './models.mjs';
+import { operator } from './agent.mjs';
+import { SWEEP_MODELS, codexModels, effortsOf, resolveModel } from './models.mjs';
 
 const { values: opt } = parseArgs({
   options: {
+    suite: { type: 'string', default: 'fast' },
     models: { type: 'string' },
-    effort: { type: 'string', default: 'high' },
-    size: { type: 'string', default: '3' },
-    mode: { type: 'string', default: 'interactive' },
-    challenge: { type: 'string', default: 'ladder' },
+    efforts: { type: 'string' },
+    top: { type: 'string' },
     url: { type: 'string', default: 'https://cube.krnl.studio/mcp' },
-    'max-minutes': { type: 'string', default: '90' },
     'codex-home': { type: 'string', default: join(homedir(), '.codex-bench') },
     go: { type: 'boolean', default: false },
   },
 });
 
-const token = process.env.CUBE_OPERATOR_TOKEN;
-if (!token) {
-  console.error('CUBE_OPERATOR_TOKEN is not set (run with --env-file=.env.local)');
+const fail = (msg) => {
+  console.error(msg);
   process.exit(2);
+};
+const token = process.env.CUBE_OPERATOR_TOKEN;
+if (!token) fail('CUBE_OPERATOR_TOKEN is not set (run with --env-file=.env.local)');
+if (!['fast', 'thorough'].includes(opt.suite)) fail('--suite must be fast or thorough');
+
+const call = operator(opt.url, token);
+const { suites, versions } = await call('/api/admin/suites?limit=500');
+const current = (s) => s.board === 'verified' && !s.hidden && s.version === versions[s.kind];
+
+// Which models: a list, the top N on Fast, or everyone we know.
+let models = opt.models ? opt.models.split(',').map((m) => m.trim()) : SWEEP_MODELS;
+if (opt.top) {
+  const best = new Map();
+  for (const s of suites.filter((s) => current(s) && s.kind === 'fast' && s.status === 'finished' && s.model_id)) {
+    best.set(s.model_id, Math.max(best.get(s.model_id) ?? 0, s.grade?.score ?? 0));
+  }
+  models = [...best].sort((a, b) => b[1] - a[1]).slice(0, Number(opt.top)).map(([id]) => id);
+  if (models.length === 0) fail('No finished Verified Fast suites yet, so there is no top N. Run --suite fast first.');
 }
 
-const models = opt.models ? opt.models.split(',').map((m) => m.trim()) : SWEEP_MODELS;
-const listed = codexModels(opt['codex-home']);
-const labelOf = (m) => {
-  const name = agentFor(m) === 'claude' ? claudeName(m) : codexName(m, listed);
-  return name ? boardLabel(name, effortFor(m, opt.effort)) : null;
+const listing = codexModels(opt['codex-home']);
+const effortMode = opt.efforts ?? (opt.suite === 'fast' ? 'all' : 'top');
+const effortsFor = (model) => {
+  const takes = effortsOf(model, listing);
+  if (takes.length === 0) return [null];
+  if (effortMode === 'all') return takes;
+  if (effortMode === 'top') return [takes.at(-1)];
+  return effortMode.split(',').map((e) => e.trim()).filter((e) => takes.includes(e));
 };
 
-const site = opt.url.replace(/\/mcp\/?$/, '');
-const res = await fetch(`${site}/api/admin/runs?limit=500`, { headers: { Authorization: `Bearer ${token}` } });
-if (!res.ok) {
-  console.error(`could not list runs: ${res.status}`);
-  process.exit(1);
+const mine = suites.filter((s) => current(s) && s.kind === opt.suite);
+const plan = [];
+for (const model of models) {
+  for (const effort of effortsFor(model)) {
+    const m = resolveModel(model, effort ?? 'high', opt['codex-home']);
+    if (m.error) {
+      plan.push({ model, effort, label: null, state: m.error });
+      continue;
+    }
+    const same = mine.filter((s) => s.model_name === m.label);
+    const done = same.find((s) => s.status === 'finished');
+    const open = same.find((s) => s.status === 'active');
+    // A suite touched in the last 45 minutes (a test lasts at most 36) may still be playing elsewhere.
+    const busy = open && Date.now() - Date.parse(open.updated_at) < 45 * 60_000;
+    const state = done ? `done, ${done.grade?.score?.toFixed(1) ?? '?'}` : busy ? 'playing elsewhere, skipped' : open ? 'resume' : 'to play';
+    plan.push({ model, effort: m.effort, label: m.label, agent: m.agent, state, resume: !done && open ? open.id : null });
+  }
 }
-const { runs } = await res.json();
-const done = new Set(
-  runs
-    .filter(
-      (r) =>
-        r.board === 'verified' && r.status === 'finished' && !r.hidden && r.tool_use === 'model_only' &&
-        String(r.size) === opt.size && r.mode === opt.mode && r.challenge === opt.challenge,
-    )
-    .map((r) => r.model_name),
-);
 
-const plan = models.map((m) => ({ model: m, label: labelOf(m) }));
-for (const p of plan) {
-  const state = !p.label ? 'unknown id, skipped' : done.has(p.label) ? 'already played, skipped' : 'to play';
-  console.log(`${p.model.padEnd(18)} ${String(p.label ?? '-').padEnd(28)} ${state}`);
-}
-const todo = plan.filter((p) => p.label && !done.has(p.label));
-console.log(`\n${todo.length} run(s): ${opt.size}×${opt.size} ${opt.mode} ${opt.challenge}, effort ${opt.effort}, up to ${opt['max-minutes']} min each.`);
+for (const p of plan) console.log(`${p.model.padEnd(18)} ${String(p.label ?? '-').padEnd(30)} ${p.state}`);
+const todo = plan.filter((p) => p.label && (p.state === 'to play' || p.state === 'resume'));
+const lanes = { claude: todo.filter((p) => p.agent === 'claude'), codex: todo.filter((p) => p.agent === 'codex') };
+const hours = { fast: 0.75, thorough: 8 }[opt.suite];
+const longest = Math.max(lanes.claude.length, lanes.codex.length) * hours;
+console.log(`\n${todo.length} ${opt.suite} suite(s): ${lanes.claude.length} on Claude Code, ${lanes.codex.length} on Codex, side by side. Up to ${longest.toFixed(1)} h.`);
 if (!opt.go) {
   console.log('Plan only. Add --go to play.');
   process.exit(0);
 }
 
-const run = join(dirname(fileURLToPath(import.meta.url)), 'run.mjs');
-for (const [i, p] of todo.entries()) {
-  console.log(`\n=== ${i + 1}/${todo.length}: ${p.label} ===`);
-  const args = [run, '--model', p.model, '--effort', opt.effort, '--size', opt.size, '--mode', opt.mode, '--challenge', opt.challenge];
-  args.push('--url', opt.url, '--max-minutes', opt['max-minutes'], '--codex-home', opt['codex-home']);
-  const r = spawnSync(process.execPath, args, { stdio: 'inherit', env: process.env });
-  if (r.status === 3) console.log(`!!! ${p.label}: lockdown broken, run hidden; check the transcript`);
-}
+// One lane per CLI: suites in a lane run one after another.
+const script = join(dirname(fileURLToPath(import.meta.url)), 'suite.mjs');
+const playOne = (p) =>
+  new Promise((resolve) => {
+    const args = [script, '--model', p.model, '--suite', opt.suite, '--url', opt.url, '--codex-home', opt['codex-home']];
+    if (p.effort) args.push('--effort', p.effort);
+    if (p.resume) args.push('--resume', p.resume);
+    const child = spawn(process.execPath, args, { env: process.env, stdio: ['ignore', 'pipe', 'pipe'] });
+    const tag = `[${p.label}]`;
+    for (const stream of [child.stdout, child.stderr]) {
+      let buf = '';
+      stream.on('data', (d) => {
+        buf += d;
+        const lines = buf.split('\n');
+        buf = lines.pop();
+        for (const l of lines) console.log(`${tag} ${l}`);
+      });
+    }
+    child.on('close', (code) => resolve(code));
+  });
+
+const results = [];
+await Promise.all(
+  Object.values(lanes).map(async (lane) => {
+    for (const p of lane) {
+      const code = await playOne(p);
+      results.push({ label: p.label, code });
+      if (code === 3) console.log(`!!! ${p.label}: lockdown broken, suite hidden; check the transcript`);
+      else if (code !== 0) console.log(`!!! ${p.label}: suite.mjs exited ${code}`);
+    }
+  }),
+);
+console.log(`\nSweep done: ${results.filter((r) => r.code === 0).length} of ${results.length} suites played cleanly.`);

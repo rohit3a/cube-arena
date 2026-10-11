@@ -1,5 +1,5 @@
 // Operator-only suite API (Authorization: Bearer CUBE_OPERATOR_TOKEN), used by runner/suite.mjs.
-//   GET  /api/admin/suites?limit=50                 recent suites with their grades
+//   GET  /api/admin/suites?limit=50                 recent suites with their grades, and each kind's current version
 //   GET  /api/admin/suites?id=…                     one suite
 //   POST /api/admin/suites {kind, model_name, model, model_id, effort, agent}   create a Verified suite
 //   POST /api/admin/suites {id, finish: true}       close it (tests never played count 0)
@@ -24,7 +24,8 @@ export async function GET(req: Request) {
     return suite ? Response.json({ suite, tests: SUITES[suite.kind].slots }) : Response.json({ error: 'no such suite' }, { status: 404 });
   }
   const limit = Math.min(500, Math.max(1, Number(q.get('limit')) || 50));
-  return Response.json({ suites: await listSuites(limit) }, { headers: { 'Cache-Control': 'no-store' } });
+  const versions = Object.fromEntries(SUITE_KINDS.map((k) => [k, SUITES[k].version]));
+  return Response.json({ suites: await listSuites(limit), versions }, { headers: { 'Cache-Control': 'no-store' } });
 }
 
 export async function POST(req: Request) {
