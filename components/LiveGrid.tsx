@@ -17,19 +17,31 @@ export interface LiveCard {
 }
 
 /** In-progress attempts. Pictures only: the same images the models get. */
-export default function LiveGrid({ initial }: { initial: LiveCard[] }) {
+export default function LiveGrid({ initial, at }: { initial: LiveCard[]; at: number }) {
   const [items, setItems] = useState(initial);
   useEffect(() => {
+    // Only a list newer than the one on screen replaces it: a slow reply or
+    // the CDN's cached copy can be older. One request at a time, none while hidden.
+    let shown = at;
+    let busy = false;
     const t = setInterval(async () => {
+      if (busy || document.hidden) return;
+      busy = true;
       try {
         const r = await fetch('/api/live', { cache: 'no-store' });
-        if (r.ok) setItems((await r.json()).items);
+        const data = r.ok ? ((await r.json()) as { at: number; items: LiveCard[] }) : null;
+        if (data && data.at > shown) {
+          shown = data.at;
+          setItems(data.items);
+        }
       } catch {
         /* keep the last list */
+      } finally {
+        busy = false;
       }
     }, 5000);
     return () => clearInterval(t);
-  }, []);
+  }, [at]);
   if (items.length === 0) {
     return (
       <div className="idle">

@@ -187,7 +187,12 @@ async function recentFinishedQuery(limit = 12): Promise<FeedItem[]> {
     order by a.finished_at desc nulls last limit ${limit}`);
 }
 
-async function liveAttemptsQuery(limit = 24): Promise<FeedItem[]> {
+/**
+ * Cubes being solved now. Not cached here: unstable_cache hands out its stale
+ * copy while it refreshes, and copies of different ages made /live jump back
+ * to older states. The API's 3-second CDN cache keeps the load down.
+ */
+export async function liveAttempts(limit = 24): Promise<FeedItem[]> {
   return withDb((sql) => sql<FeedItem[]>`
     select a.id, a.status, a.size, a.mode, a.level, a.move_count, a.finished_at, a.created_at,
            r.model_name, r.display_name, r.board, r.tool_use, r.challenge
@@ -223,7 +228,6 @@ async function replayQuery(id: string): Promise<Replay | null> {
 export const allBoards = unstable_cache(allBoardsQuery, ['cube-arena', 'allBoards'], { revalidate: 20 });
 export const stats = unstable_cache(statsQuery, ['cube-arena', 'stats'], { revalidate: 20 });
 export const recentFinished = unstable_cache(recentFinishedQuery, ['cube-arena', 'recentFinished'], { revalidate: 10 });
-export const liveAttempts = unstable_cache(liveAttemptsQuery, ['cube-arena', 'liveAttempts'], { revalidate: 3 });
 
 /** Deduped per request (metadata and page both ask). Not cached across requests: live attempts change. */
 export const replay = cache(replayQuery);
