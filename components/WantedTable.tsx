@@ -42,7 +42,8 @@ export default function WantedTable({ items, empty }: { items: WantedItem[]; emp
           ))}
         </div>
         <label className={`toggle ${maker === 'all' ? '' : 'on'}`}>
-          <span>Maker</span>
+          <span className="toggle-key">Maker</span>
+          <span className="toggle-value">{maker === 'all' ? 'All' : maker}</span>
           <select aria-label="Maker" value={maker} onChange={(e) => setMaker(e.target.value)}>
             <option value="all">All</option>
             {makers.map((m) => (
@@ -63,21 +64,21 @@ export default function WantedTable({ items, empty }: { items: WantedItem[]; emp
                 <th>Model</th>
                 <th>Effort</th>
                 <th>Status</th>
-                <th>Reach it via</th>
+                <th className="w-via">Reach it via</th>
                 <th>Run it</th>
               </tr>
             </thead>
             <tbody>
               {rows.map((i) => (
                 <tr key={i.key}>
-                  <td>
+                  <td className="w-model">
                     <Link href={`/models/${i.model_id}`} className="model-link">
                       {i.name}
                     </Link>
                     <span className="muted"> · {i.maker}</span>
                   </td>
-                  <td>{i.effort ?? '–'}</td>
-                  <td>
+                  <td className="w-effort">{i.effort ?? <span className="faint">–</span>}</td>
+                  <td className="w-status">
                     {i.runs > 0 ? (
                       <span className="status done">
                         {i.runs} run{i.runs > 1 ? 's' : ''} · {fmtScore(i.mean)}
@@ -92,7 +93,7 @@ export default function WantedTable({ items, empty }: { items: WantedItem[]; emp
                     )}
                     {i.runs > 0 && i.claim && <span className="status claimed"> · running again</span>}
                   </td>
-                  <td className="muted">{i.via.join(', ')}</td>
+                  <td className="muted w-via">{i.via.join(', ')}</td>
                   <td className="cmd">
                     <span title={i.command}>
                       <CopyButton text={i.command} label="Copy" />

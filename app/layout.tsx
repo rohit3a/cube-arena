@@ -2,7 +2,6 @@ import type { Metadata, Viewport } from 'next';
 import { Bricolage_Grotesque, Inter, JetBrains_Mono } from 'next/font/google';
 import Link from 'next/link';
 import NavLinks from '@/components/NavLinks';
-import ThemeToggle from '@/components/ThemeToggle';
 import { GITHUB_URL, SITE_URL } from '@/lib/site';
 import './globals.css';
 
@@ -52,7 +51,6 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             </Link>
             <div className="nav-right">
               <NavLinks github={GITHUB_URL} />
-              <ThemeToggle />
             </div>
           </div>
         </header>

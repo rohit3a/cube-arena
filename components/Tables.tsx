@@ -44,16 +44,18 @@ export function LadderTable({ rows, maxLevel, compact = false }: { rows: LadderR
           <tr>
             <th className="rank">#</th>
             <th>Model</th>
-            <th className="num">Best level</th>
+            <th className="num">
+              <span className="wide-only">Best </span>level
+            </th>
             <th className="num" title="Moves the best run used to reach its best level, failed attempts included">
               Moves
             </th>
-            <th className="num" title="Time the best run took to reach its best level">
+            <th className="num opt" title="Time the best run took to reach its best level">
               Time
             </th>
-            <th className="num">Runs</th>
-            {!compact && <th>Last played</th>}
-            {!compact && <th>Replay</th>}
+            <th className="num opt opt-md">Runs</th>
+            {!compact && <th className="opt opt-md">Last played</th>}
+            {!compact && <th className="opt">Replay</th>}
           </tr>
         </thead>
         <tbody>
@@ -67,6 +69,11 @@ export function LadderTable({ rows, maxLevel, compact = false }: { rows: LadderR
                 <span>
                   {r.display_name} · via {r.via} <BoardBadge board={r.board} />
                 </span>
+                {r.best_attempt && (
+                  <Link href={`/replay/${r.best_attempt}`} className="cell-replay">
+                    Best solve →
+                  </Link>
+                )}
               </td>
               <td className="num">
                 <strong>{r.best}</strong>
@@ -74,14 +81,14 @@ export function LadderTable({ rows, maxLevel, compact = false }: { rows: LadderR
                 <TileBar value={r.best} max={maxLevel} />
               </td>
               <td className="num">{r.moves ?? '–'}</td>
-              <td className="num">{duration(r.secs)}</td>
-              <td className="num">{r.runs}</td>
+              <td className="num opt">{duration(r.secs)}</td>
+              <td className="num opt opt-md">{r.runs}</td>
               {!compact && (
-                <td className="faint" suppressHydrationWarning>
+                <td className="faint opt opt-md" suppressHydrationWarning>
                   {ago(r.last)}
                 </td>
               )}
-              {!compact && <td>{r.best_attempt ? <Link href={`/replay/${r.best_attempt}`}>best solve →</Link> : <span className="faint">–</span>}</td>}
+              {!compact && <td className="opt">{r.best_attempt ? <Link href={`/replay/${r.best_attempt}`}>best solve →</Link> : <span className="faint">–</span>}</td>}
             </tr>
           ))}
         </tbody>
@@ -98,12 +105,16 @@ export function ScrambleTable({ rows }: { rows: ScrambleRow[] }) {
           <tr>
             <th className="rank">#</th>
             <th>Model</th>
-            <th className="num">Solved</th>
-            <th className="num">Solve rate</th>
-            <th className="num">Median moves</th>
-            <th className="num">Median time</th>
-            <th>Last played</th>
-            <th>Replay</th>
+            <th className="num opt opt-md">Solved</th>
+            <th className="num">
+              Solve<span className="wide-only"> rate</span>
+            </th>
+            <th className="num" title="Median moves">
+              <span className="wide-only">Median </span>moves
+            </th>
+            <th className="num opt">Median time</th>
+            <th className="opt opt-md">Last played</th>
+            <th className="opt">Replay</th>
           </tr>
         </thead>
         <tbody>
@@ -117,19 +128,24 @@ export function ScrambleTable({ rows }: { rows: ScrambleRow[] }) {
                 <span>
                   {r.display_name} · via {r.via} <BoardBadge board={r.board} />
                 </span>
+                {r.best_attempt && (
+                  <Link href={`/replay/${r.best_attempt}`} className="cell-replay">
+                    Best solve →
+                  </Link>
+                )}
               </td>
-              <td className="num">
+              <td className="num opt opt-md">
                 {r.solved} / {r.runs}
               </td>
               <td className="num">
                 <strong>{Math.round((100 * r.solved) / r.runs)}%</strong>
               </td>
               <td className="num">{r.median_moves === null ? '–' : Math.round(r.median_moves)}</td>
-              <td className="num">{duration(r.median_secs)}</td>
-              <td className="faint" suppressHydrationWarning>
+              <td className="num opt">{duration(r.median_secs)}</td>
+              <td className="faint opt opt-md" suppressHydrationWarning>
                 {ago(r.last)}
               </td>
-              <td>{r.best_attempt ? <Link href={`/replay/${r.best_attempt}`}>best solve →</Link> : <span className="faint">–</span>}</td>
+              <td className="opt">{r.best_attempt ? <Link href={`/replay/${r.best_attempt}`}>best solve →</Link> : <span className="faint">–</span>}</td>
             </tr>
           ))}
         </tbody>
