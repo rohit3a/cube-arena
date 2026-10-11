@@ -17,7 +17,7 @@ import { parseArgs } from 'node:util';
 import { operator } from './agent.mjs';
 import { playSuite } from './play-suite.mjs';
 
-const VERSION = '0.2.0';
+const VERSION = '0.2.1';
 const DEFAULT_URL = 'https://cube.krnl.studio/mcp';
 const HOME = process.env.CUBE_ARENA_HOME || join(homedir(), '.cube-arena');
 const CONFIG = join(HOME, 'config.json');
@@ -25,8 +25,8 @@ const VIA = ['claude-code', 'codex', 'openrouter', 'api'];
 
 const HELP = `cube-arena-runner ${VERSION}: run Cube Arena Index suites for the Verified board.
 
-  login <code> [--show-name | --hide-name]   save your invite code (once)
-  profile [--x <handle> | --no-x]             your X handle on the contributors board
+  login <code> [--show-name | --hide-name] [--name <name>]   save your invite code (once)
+  profile [--name <name>] [--x <handle> | --no-x]            your name and X handle on the boards
   whoami                                      who your code belongs to
   wanted [--suite thorough] [--all]           what still needs running
   models                                      every model the runner knows
@@ -109,6 +109,16 @@ async function setX(code, handle) {
   return me;
 }
 
+/** Sets the name shown next to your results. */
+async function setName(code, name) {
+  const me = await get(site, '/api/me', code, { name }).catch((e) => fail(e.message));
+  console.log(`Name set to ${me.name}.`);
+  return me;
+}
+
+/** An invite made without a name starts as this; login asks for a real one. */
+const UNNAMED = 'Invitee';
+
 const [command, ...rest] = process.argv.slice(2);
 const { values: opt, positionals } = parseArgs({
   args: rest,
@@ -127,6 +137,7 @@ const { values: opt, positionals } = parseArgs({
     'no-transcript': { type: 'boolean', default: false },
     'show-name': { type: 'boolean' },
     'hide-name': { type: 'boolean' },
+    name: { type: 'string' },
     x: { type: 'string' },
     'no-x': { type: 'boolean', default: false },
     all: { type: 'boolean', default: false },
@@ -154,7 +165,16 @@ if (!command || command === 'help' || command === '--help' || command === '-h') 
     fail(`That code didn't work: ${e.message}`);
   }
   let credit = opt['show-name'] ? true : opt['hide-name'] ? false : null;
-  if (credit === null) credit = /^y/i.test(await ask(`Hi ${me.name}! Show your name next to your results on the boards? [y/N] `));
+  const hi = me.name === UNNAMED ? 'Hi!' : `Hi ${me.name}!`;
+  if (credit === null) credit = /^y/i.test(await ask(`${hi} Show your name next to your results on the boards? [y/N] `));
+  if (credit) {
+    let name = opt.name;
+    while (!name) {
+      name = (await ask(me.name === UNNAMED ? 'Your name for the boards: ' : `Your name for the boards (Enter for ${me.name}): `)).trim();
+      if (!name && me.name !== UNNAMED) name = me.name;
+    }
+    if (name !== me.name) ({ name: me.name } = await setName(code, name));
+  }
   writeConfig({ ...config, invite: code, credit, url: opt.url ?? config.url });
   console.log(`Saved to ${CONFIG}. Your results will show ${credit ? `"run by ${me.name}"` : '"run by an invited tester"'}.`);
   if (credit) {
@@ -173,8 +193,9 @@ if (!command || command === 'help' || command === '--help' || command === '-h') 
   if (me.profile && config.credit) console.log(`Your page: ${me.profile}`);
 } else if (command === 'profile') {
   if (!token) fail('No invite code yet: cube-arena-runner login AB12-CD34');
+  if (opt.name) await setName(token, opt.name);
   const me = opt['no-x'] ? await setX(token, '') : opt.x ? await setX(token, opt.x) : await get(site, '/api/me', token).catch((e) => fail(e.message));
-  if (!opt.x && !opt['no-x']) console.log(`${me.name}${me.x_handle ? ` (@${me.x_handle})` : ', no X handle yet (add one: profile --x yourhandle)'}`);
+  if (!opt.x && !opt['no-x'] && !opt.name) console.log(`${me.name}${me.x_handle ? ` (@${me.x_handle})` : ', no X handle yet (add one: profile --x yourhandle)'}`);
   if (me.profile) console.log(config.credit ? `Your page: ${me.profile}` : 'Your name is hidden on results, so you are not on the contributors board. To show it: login <code> --show-name');
 } else if (command === 'models') {
   const { models, runner } = await get(site, '/api/catalog');

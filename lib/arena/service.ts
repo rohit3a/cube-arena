@@ -59,7 +59,7 @@ export const hashIp = (ip: string | null) =>
 
 const BLOCKED = /(fuck|shit|cunt|nigg|fag|rape|hitler|nazi|whore|slut|bitch|dick|cock|pussy|kkk|porn)/;
 
-function cleanName(raw: unknown, min: number, max: number, what: string): string {
+export function cleanName(raw: unknown, min: number, max: number, what: string): string {
   const v = String(raw ?? '').replace(/\s+/g, ' ').trim();
   if (v.length < min || v.length > max) throw new ArenaError('bad_name', `${what} must be ${min} to ${max} characters.`);
   if (!/^[\p{L}\p{N} ._:/()@+#-]+$/u.test(v)) throw new ArenaError('bad_name', `${what} may use letters, numbers, spaces and . _ : / ( ) @ + # - only.`);

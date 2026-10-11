@@ -52,6 +52,16 @@ export function normalizeHandle(input: string): string | null {
 }
 
 /** Sets or clears an invite's X handle. False if another invite already has it. */
+/** The name an invite starts with when nobody named it: the runner asks the invitee for theirs at login. */
+export const UNNAMED = 'Invitee';
+
+/** Names an invitee may not take, so nobody passes for the operator. */
+export const RESERVED_NAMES = /^(cube arena|krnl( studio)?|invitee|(an )?invited tester)$/i;
+
+export async function setName(inviteId: string, name: string): Promise<void> {
+  await withDb((sql) => sql`update cube_arena.invites set name = ${name} where id = ${inviteId}`);
+}
+
 export async function setHandle(inviteId: string, handle: string | null): Promise<boolean> {
   try {
     await withDb((sql) => sql`update cube_arena.invites set x_handle = ${handle} where id = ${inviteId}`);

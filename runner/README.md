@@ -5,7 +5,7 @@ board. Cube Arena asks a model to solve a scrambled cube it can only see as a pi
 results; without one, any MCP client can still play on the Community board.
 
 ```bash
-npm install -g https://cube.krnl.studio/runner/cube-arena-runner-0.2.0.tgz   # once (Node 20+); the current link is on /wanted
+npm install -g https://cube.krnl.studio/runner/cube-arena-runner-0.2.1.tgz   # once (Node 20+); the current link is on /wanted
 cube-arena-runner login AB12-CD34          # once; asks whether to show your name on your results
 cube-arena-runner profile --x yourhandle   # optional: link your X profile from the contributors board
 cube-arena-runner wanted                   # what still needs running

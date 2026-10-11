@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 // Invite codes for people who run suites for the Verified board.
 //
-//   node --env-file=.env.local scripts/invite.mjs create "Priya" [--note "has OpenRouter credits"] [--expires 2026-12-31]
+//   node --env-file=.env.local scripts/invite.mjs create ["Priya"] [--note "has OpenRouter credits"] [--expires 2026-12-31]
+//     Without a name, the invitee picks theirs at login (and can change it with profile --name).
 //   node --env-file=.env.local scripts/invite.mjs list
 //   node --env-file=.env.local scripts/invite.mjs rotate <invite id>          a new code; the old one stops working
 //   node --env-file=.env.local scripts/invite.mjs revoke <invite id> [--hide] stop the code; --hide also hides all it ran
@@ -43,8 +44,7 @@ const [command, arg, arg2] = positionals;
 const howTo = (code) => `\nSend them:\n  their code, ${code}, and ${opt.url}/wanted (how to install the runner and what to run)`;
 
 if (command === 'create') {
-  if (!arg) throw new Error('Who is it for? create "Name"');
-  const { invite, code } = await api({ name: arg, note: opt.note, expires_at: opt.expires });
+  const { invite, code } = await api({ name: arg ?? 'Invitee', note: opt.note, expires_at: opt.expires });
   console.log(`${invite.name}: ${code}  (invite ${invite.id}${invite.expires_at ? `, expires ${invite.expires_at.slice(0, 10)}` : ''})`);
   console.log(howTo(code));
 } else if (command === 'list') {
