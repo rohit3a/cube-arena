@@ -259,7 +259,8 @@ async function endAttempt(tx: Tx, a: AttemptRow, status: AttemptRow['status'], d
 
 /** Why an attempt ran out: its own clock, or the run's (a suite test's) clock, which caps it. */
 function lateReason(run: RunRow, a: AttemptRow): string {
-  if (!run.deadline_at || a.deadline_at.getTime() < run.deadline_at.getTime()) return `no result within ${ATTEMPT_MINUTES[a.mode]} minutes`;
+  // A capped attempt's deadline is the run's, give or take the microseconds lost on the way through JavaScript.
+  if (!run.deadline_at || a.deadline_at.getTime() < run.deadline_at.getTime() - 1000) return `no result within ${ATTEMPT_MINUTES[a.mode]} minutes`;
   const minutes = Math.round((run.deadline_at.getTime() - run.created_at.getTime()) / 60_000);
   return run.suite_id ? `the test's ${minutes} minutes ran out` : `the run's ${minutes} minutes ran out`;
 }
