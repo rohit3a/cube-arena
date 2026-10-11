@@ -75,7 +75,7 @@ export default async function Contributors() {
         <section className="card ix-card">
           <div className="chart-empty">
             <span>
-              Nobody has finished a suite yet. The first invited tester to finish one with their name shown goes here. See{' '}
+              Nobody has finished a suite yet. The first invited tester to finish one with their name shown goes here. <Link href="/apply">Apply for an invite</Link>, or see{' '}
               <Link href="/wanted">Wanted</Link> for what still needs running.
             </span>
           </div>
@@ -146,7 +146,8 @@ export default async function Contributors() {
             <p className="ix-foot">
               {anonymous > 0 && `Plus ${plural(anonymous, 'suite')} from invited testers who chose not to show their name. `}
               {ours > 0 && `Cube Arena ran ${plural(ours, 'suite')} itself. `}
-              Invites are handed out by hand; see <Link href="/wanted">Wanted</Link> for how a run works and what still needs doing.
+              Want to be on it? <Link href="/apply">Apply for an invite</Link>; see <Link href="/wanted">Wanted</Link> for how a run works and what
+              still needs doing.
             </p>
           </section>
         </>

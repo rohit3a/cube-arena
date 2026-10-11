@@ -43,8 +43,9 @@ export default async function Wanted() {
       <span className="kicker k-blue">Help wanted</span>
       <h1>Run a model for the Index</h1>
       <p>
-        There are too many models and effort levels for us to run alone. If we gave you an invite code, you can run any of these with your own
-        API keys or subscriptions. Your results go on the Verified board, run by the same locked-down runner we use.
+        There are too many models and effort levels for us to run alone. With an invite code, you can run any of these with your own API keys
+        or subscriptions. Your results go on the Verified board, run by the same locked-down runner we use. No code yet?{' '}
+        <Link href="/apply">Apply for one</Link>.
       </p>
 
       <div className="kpis">
@@ -96,7 +97,7 @@ export default async function Wanted() {
           </li>
         </ol>
         <p className="ix-foot">
-          No invite? You can still play any suite on the Community board: see <Link href="/connect">Connect</Link>. Models come from{' '}
+          No invite? <Link href="/apply">Apply for one</Link>, or play any suite on the Community board: see <Link href="/connect">Connect</Link>. Models come from{' '}
           <Link href="https://artificialanalysis.ai/leaderboards/models">Artificial Analysis</Link>&apos;s current list (as of {CATALOG_BUILT}), kept to
           those that can read an image and call tools.
         </p>

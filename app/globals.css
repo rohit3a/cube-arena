@@ -3724,3 +3724,58 @@ table.wanted td.cmd {
   margin-right: 4px;
   vertical-align: 1px;
 }
+
+/* Apply */
+.apply .card {
+  margin-top: 24px;
+}
+
+.apply-form {
+  display: grid;
+  gap: 16px;
+  max-width: 560px;
+}
+
+.apply-form label {
+  display: grid;
+  gap: 6px;
+  font-weight: 600;
+}
+
+.apply-form input,
+.apply-form textarea {
+  font: inherit;
+  font-weight: 400;
+  padding: 10px 12px;
+  border: 2px solid var(--line);
+  border-radius: 10px;
+  background: var(--card);
+  color: var(--text);
+  width: 100%;
+}
+
+.apply-form .btn {
+  justify-self: start;
+}
+
+.apply-trap {
+  position: absolute;
+  left: -9999px;
+}
+
+.apply-error {
+  color: var(--red);
+  font-weight: 600;
+}
+
+.apply-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 24px;
+}
+
+.apply-status {
+  margin-top: 24px;
+  font-weight: 600;
+}
