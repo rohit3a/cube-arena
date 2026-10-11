@@ -2,6 +2,7 @@
 // transcripts), plus the few calls an invitee's runner may make on its own
 // suites. Reached through app/api/admin/*.
 
+import { catalogModel, listCost } from './catalog';
 import { clientLabel } from './clients';
 import { type SuiteRow, type Usage, UUID, transaction, withDb } from './db';
 import { formatCode, hashCode, newCode } from './invites';
@@ -80,11 +81,23 @@ export async function setHidden(id: string, hidden: boolean, reason: string | nu
   return { ...r, via: clientLabel(client) };
 }
 
-/** Records the tokens and cost the runner measured for a run. */
+/**
+ * Records the tokens and cost the runner measured for a run. Without a cost
+ * (Codex counts only tokens), it is worked out from the suite model's list price.
+ */
 export async function setUsage(id: string, usage: Usage): Promise<boolean> {
   if (!UUID.test(id)) return false;
-  const rows = await withDb((sql) => sql`update cube_arena.runs set usage = ${sql.json(usage as Record<string, number>)} where id = ${id} returning id`);
-  return rows.length > 0;
+  return withDb(async (sql) => {
+    let u = usage;
+    if (u.cost_usd === undefined) {
+      const [s] = await sql<{ model_id: string | null }[]>`
+        select s.model_id from cube_arena.runs r join cube_arena.suites s on s.id = r.suite_id where r.id = ${id}`;
+      const cost = s?.model_id ? listCost(catalogModel(s.model_id), u) : null;
+      if (cost !== null) u = { ...u, cost_usd: cost };
+    }
+    const rows = await sql`update cube_arena.runs set usage = ${sql.json(u as Record<string, number>)} where id = ${id} returning id`;
+    return rows.length > 0;
+  });
 }
 
 export interface AdminSuite extends SuiteRow {

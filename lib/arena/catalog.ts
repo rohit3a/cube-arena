@@ -30,6 +30,18 @@ export const CATALOG_BUILT = data.built;
 const byId = new Map(CATALOG.map((m) => [m.id, m]));
 export const catalogModel = (id: string) => byId.get(id) ?? null;
 
+/**
+ * What tokens cost at the model's list price, for harnesses that count tokens
+ * but not dollars (Codex). input_tokens includes the cached ones, as Codex
+ * counts them. Null when the price or the counts are missing.
+ */
+export function listCost(m: CatalogModel | null, u: { input_tokens?: number; cached_input_tokens?: number; output_tokens?: number }): number | null {
+  const p = m?.price;
+  if (p?.input == null || p.output == null || u.input_tokens === undefined || u.output_tokens === undefined) return null;
+  const cached = Math.min(u.cached_input_tokens ?? 0, u.input_tokens);
+  return ((u.input_tokens - cached) * p.input + cached * (p.cached ?? p.input) + u.output_tokens * p.output) / 1e6;
+}
+
 /** "Claude Opus 5.5 (max)", or just the name for a model with no effort setting. */
 export const labelOf = (m: CatalogModel, effort: string | null) => (effort ? `${m.name} (${effort})` : m.name);
 

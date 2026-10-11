@@ -131,7 +131,10 @@ export interface Usage {
   cached_input_tokens?: number;
   output_tokens?: number;
   reasoning_tokens?: number;
-  /** As reported by the agent CLI (Claude Code reports an API-equivalent cost). */
+  /**
+   * API-equivalent cost: as Claude Code or OpenRouter report it, or, where the
+   * harness counts only tokens (Codex), worked out from the model's list price.
+   */
   cost_usd?: number;
 }
 

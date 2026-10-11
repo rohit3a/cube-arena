@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { agentFor, boardLabel, claudeName, codexName, effortsOf, resolveModel } from '../runner/models.mjs';
+import { catalogModel, listCost } from '../lib/arena/catalog';
 
 const listed = [
   { slug: 'gpt-6-astra', display_name: 'GPT-6-Astra' },
@@ -45,5 +46,21 @@ describe('Verified board names', () => {
     expect(resolveModel('claude-opus-5', 'max', '/nowhere').label).toBe('Claude Opus 5 (max)');
     expect(agentFor('gpt-6-luna')).toBe('codex');
     expect(agentFor('claude-opus-5')).toBe('claude');
+  });
+});
+
+describe('listCost', () => {
+  const astra = catalogModel('gpt-6-astra');
+
+  it('prices uncached input, cached input and output separately', () => {
+    // GPT-6-Astra's 2×2 ladder: $10 in, $1 cached, $50 out per million.
+    const cost = listCost(astra, { input_tokens: 887_473, cached_input_tokens: 804_096, output_tokens: 41_008 });
+    expect(cost).toBeCloseTo((83_377 * 10 + 804_096 * 1 + 41_008 * 50) / 1e6, 9);
+  });
+
+  it('gives nothing without a price or token counts', () => {
+    expect(listCost(null, { input_tokens: 1, output_tokens: 1 })).toBeNull();
+    expect(listCost(astra, { input_tokens: 1 })).toBeNull();
+    expect(listCost(catalogModel('gpt-reserve'), { input_tokens: 1, output_tokens: 1 })).toBeNull();
   });
 });
