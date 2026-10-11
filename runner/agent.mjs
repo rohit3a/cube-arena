@@ -56,7 +56,10 @@ function claudeCommand(s, work) {
   if (s.effort) args.push('--effort', s.effort);
   args.push('--strict-mcp-config', '--mcp-config', config, '--allowedTools', 'mcp__cube-arena');
   args.push('--output-format', 'stream-json', '--verbose', '--no-session-persistence', '--setting-sources', 'local');
-  return { cmd: 'claude', args, env: process.env };
+  // Claude Code caps one reply below some models' own maximum (64k for Opus 5.5,
+  // which can write 128k). Asking for more than any model allows gets each model
+  // its own maximum: Claude Code lowers the value to the model's limit.
+  return { cmd: 'claude', args, env: { ...process.env, CLAUDE_CODE_MAX_OUTPUT_TOKENS: String(MAX_OUTPUT_TOKENS) } };
 }
 
 // Everything Codex could use besides the cube server, switched off. With
@@ -92,6 +95,8 @@ function codexCommand(s, work) {
 // Transcripts keep everything but the pictures, which the site can redraw.
 /** The model name on messages Claude Code writes itself: API errors, usage limits. */
 const SYNTHETIC = '<synthetic>';
+/** More than any Claude model's output limit, so each gets its own. */
+const MAX_OUTPUT_TOKENS = 1_000_000;
 /** Claude Code's notice that one reply ran past the model's output token maximum. */
 const OUTPUT_CAP = /exceeded the \d+ output token maximum/i;
 
