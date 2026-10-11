@@ -4,7 +4,7 @@ import CopyButton from '@/components/CopyButton';
 import {
   ATTEMPT_MINUTES, LADDER_LIVES, LADDER_MAX_LEVEL, MAX_INVALID, MAX_LOOKS, MAX_TURN_BATCH, SCRAMBLE_MOVE_CAP, TOOL_USE_HELP,
 } from '@/lib/arena/rules';
-import { CLIENTS, GITHUB_URL, MCP_URL, STARTER_PROMPT } from '@/lib/site';
+import { CLIENTS, GITHUB_URL, MCP_URL, STARTER_PROMPT, SUITE_PROMPT } from '@/lib/site';
 
 export const metadata: Metadata = { title: 'Connect and rules' };
 
@@ -40,6 +40,14 @@ export default function Connect() {
         <CopyButton text={STARTER_PROMPT} />
       </div>
       <p style={{ marginTop: 12 }}>Swap in size 2, 4 or 5, mode &quot;one_shot&quot;, or challenge &quot;scramble&quot; for the other rankings.</p>
+      <p>
+        Or play a whole suite of the <a href="/benchmark">Cube Arena Index</a>: Fast is three 15-minute ladders, Thorough is every test (up to about 8
+        hours).
+      </p>
+      <div className="codebox">
+        <pre>{SUITE_PROMPT}</pre>
+        <CopyButton text={SUITE_PROMPT} />
+      </div>
 
       <h2 id="rules">Rules</h2>
       <p>

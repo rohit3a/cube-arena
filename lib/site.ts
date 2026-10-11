@@ -6,6 +6,8 @@ export const GITHUB_URL = 'https://github.com/rohit3a/cube-arena';
 
 export const STARTER_PROMPT = `Let's play Cube Arena. First call get_rules. Then call start_run with size 3, mode "interactive", challenge "ladder", display_name "<your name>", model_name "<your exact model and variant, e.g. GPT-6-Astra or Claude Opus 5.5>", and tool_use "model_only". Solve each cube from the pictures only: don't write or run any code. Keep climbing until the run ends, then tell me your best level.`;
 
+export const SUITE_PROMPT = `Let's play the Cube Arena Fast suite. First call get_rules. Then call start_suite with suite "fast", display_name "<your name>" and model_name "<your exact model and variant>". It starts test 1 of 3; when a test ends, call next_test with the suite_id until the suite is over. Solve each cube from the pictures only: don't write or run any code. Then tell me your index score.`;
+
 export const CLIENTS: ConnectClient[] = [
   {
     id: 'claude',

@@ -49,6 +49,22 @@ layers `M E S` on odd cubes, and free whole-cube rotations `x y z`.
 
 Every entry also shows **via**: the app that connected, from what our server saw, not from the model.
 
+### The Cube Arena Index
+
+[cube.krnl.studio/benchmark](https://cube.krnl.studio/benchmark) ranks models on two fixed suites of tests, played on the Verified board
+at every effort level a model offers:
+
+- **Fast** (45 minutes at most): 2×2 and 3×3 ladders, interactive, and a 3×3 ladder, one-shot. 15 minutes each.
+- **Thorough** (up to about 8 hours): every model-only test, 2×2 to 5×5, ladder and full scramble, interactive and one-shot. Ladders get
+  30 minutes; each full scramble is two cubes of 15 minutes. It goes to the strongest models from Fast.
+
+Each test scores 0 to 100: a ladder by how far up it climbed (level 7 of 20 is 35), a full scramble 100 for a solve. Up to 20% of each is
+for few moves. The index is the mean of the tests, and a test that was never played counts 0. Every model gets the same cubes, fixed per
+suite version from a secret only the server knows. Time is not scored directly; it counts through each test's budget. The page also
+plots score against moves, time and cost, and each model has a page with every effort it was run at.
+
+Anyone can play a suite with the `start_suite` and `next_test` tools; those results stay on the Community board.
+
 ## How it works
 
 | Part | Where |
@@ -58,7 +74,8 @@ Every entry also shows **via**: the app that connected, from what our server saw
 | The picture models see: unfolded net, two 3D corner views, legend (SVG → PNG) | [`lib/render`](lib/render) |
 | Game rules and state, all in Postgres transactions | [`lib/arena`](lib/arena) |
 | MCP server (stateless Streamable HTTP) | [`app/mcp/route.ts`](app/mcp/route.ts), [`lib/arena/mcp.ts`](lib/arena/mcp.ts) |
-| Website: leaderboards, live view, 3D replays | [`app`](app), [`components`](components) |
+| Suites and their grading | [`lib/arena/suites.ts`](lib/arena/suites.ts) |
+| Website: index, leaderboards, live view, 3D replays | [`app`](app), [`components`](components) |
 
 Built with Next.js, the MCP TypeScript SDK, react-three-fiber and Postgres (Supabase).
 
@@ -78,10 +95,14 @@ Checks: `npm run typecheck`, `npm run lint`, `npm test`. `scripts/smoke.mjs` pla
 ### Verified runs
 
 ```bash
-node --env-file=.env.local runner/run.mjs --model claude-opus-5-5 --effort high --size 3 --mode interactive
-node --env-file=.env.local runner/run.mjs --model gpt-6-astra --effort xhigh
-node --env-file=.env.local runner/sweep.mjs            # every model in runner/models.mjs; prints the plan, add --go to play
+node --env-file=.env.local runner/suite.mjs --model gpt-6-luna --effort max --suite fast    # one suite, a fresh session per test
+node --env-file=.env.local runner/sweep.mjs --suite fast                # every model × effort in runner/models.mjs; add --go to play
+node --env-file=.env.local runner/sweep.mjs --suite thorough --top 5    # Thorough for the 5 best on Fast, at their top effort
+node --env-file=.env.local runner/run.mjs --model claude-opus-5-5 --effort high --size 3 --mode interactive   # a single run
 ```
+
+The sweep plays Claude and Codex models side by side, one suite at a time each, skips suites already finished and resumes half-played
+ones. Claude models only get the efforts they support (Opus 4.5: low to high; Sonnet 4.5 and Haiku 4.5: none).
 
 Codex runs use their own `CODEX_HOME` (`~/.codex-bench`, signed in once with `CODEX_HOME=~/.codex-bench codex login --device-auth`).
 If anything other than the cube tools shows up, the run is stopped and hidden. Transcripts are saved to `runner/out/`.
@@ -94,7 +115,8 @@ node --env-file=.env.local scripts/moderate.mjs hide <run or attempt id, or repl
 node --env-file=.env.local scripts/moderate.mjs rename <id> "GPT-6-Astra"
 ```
 
-Hidden runs leave every public page but stay in the database (`unhide` brings them back).
+Hidden runs leave every public page but stay in the database (`unhide` brings them back). Hiding a suite, or any run in it, hides the
+whole suite.
 
 ## License
 
