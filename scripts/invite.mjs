@@ -5,6 +5,7 @@
 //   node --env-file=.env.local scripts/invite.mjs list
 //   node --env-file=.env.local scripts/invite.mjs rotate <invite id>          a new code; the old one stops working
 //   node --env-file=.env.local scripts/invite.mjs revoke <invite id> [--hide] stop the code; --hide also hides all it ran
+//   node --env-file=.env.local scripts/invite.mjs x <invite id> <handle|->     their X handle on /contributors ("-" clears it)
 //
 // A code is shown once, when it's made (or rotated). Needs CUBE_OPERATOR_TOKEN.
 import { parseArgs } from 'node:util';
@@ -38,7 +39,7 @@ async function api(body) {
   return json;
 }
 
-const [command, arg] = positionals;
+const [command, arg, arg2] = positionals;
 const howTo = (code) => `\nSend them:\n  npx cube-arena-runner login ${code}\n  then pick something from ${opt.url}/wanted`;
 
 if (command === 'create') {
@@ -51,7 +52,7 @@ if (command === 'create') {
   for (const i of invites) {
     const state = i.revoked_at ? 'revoked' : i.expires_at && new Date(i.expires_at) < new Date() ? 'expired' : 'live';
     const used = i.last_used_at ? `last used ${i.last_used_at.slice(0, 10)}` : 'never used';
-    console.log(`${i.id}  ${i.name.padEnd(20)} …${i.code_hint}  ${state.padEnd(8)} ${String(i.finished).padStart(3)} suites  ${used}${i.note ? `  (${i.note})` : ''}`);
+    console.log(`${i.id}  ${i.name.padEnd(20)} …${i.code_hint}  ${state.padEnd(8)} ${String(i.finished).padStart(3)} suites  ${used}${i.x_handle ? `  @${i.x_handle}` : ''}${i.note ? `  (${i.note})` : ''}`);
   }
 } else if (command === 'rotate') {
   const { code } = await api({ id: arg, rotate: true });
@@ -60,6 +61,10 @@ if (command === 'create') {
 } else if (command === 'revoke') {
   const { suites_hidden } = await api({ id: arg, revoke: true, hide: opt.hide });
   console.log(`Revoked.${opt.hide ? ` ${suites_hidden} suite(s) hidden.` : ' Their results stay up (add --hide to hide them).'}`);
+} else if (command === 'x') {
+  if (!arg || !arg2) throw new Error('x <invite id> <handle>, or "-" to clear it');
+  const { x_handle } = await api({ id: arg, x_handle: arg2 === '-' ? '' : arg2 });
+  console.log(x_handle ? `X handle set to @${x_handle}.` : 'X handle cleared.');
 } else {
-  console.log('Usage: invite.mjs create "Name" | list | rotate <id> | revoke <id> [--hide]');
+  console.log('Usage: invite.mjs create "Name" | list | rotate <id> | revoke <id> [--hide] | x <id> <handle|->');
 }

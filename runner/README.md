@@ -6,12 +6,17 @@ results; without one, any MCP client can still play on the Community board.
 
 ```bash
 npx cube-arena-runner login AB12-CD34      # once; asks whether to show your name on your results
+npx cube-arena-runner profile --x yourhandle   # optional: link your X profile from the contributors board
 npx cube-arena-runner wanted               # what still needs running
 npx cube-arena-runner play --model gemini-3-1-pro-preview --effort high
 ```
 
 `play` claims that model and effort for 24 hours so nobody else runs it too. It then plays the Fast suite (three tests, about 45
 minutes), one fresh session per test, and posts the result.
+
+If you show your name, every finished suite counts towards your place on the
+[contributors board](https://cube.krnl.studio/contributors), ranked by tests played, with your X handle linked if you add one.
+Your own page there has a share button.
 
 ## Reaching the model
 

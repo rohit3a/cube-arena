@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
+import { PersonName } from '@/components/People';
 import { fmtCost, fmtDuration, fmtScore, fmtTokens, heat } from '@/lib/arena/format';
 import { suiteEntry, testNames } from '@/lib/arena/index-data';
 import { CHALLENGE_LABEL, LADDER_MAX_LEVEL, MODE_LABEL } from '@/lib/arena/rules';
@@ -39,7 +40,8 @@ export default async function SuitePage(props: { params: Promise<{ id: string }>
       <p>
         {e.board === 'verified' ? (
           <>
-            <span className="badge verified">Verified</span> Run by {e.run_by[0] === 'Cube Arena' ? 'us' : e.run_by[0]} through{' '}
+            <span className="badge verified">Verified</span> Run by{' '}
+            {e.contributor ? <PersonName {...e.contributor} /> : e.run_by[0] === 'Cube Arena' ? 'us' : e.run_by[0]} through{' '}
             {e.harness ?? e.runs[0]?.via ?? 'the official CLI'}, locked to the cube tools.
           </>
         ) : (

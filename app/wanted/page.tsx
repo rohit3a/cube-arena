@@ -87,7 +87,9 @@ export default async function Wanted() {
           </li>
           <li>
             <strong>That&apos;s it.</strong> The result shows up on <Link href="/benchmark">the Index</Link>. If two people run the same thing, the
-            Index shows the average. The runner also uploads a text log of each session (no pictures) so we can check it.
+            Index shows the average. The runner also uploads a text log of each session (no pictures) so we can check it. If you show your name,
+            you go on the <Link href="/contributors">contributors board</Link>, with your X handle if you add one (
+            <code>npx cube-arena-runner profile --x yourhandle</code>).
           </li>
         </ol>
         <p className="ix-foot">

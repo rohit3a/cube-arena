@@ -33,3 +33,31 @@ export async function inviteFor(input: string): Promise<InviteRow | null> {
     returning *`);
   return invite ?? null;
 }
+
+/**
+ * A contributor's profile path: their X handle, or "i-" and the start of the
+ * invite id until they set one (handles can't contain "-", so these never clash).
+ */
+export const contributorSlug = (inviteId: string, handle: string | null) => (handle ? handle.toLowerCase() : `i-${inviteId.slice(0, 8)}`);
+
+/** "@Priya_K", "x.com/priya_k" or "https://twitter.com/priya_k" → "Priya_K"; null if it isn't a handle. */
+export function normalizeHandle(input: string): string | null {
+  const h = input
+    .trim()
+    .replace(/^https?:\/\//i, '')
+    .replace(/^(www\.)?(x|twitter)\.com\//i, '')
+    .replace(/^@/, '')
+    .replace(/[/?#].*$/, '');
+  return /^[A-Za-z0-9_]{1,15}$/.test(h) ? h : null;
+}
+
+/** Sets or clears an invite's X handle. False if another invite already has it. */
+export async function setHandle(inviteId: string, handle: string | null): Promise<boolean> {
+  try {
+    await withDb((sql) => sql`update cube_arena.invites set x_handle = ${handle} where id = ${inviteId}`);
+    return true;
+  } catch (e) {
+    if ((e as { code?: string }).code === '23505') return false;
+    throw e;
+  }
+}

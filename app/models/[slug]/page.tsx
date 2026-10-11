@@ -144,7 +144,7 @@ export default async function ModelPage(props: { params: Promise<{ slug: string 
                         <strong>{fmtScore(e.score)}</strong> at {e.effort ?? 'default'}
                       </Link>{' '}
                       <span className="muted">
-                        · run by {e.run_by.join(', ')}
+                        · run by {e.contributor ? <Link href={`/contributors/${e.contributor.slug}`}>{e.contributor.name}</Link> : e.run_by.join(', ')}
                         {e.harness ? ` via ${e.harness}` : ''} ·{' '}
                         <span suppressHydrationWarning>{e.finished_at ? new Date(e.finished_at).toLocaleDateString(undefined, { day: 'numeric', month: 'short' }) : ''}</span>
                       </span>

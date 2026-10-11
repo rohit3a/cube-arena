@@ -3576,3 +3576,135 @@ table.wanted td.cmd {
 .via-note {
   white-space: nowrap;
 }
+
+/* ---------- Contributors ---------- */
+
+.handle {
+  font-family: var(--font-mono);
+  font-size: 0.86em;
+  font-weight: 600;
+  color: var(--text-2);
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.handle:hover {
+  color: var(--text);
+  text-decoration: underline;
+}
+
+.model-cell > .person-name {
+  font-size: inherit;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.person-name a:first-child {
+  color: var(--text);
+  text-decoration: none;
+}
+
+.person-name a:first-child:hover {
+  text-decoration: underline;
+}
+
+.people-top {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+  margin: 28px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.person-card {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  min-width: 0;
+  padding: 18px 20px;
+  border: var(--bw) solid var(--line);
+  border-radius: 16px;
+  background: var(--card);
+  box-shadow: var(--shadow);
+}
+
+.person-card.r1 {
+  background: var(--yellow);
+  color: var(--on-color);
+}
+
+.person-card.r1 .handle {
+  color: var(--on-color);
+  opacity: 0.8;
+}
+
+.person-card .medal {
+  margin-bottom: 4px;
+}
+
+.person-card-name {
+  max-width: 100%;
+  overflow: hidden;
+  color: inherit;
+  font-family: var(--font-display);
+  font-size: 1.45rem;
+  font-weight: 800;
+  line-height: 1.15;
+  text-decoration: none;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.person-card-name:hover {
+  text-decoration: underline;
+}
+
+.person-card-stats {
+  margin-top: auto;
+  padding-top: 6px;
+  font-size: 0.9rem;
+}
+
+.share-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 20px;
+}
+
+.model-cell > .badge.new {
+  display: inline-flex;
+  margin: 4px 0 0;
+  padding: 0 8px;
+  background: var(--green-t);
+  color: var(--text);
+  font-size: 0.7rem;
+}
+
+@media (max-width: 760px) {
+  .people-top {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 10px;
+  }
+
+  .person-card {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    align-items: center;
+    column-gap: 12px;
+    row-gap: 2px;
+    padding: 14px 16px;
+  }
+
+  .person-card .medal {
+    grid-row: span 3;
+    margin: 0;
+  }
+
+  .person-card-stats {
+    margin: 0;
+    padding: 0;
+  }
+}

@@ -6,6 +6,7 @@ import { unstable_cache } from 'next/cache';
 import { catalogCost, harnessLabel } from './catalog';
 import { clientLabel } from './clients';
 import { type SuiteRow, type Usage, UUID, withDb } from './db';
+import { contributorSlug } from './invites';
 import { estimateCost, makerOf, slugOf, splitLabel } from './makers';
 import { gradeSuites } from './suite-data';
 import { SUITES, type SuiteKind, suiteTests } from './suites';
@@ -66,17 +67,20 @@ export interface SuiteEntry {
   run_by: string[];
   /** How the model was reached: "Claude Code", "Codex", "OpenRouter", an API host. */
   harness: string | null;
+  /** The invitee who ran it, when they chose to show their name (contributors.ts). */
+  contributor: { slug: string; name: string; x: string | null } | null;
 }
 
 interface Row extends SuiteRow {
   invite_name: string | null;
+  invite_x: string | null;
   runs: (Omit<SuiteRunInfo, 'via'> & { usage: Usage | null; client: string | null })[];
 }
 
 async function suiteEntriesQuery(): Promise<SuiteEntry[]> {
   return withDb(async (sql) => {
     const rows = await sql<Row[]>`
-      select s.*, i.name as invite_name,
+      select s.*, i.name as invite_name, i.x_handle as invite_x,
         coalesce((
           select json_agg(json_build_object(
             'slot', r.suite_slot, 'run_id', r.id, 'status', r.status, 'end_reason', r.end_reason,
@@ -154,6 +158,10 @@ async function suiteEntriesQuery(): Promise<SuiteEntry[]> {
         ids: [s.id],
         run_by: [s.board === 'community' ? s.display_name : !s.invite_id ? 'Cube Arena' : s.credit && s.invite_name ? s.invite_name : 'an invited tester'],
         harness: harnessLabel(s.harness ?? s.agent),
+        contributor:
+          s.board === 'verified' && s.invite_id && s.credit && s.invite_name
+            ? { slug: contributorSlug(s.invite_id, s.invite_x), name: s.invite_name, x: s.invite_x }
+            : null,
       };
     });
   });

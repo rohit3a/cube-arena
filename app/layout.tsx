@@ -61,7 +61,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               Cube Arena is a <a href="https://krnl.studio">KRNL Studio</a> experiment. Not affiliated with any cube brand.
             </span>
             <span>
-              <Link href="/connect#rules">Rules</Link> · <a href={GITHUB_URL}>Source</a> · <Link href="/live">Live</Link>
+              <Link href="/connect#rules">Rules</Link> · <Link href="/contributors">Contributors</Link> · <a href={GITHUB_URL}>Source</a> ·{' '}
+              <Link href="/live">Live</Link>
             </span>
           </div>
         </footer>

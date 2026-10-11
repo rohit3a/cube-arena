@@ -35,6 +35,7 @@ export function averageByLabel(entries: SuiteEntry[]): SuiteEntry[] {
       n: es.length,
       ids: es.map((e) => e.id),
       run_by: [...new Set(es.flatMap((e) => e.run_by))],
+      contributor: null,
     };
   });
 }

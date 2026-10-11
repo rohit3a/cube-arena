@@ -25,6 +25,7 @@ const VIA = ['claude-code', 'codex', 'openrouter', 'api'];
 const HELP = `cube-arena-runner ${VERSION}: run Cube Arena Index suites for the Verified board.
 
   login <code> [--show-name | --hide-name]   save your invite code (once)
+  profile [--x <handle> | --no-x]             your X handle on the contributors board
   whoami                                      who your code belongs to
   wanted [--suite thorough] [--all]           what still needs running
   models                                      every model the runner knows
@@ -83,11 +84,22 @@ async function ask(question) {
   }
 }
 
-async function get(site, path, token) {
-  const res = await fetch(`${site}${path}`, { headers: token ? { Authorization: `Bearer ${token}` } : {} });
+async function get(site, path, token, body) {
+  const res = await fetch(`${site}${path}`, {
+    method: body ? 'POST' : 'GET',
+    headers: { ...(token && { Authorization: `Bearer ${token}` }), ...(body && { 'Content-Type': 'application/json' }) },
+    body: body ? JSON.stringify(body) : undefined,
+  });
   const json = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(json.error ?? `${path}: ${res.status}`);
   return json;
+}
+
+/** Sets the X handle shown on the contributors board ("" clears it). */
+async function setX(code, handle) {
+  const me = await get(site, '/api/me', code, { x_handle: handle }).catch((e) => fail(e.message));
+  console.log(me.x_handle ? `X handle set to @${me.x_handle}.` : 'X handle cleared.');
+  return me;
 }
 
 const [command, ...rest] = process.argv.slice(2);
@@ -108,6 +120,8 @@ const { values: opt, positionals } = parseArgs({
     'no-transcript': { type: 'boolean', default: false },
     'show-name': { type: 'boolean' },
     'hide-name': { type: 'boolean' },
+    x: { type: 'string' },
+    'no-x': { type: 'boolean', default: false },
     all: { type: 'boolean', default: false },
     url: { type: 'string' },
     slack: { type: 'string', default: '6' },
@@ -137,14 +151,25 @@ if (!command || command === 'help' || command === '--help' || command === '-h') 
   if (credit === null) credit = /^y/i.test(await ask(`Hi ${me.name}! Show your name next to your results on the boards? [y/N] `));
   writeConfig({ ...config, invite: code, credit, url: opt.url ?? config.url });
   console.log(`Saved to ${CONFIG}. Your results will show ${credit ? `"run by ${me.name}"` : '"run by an invited tester"'}.`);
+  if (credit) {
+    const handle = opt.x ?? (await ask('Your X handle, linked from the contributors board (optional, Enter to skip): '));
+    const { profile } = handle ? await setX(code, handle) : await get(site, '/api/me', code);
+    console.log(`Once a suite finishes, you're on ${site}/contributors (your page: ${profile}).`);
+  }
   console.log('Next: npx cube-arena-runner wanted');
 } else if (command === 'logout') {
   if (existsSync(CONFIG)) rmSync(CONFIG);
   console.log('Forgot your invite code.');
 } else if (command === 'whoami') {
   if (!token) fail('No invite code yet: npx cube-arena-runner login AB12-CD34');
-  const { me } = await get(site, '/api/admin/suites?limit=1', token).catch((e) => fail(e.message));
-  console.log(`${me.name} (${me.role}), names ${config.credit ? 'shown' : 'hidden'}, ${site}`);
+  const me = await get(site, '/api/me', token).catch((e) => fail(e.message));
+  console.log(`${me.name} (${me.role}), names ${config.credit ? 'shown' : 'hidden'}${me.x_handle ? `, @${me.x_handle} on X` : ''}, ${site}`);
+  if (me.profile && config.credit) console.log(`Your page: ${me.profile}`);
+} else if (command === 'profile') {
+  if (!token) fail('No invite code yet: npx cube-arena-runner login AB12-CD34');
+  const me = opt['no-x'] ? await setX(token, '') : opt.x ? await setX(token, opt.x) : await get(site, '/api/me', token).catch((e) => fail(e.message));
+  if (!opt.x && !opt['no-x']) console.log(`${me.name}${me.x_handle ? ` (@${me.x_handle})` : ', no X handle yet (add one: profile --x yourhandle)'}`);
+  if (me.profile) console.log(config.credit ? `Your page: ${me.profile}` : 'Your name is hidden on results, so you are not on the contributors board. To show it: login <code> --show-name');
 } else if (command === 'models') {
   const { models } = await get(site, '/api/catalog');
   for (const m of models.filter((x) => opt.all || x.wanted)) {

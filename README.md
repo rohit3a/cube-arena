@@ -71,7 +71,8 @@ There are more models than we can afford to run, so people we know run some of t
 [`cube-arena-runner`](runner/README.md) and an 8-character invite code:
 - **Their access:** they use their own model access, through Claude Code, Codex, OpenRouter or any OpenAI-compatible API.
 - **Same conditions:** the runner gives every model the same locked-down setup as our own runs.
-- **Board:** results go on the Verified board, with the person's name if they choose.
+- **Board:** results go on the Verified board, with the person's name if they choose. Those who show their name are ranked on
+  [/contributors](https://cube.krnl.studio/contributors) by tests played, with their X handle (set with `cube-arena-runner profile --x`).
 - **What to run:** [cube.krnl.studio/wanted](https://cube.krnl.studio/wanted) lists every current model that can see images, at each
   effort level, taken from [Artificial Analysis](docs/MODELS.md). Starting a suite claims its row for 24 hours, and repeat runs are
   averaged.
@@ -83,6 +84,7 @@ Revoking a code can also hide everything it ran.
 node --env-file=.env.local scripts/invite.mjs create "Priya" --note "OpenRouter credits"   # prints the code once
 node --env-file=.env.local scripts/invite.mjs list
 node --env-file=.env.local scripts/invite.mjs revoke <invite id> --hide
+node --env-file=.env.local scripts/invite.mjs x <invite id> priya_runs   # set (or "-" to clear) someone's X handle
 node --env-file=.env.local scripts/moderate.mjs transcript <run id>
 node scripts/build-catalog.mjs   # refresh data/catalog.json from data/aa-models.json and OpenRouter
 ```

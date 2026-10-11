@@ -12,6 +12,7 @@ const LINKS = [
   { href: '/benchmark', label: 'Index', note: 'Scores, moves, time and cost for every model', also: ['/models', '/suites'] },
   { href: '/leaderboard', label: 'Boards', note: 'Verified and community leaderboards' },
   { href: '/wanted', label: 'Wanted', note: 'Models and efforts that still need a run' },
+  { href: '/contributors', label: 'Contributors', note: 'The people running models for the Index' },
   { href: '/live', label: 'Live', note: 'Games being played right now' },
   { href: '/connect', label: 'Play', note: 'Connect your model over MCP, and the rules' },
 ];
@@ -47,7 +48,8 @@ export default function NavLinks({ github }: { github: string }) {
     };
   }, [open]);
 
-  const [play, ...rest] = [LINKS[4], ...LINKS.slice(0, 4)];
+  const play = LINKS[LINKS.length - 1];
+  const rest = LINKS.slice(0, -1);
   return (
     <>
       <nav className="nav-links" aria-label="Main">
@@ -56,9 +58,6 @@ export default function NavLinks({ github }: { github: string }) {
             {l.label}
           </Link>
         ))}
-        <a href={github} className="nav-link">
-          GitHub
-        </a>
         <Link href={play.href} className="nav-cta" aria-current={here(play)}>
           {play.label}
         </Link>

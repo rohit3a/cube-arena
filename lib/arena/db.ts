@@ -144,6 +144,8 @@ export interface InviteRow {
   expires_at: Date | null;
   revoked_at: Date | null;
   last_used_at: Date | null;
+  /** Without the @; shown on the contributors board. */
+  x_handle: string | null;
 }
 
 export interface AttemptRow {

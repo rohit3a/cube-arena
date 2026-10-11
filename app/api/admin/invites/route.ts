@@ -3,8 +3,11 @@
 //   POST /api/admin/invites {name, note?, expires_at?}        make one; the reply has the code (shown only now)
 //   POST /api/admin/invites {id, rotate: true}                a new code for the same person
 //   POST /api/admin/invites {id, revoke: true, hide?: true}   stop the code; hide: also hide everything it ran
+//   POST /api/admin/invites {id, x_handle}                    set their X handle ("" clears it)
 import { createInvite, listInvites, revokeInvite, rotateInvite } from '@/lib/arena/admin';
 import { authFrom, deny } from '@/lib/arena/auth';
+import { UUID } from '@/lib/arena/db';
+import { normalizeHandle, setHandle } from '@/lib/arena/invites';
 
 export const dynamic = 'force-dynamic';
 
@@ -28,6 +31,12 @@ export async function POST(req: Request) {
   if (id && body.revoke === true) {
     const hidden = await revokeInvite(id, body.hide === true);
     return hidden === null ? Response.json({ error: 'no such invite' }, { status: 404 }) : Response.json({ revoked: true, suites_hidden: hidden });
+  }
+  if (id && typeof body.x_handle === 'string') {
+    const handle = body.x_handle.trim() ? normalizeHandle(body.x_handle) : null;
+    if (body.x_handle.trim() && !handle) return Response.json({ error: 'not an X handle' }, { status: 400 });
+    if (!UUID.test(id)) return Response.json({ error: 'no such invite' }, { status: 404 });
+    return (await setHandle(id, handle)) ? Response.json({ x_handle: handle }) : Response.json({ error: 'another invite has that handle' }, { status: 409 });
   }
   const name = str(body.name, 40);
   if (!name) return Response.json({ error: 'name is needed (who the code is for)' }, { status: 400 });

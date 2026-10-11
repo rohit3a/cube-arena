@@ -18,6 +18,12 @@ const MODELS: [string, string, number][] = [
   ['GPT-6-Luna', 'gpt-6-luna', 8],
 ];
 const EFFORTS = ['low', 'medium', 'high', 'xhigh', 'max'];
+// Made-up invitees, so the contributors board has someone on it.
+const PEOPLE = [
+  { slug: 'priya_runs', name: 'Priya', x: 'priya_runs' },
+  { slug: 'i-0badc0de', name: 'Tomás', x: null },
+  { slug: 'mayacodes', name: 'Maya Chen', x: 'mayacodes' },
+];
 
 export function demoEntries(): SuiteEntry[] {
   const out: SuiteEntry[] = [];
@@ -62,8 +68,9 @@ export function demoEntries(): SuiteEntry[] {
           progress: { started: tests.length, of: tests.length },
           n: 1,
           ids: [`00000000-0000-4000-8000-${String(n).padStart(12, '0')}`],
-          run_by: ['Cube Arena'],
+          run_by: [n % 4 === 3 ? 'an invited tester' : n % 4 === 0 ? 'Cube Arena' : PEOPLE[n % 3].name],
           harness: slug.startsWith('gpt') ? 'Codex' : 'Claude Code',
+          contributor: n % 4 === 3 || n % 4 === 0 ? null : PEOPLE[n % 3],
         });
       }
     }

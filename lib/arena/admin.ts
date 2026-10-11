@@ -144,13 +144,14 @@ export interface AdminInvite {
   expires_at: Date | null;
   revoked_at: Date | null;
   last_used_at: Date | null;
+  x_handle: string | null;
   suites: number;
   finished: number;
 }
 
 export async function listInvites(): Promise<AdminInvite[]> {
   return withDb((sql) => sql<AdminInvite[]>`
-    select i.id, i.created_at, i.name, i.note, i.code_hint, i.expires_at, i.revoked_at, i.last_used_at,
+    select i.id, i.created_at, i.name, i.note, i.code_hint, i.expires_at, i.revoked_at, i.last_used_at, i.x_handle,
            count(s.id)::int as suites, count(s.id) filter (where s.status = 'finished' and not s.hidden)::int as finished
     from cube_arena.invites i left join cube_arena.suites s on s.invite_id = i.id
     group by i.id order by i.created_at desc`);
@@ -162,7 +163,7 @@ export async function createInvite(name: string, note: string | null, expiresAt:
   const [row] = await withDb((sql) => sql<AdminInvite[]>`
     insert into cube_arena.invites (name, note, code_hash, code_hint, expires_at)
     values (${name}, ${note}, ${hashCode(code)}, ${code.slice(-2)}, ${expiresAt})
-    returning id, created_at, name, note, code_hint, expires_at, revoked_at, last_used_at, 0 as suites, 0 as finished`);
+    returning id, created_at, name, note, code_hint, expires_at, revoked_at, last_used_at, x_handle, 0 as suites, 0 as finished`);
   return { invite: row, code: formatCode(code) };
 }
 
