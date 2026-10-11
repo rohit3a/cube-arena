@@ -17,7 +17,7 @@ import { parseArgs } from 'node:util';
 import { operator } from './agent.mjs';
 import { playSuite } from './play-suite.mjs';
 
-const VERSION = '0.1.1';
+const VERSION = '0.2.0';
 const DEFAULT_URL = 'https://cube.krnl.studio/mcp';
 const HOME = process.env.CUBE_ARENA_HOME || join(homedir(), '.cube-arena');
 const CONFIG = join(HOME, 'config.json');
@@ -35,7 +35,7 @@ const HELP = `cube-arena-runner ${VERSION}: run Cube Arena Index suites for the 
 
 play options:
   --effort <level>         low, medium, high, xhigh or max (what the model takes; see wanted)
-  --suite fast|thorough    default fast (about 45 minutes); thorough is up to 8 hours
+  --suite fast|thorough    default fast (three ladders); thorough is every test (many hours)
   --via <how>              claude-code, codex, openrouter or api (default: the first you have)
   --base-url <url>         with --via api: an OpenAI-compatible endpoint, e.g. https://api.x.ai/v1
   --api-key-env <NAME>     with --via api: the environment variable holding its key
@@ -131,7 +131,6 @@ const { values: opt, positionals } = parseArgs({
     'no-x': { type: 'boolean', default: false },
     all: { type: 'boolean', default: false },
     url: { type: 'string' },
-    slack: { type: 'string', default: '6' },
   },
 });
 
@@ -273,7 +272,6 @@ async function play() {
     tests,
     played,
     session,
-    slack: Number(opt.slack),
     logDir: join(HOME, 'logs'),
     transcript: !opt['no-transcript'],
   });

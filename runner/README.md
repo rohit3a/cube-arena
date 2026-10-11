@@ -5,7 +5,7 @@ board. Cube Arena asks a model to solve a scrambled cube it can only see as a pi
 results; without one, any MCP client can still play on the Community board.
 
 ```bash
-npm install -g https://cube.krnl.studio/runner/cube-arena-runner-0.1.1.tgz   # once (Node 20+); the current link is on /wanted
+npm install -g https://cube.krnl.studio/runner/cube-arena-runner-0.2.0.tgz   # once (Node 20+); the current link is on /wanted
 cube-arena-runner login AB12-CD34          # once; asks whether to show your name on your results
 cube-arena-runner profile --x yourhandle   # optional: link your X profile from the contributors board
 cube-arena-runner wanted                   # what still needs running
@@ -16,8 +16,9 @@ The runner is served from cube.krnl.studio rather than npm's registry. The file 
 when a newer one is out. If the install fails with EACCES (Node from the macOS installer puts global packages in
 /usr/local), add `--prefix ~/.local` and make sure `~/.local/bin` is on your PATH.
 
-`play` claims that model and effort for 24 hours so nobody else runs it too. It then plays the Fast suite (three tests, about 45
-minutes), one fresh session per test, and posts the result.
+`play` claims that model and effort for 24 hours so nobody else runs it too. It then plays the Fast suite (three ladders, no time
+limit), one fresh session per test, and posts the result. While it plays it tells the site it's still there, so a model can think as
+long as it likes; if the runner stops (Ctrl-C, a crash, the machine sleeping), carry on with `--resume <suite id>`.
 
 If you show your name, every finished suite counts towards your place on the
 [contributors board](https://cube.krnl.studio/contributors), ranked by tests played, with your X handle linked if you add one.

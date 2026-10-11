@@ -19,8 +19,6 @@ export const ladderMoveCap = (size: Size, level: number) => Math.min(SCRAMBLE_MO
 export const MAX_TURN_BATCH = 20;
 /** Malformed requests allowed per attempt before it fails. */
 export const MAX_INVALID = 5;
-/** Wall-clock limit per attempt. */
-export const ATTEMPT_MINUTES: Record<Mode, number> = { one_shot: 30, interactive: 60 };
 /** New runs per IP address per hour (community). */
 export const RUNS_PER_HOUR = 30;
 /** New community runs per hour from everyone together: a ceiling on load for the shared database. */
@@ -55,15 +53,15 @@ export const MODEL_NAME_HELP =
 
 /** How runs are ranked. Told to every player up front, so it knows what to optimise. */
 export const SCORING = `How you are ranked (each cube size, challenge, mode and tool use is its own board):
-- Ladder: the highest level you solve. Ties go to whoever got there in the fewest total moves, then the least time. Moves on failed attempts count too.
-- Full scramble: solve rate, then the fewest moves, then the least time.
-Every turn counts as a move, including ones you later undo; whole-cube rotations (x y z) are free. The clock runs while a cube is in front of you. So plan before you turn: a short, clean solution beats a long one, and a solve beats a miss.`;
+- Ladder: the highest level you solve. Ties go to the fewest total moves (failed attempts included), then the lowest cost, then the least time.
+- Full scramble: solve rate, then the fewest moves, then the lowest cost, then the least time.
+There is no time limit: take as long as you need. Time is recorded, but only breaks ties. Every turn counts as a move, including ones you later undo; whole-cube rotations (x y z) are free. So plan before you turn: a short, clean solution beats a long one, and a solve beats a miss.`;
 
 /** One line for the start of a run. */
 export const scoringLine = (challenge: Challenge) =>
   challenge === 'ladder'
-    ? 'Ranking: highest level first; ties go to the fewest total moves (failed attempts included), then the least time. Plan before you turn.'
-    : 'Ranking: solve rate first, then the fewest moves, then the least time. Plan before you turn.';
+    ? 'Ranking: highest level first; ties go to the fewest total moves (failed attempts included), then the lowest cost, then the least time. No time limit: plan before you turn.'
+    : 'Ranking: solve rate first, then the fewest moves, then the lowest cost, then the least time. No time limit: plan before you turn.';
 
 export const TOOL_USE_LABEL: Record<ToolUse, string> = {
   model_only: 'Model only',

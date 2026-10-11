@@ -7,6 +7,7 @@ import { averageByLabel, resultHref } from '@/lib/arena/aggregate';
 import { type CatalogModel, catalogModel, harnessLabel } from '@/lib/arena/catalog';
 import { type SuiteEntry, suiteEntries, testNames } from '@/lib/arena/index-data';
 import { effortRank } from '@/lib/arena/makers';
+import { suiteOrder } from '@/lib/arena/ranking';
 import { SUITES, SUITE_KINDS } from '@/lib/arena/suites';
 import { commandFor } from '@/lib/arena/wanted';
 
@@ -35,7 +36,7 @@ export default async function ModelPage(props: { params: Promise<{ slug: string 
   const { model, maker, color, board } = es[0];
   const invited = es.some((e) => !e.run_by.includes('Cube Arena'));
   const finished = es.filter((e) => e.status === 'finished');
-  const best = (kind: string) => finished.filter((e) => e.kind === kind && e.version === SUITES[e.kind].version).sort((a, b) => (b.score ?? 0) - (a.score ?? 0))[0];
+  const best = (kind: string) => finished.filter((e) => e.kind === kind && e.version === SUITES[e.kind].version).sort(suiteOrder)[0];
 
   return (
     <div className="wrap page-head">

@@ -19,7 +19,7 @@ import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 import { SYSTEM } from './system.mjs';
 
-const MAX_TURNS = 600; // assistant replies per session; a runaway guard, far above a real game
+const MAX_TURNS = 20_000; // assistant replies per session: a runaway guard only. The server already caps moves, looks and bad requests per cube.
 const MAX_TRIES = 5; // per request, for 429, 5xx and network errors
 // Only the most recent pictures stay in the conversation; older ones become a
 // short note. This bounds context and cost over hundreds of turns, but it is a
@@ -67,13 +67,13 @@ class ApiError extends Error {
 
 // node:http rather than fetch: fetch gives up when response headers take more
 // than 5 minutes, and a non-streamed answer at high effort can take longer.
-// The session deadline is the only timeout.
-function post(url, headers, body, signal) {
+// Nothing here times out: a model may think as long as it likes.
+function post(url, headers, body) {
   return new Promise((resolve, reject) => {
     const u = new URL(url);
     const req = (u.protocol === 'https:' ? https : http).request(
       u,
-      { method: 'POST', headers: { ...headers, 'Content-Length': Buffer.byteLength(body) }, signal },
+      { method: 'POST', headers: { ...headers, 'Content-Length': Buffer.byteLength(body) } },
       (res) => {
         const chunks = [];
         res.on('data', (c) => chunks.push(c));
@@ -150,7 +150,7 @@ function forgetOldPictures(messages) {
 /**
  * Plays one session over the API.
  * @param {{ model: string, effort?: string | null, prompt: string, headers: Record<string, string>,
- *   url: string, token: string, maxMinutes: number, logPath: string,
+ *   url: string, token: string, logPath: string,
  *   api: { baseUrl: string, apiKey: string, provider?: 'openrouter' | 'openai-compatible' } }} s
  * @returns {Promise<{ runId: string | null, runOver: boolean, last: any, calls: number, breach: string | null,
  *   stopReason: string | null, final: string | null, usage: Record<string, number>, code: number | null,
@@ -175,11 +175,6 @@ export async function playApiSession(s) {
     console.log(`  stopping: ${reason}`);
   }
 
-  // One signal for the whole session: it aborts whatever is in flight (an API
-  // request, a backoff wait, a tool call) when the time is up.
-  const deadline = new AbortController();
-  const { signal } = deadline;
-  const killer = Number.isFinite(s.maxMinutes) ? setTimeout(() => deadline.abort(), s.maxMinutes * 60_000) : null;
 
   function seeReply(text) {
     const first = text.split('\n')[0];
@@ -214,13 +209,12 @@ export async function playApiSession(s) {
   async function complete(body) {
     const payload = JSON.stringify(body);
     for (let attempt = 1; ; attempt++) {
-      signal.throwIfAborted();
       let status = 0;
       let message = '';
       let data = null;
       let headers;
       try {
-        const res = await post(`${base}/chat/completions`, apiHeaders, payload, signal);
+        const res = await post(`${base}/chat/completions`, apiHeaders, payload);
         ({ status, headers } = res);
         try {
           data = JSON.parse(res.text);
@@ -228,7 +222,6 @@ export async function playApiSession(s) {
           message = res.text.trim().slice(0, 200) || 'no body';
         }
       } catch (e) {
-        if (signal.aborted) throw e;
         message = e.message;
       }
       // OpenRouter reports an upstream failure inside a 200.
@@ -246,7 +239,7 @@ export async function playApiSession(s) {
       const wait = retryAfterMs(headers) ?? 2000 * 2 ** (attempt - 1);
       console.log(`  [${secs()}s] ${what}: ${message.slice(0, 160)}; retrying in ${wait / 1000}s`);
       note('error', `${what}: ${message.slice(0, 300)} (try ${attempt} of ${MAX_TRIES})`);
-      await sleep(wait, undefined, { signal });
+      await sleep(wait);
     }
   }
 
@@ -264,11 +257,11 @@ export async function playApiSession(s) {
     const transport = new StreamableHTTPClientTransport(new URL(s.url), {
       requestInit: { headers: { Authorization: `Bearer ${s.token}`, ...s.headers } },
     });
-    await client.connect(transport, { signal });
+    await client.connect(transport);
     const listed = [];
     let cursor;
     do {
-      const page = await client.listTools(cursor ? { cursor } : undefined, { signal });
+      const page = await client.listTools(cursor ? { cursor } : undefined);
       listed.push(...page.tools);
       cursor = page.nextCursor;
     } while (cursor);
@@ -300,7 +293,6 @@ export async function playApiSession(s) {
         stop(`the runner's ${MAX_TURNS}-turn limit`);
         break;
       }
-      signal.throwIfAborted();
       write('request', { turn, model: s.model, tool_choice: 'auto', ...extra, messages: messages.slice(logged) });
       logged = messages.length;
       const data = await complete({ model: s.model, messages, tools, tool_choice: 'auto', ...extra });
@@ -353,7 +345,7 @@ export async function playApiSession(s) {
         else if (!args) reply = `Error: the arguments for ${name} were not a JSON object: ${rawText.slice(0, 200)}`;
         else {
           try {
-            result = await client.callTool({ name, arguments: args }, undefined, { signal, timeout: 120_000 });
+            result = await client.callTool({ name, arguments: args }, undefined, { timeout: 120_000 });
             const content = Array.isArray(result.content) ? result.content : [];
             const text = content
               .filter((c) => c.type === 'text')
@@ -366,7 +358,6 @@ export async function playApiSession(s) {
               for (const im of images) pictures.push({ type: 'image_url', image_url: { url: `data:${im.mimeType ?? 'image/png'};base64,${im.data}` } });
             }
           } catch (e) {
-            if (signal.aborted) throw e;
             reply = `Error: the ${name} call failed: ${e.message}`;
           }
         }
@@ -383,10 +374,7 @@ export async function playApiSession(s) {
     }
     out.code = 0;
   } catch (e) {
-    if (signal.aborted) {
-      stop(`the runner's ${s.maxMinutes}-minute limit`);
-      out.code = 0;
-    } else if (e instanceof ApiError) {
+    if (e instanceof ApiError) {
       stop(`API error ${e.status || 'network'}: ${e.message}`);
       note('error', out.stopReason ?? e.message);
       out.code = 1;
@@ -396,7 +384,6 @@ export async function playApiSession(s) {
       out.code = 1;
     }
   } finally {
-    if (killer) clearTimeout(killer);
     await client.close().catch(() => {});
     out.minutes = (Date.now() - started) / 60_000;
     write('end', { stopReason: out.stopReason, breach: out.breach, calls: out.calls, usage: out.usage, code: out.code });

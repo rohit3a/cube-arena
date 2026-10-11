@@ -5,13 +5,14 @@
 //   POST /api/admin/suites {kind, model_id, effort, harness, credit}   create a Verified suite named from the catalog
 //   POST /api/admin/suites {kind, model_name, model, model_id, effort, agent}   operator only: any name
 //   POST /api/admin/suites {id, finish: true}       close it (tests never played count 0)
+//   POST /api/admin/suites {id, alive: true}        heartbeat: the runner is still playing it (every few minutes)
 // Hiding a suite goes through /api/admin/runs with the suite id.
 import { getSuite, listSuites } from '@/lib/arena/admin';
 import { type Auth, authFrom, deny } from '@/lib/arena/auth';
 import { type Harness, HARNESSES, catalogModel, labelOf } from '@/lib/arena/catalog';
 import { claimFor } from '@/lib/arena/claims';
 import type { SuiteRow } from '@/lib/arena/db';
-import { closeSuite, createSuite } from '@/lib/arena/service';
+import { closeSuite, createSuite, heartbeat } from '@/lib/arena/service';
 import { SUITES, SUITE_KINDS, type SuiteKind } from '@/lib/arena/suites';
 
 export const dynamic = 'force-dynamic';
@@ -41,6 +42,12 @@ export async function POST(req: Request) {
   const { auth, bad: badCode } = await authFrom(req);
   if (!auth) return deny(badCode);
   const body = ((await req.json().catch(() => null)) ?? {}) as Record<string, unknown>;
+
+  if (body.alive === true) {
+    const suite = await getSuite(str(body.id) ?? '');
+    if (!suite || !owns(auth, suite)) return noSuite();
+    return Response.json({ alive: await heartbeat(suite.id) });
+  }
 
   if (body.finish === true) {
     const suite = await getSuite(str(body.id) ?? '');

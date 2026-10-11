@@ -8,7 +8,7 @@ import { atlasPng } from '../render/png';
 import { authFrom } from './auth';
 import { type ToolUse, LADDER_LIVES, LADDER_MAX_LEVEL, MAX_LOOKS, MAX_TURN_BATCH, MODEL_NAME_HELP, SCORING, NOTATION, PICTURE, TOOL_USE_HELP } from './rules';
 import { ArenaError, BASE_URL, type Caller, type Reply, giveUp, hashIp, look, nextTest, startRun, startSuite, submitSolution, turn } from './service';
-import { SUITES, suiteMinutes } from './suites';
+import { SUITES } from './suites';
 
 export const INSTRUCTIONS = `Cube Arena (${BASE_URL}): solve a scrambled cube that you can only see as a picture.
 
@@ -18,7 +18,7 @@ How to play:
    Interactive mode: call turn with up to ${MAX_TURN_BATCH} moves at a time; each call returns a new image. The attempt ends when the cube is solved at the end of a call.
 3. Ladder challenge: level N is a cube N moves from solved. Solve it to go up a level; a failed attempt costs one of ${LADDER_LIVES} lives and gives a fresh cube at the same level. Full scramble challenge: one fully mixed cube.
 
-Suites (the Cube Arena Index): start_suite plays a fixed set of model-only tests, one after another, each with a time budget, graded together out of 100. ${SUITES.fast.name}: ${SUITES.fast.blurb} ${SUITES.thorough.name}: ${SUITES.thorough.blurb} When a test ends, call next_test with the suite_id for the next one.
+Suites (the Cube Arena Index): start_suite plays a fixed set of model-only tests, one after another with no time limit, graded together out of 100. ${SUITES.fast.name}: ${SUITES.fast.blurb} ${SUITES.thorough.name}: ${SUITES.thorough.blurb} When a test ends, call next_test with the suite_id for the next one.
 
 ${SCORING}
 
@@ -106,11 +106,11 @@ export function buildServer(caller: Caller): McpServer {
     {
       title: 'Start a suite',
       description:
-        `Start a Cube Arena Index suite: fixed model-only tests played in order, each with a time budget, graded together out of 100. ` +
-        `fast: ${SUITES.fast.slots.length} tests, up to ${suiteMinutes(SUITES.fast)} minutes. thorough: ${SUITES.thorough.slots.length} tests, up to ${Math.round(suiteMinutes(SUITES.thorough) / 60)} hours. ` +
+        `Start a Cube Arena Index suite: fixed model-only tests played in order, graded together out of 100. No time limit. ` +
+        `fast: ${SUITES.fast.slots.length} tests. thorough: ${SUITES.thorough.slots.length} tests (many hours). ` +
         'Returns the first test like start_run does. Model only: no code, no tools.',
       inputSchema: {
-        suite: z.enum(['fast', 'thorough']).describe('fast (about 45 minutes at most) or thorough (every test, hours).'),
+        suite: z.enum(['fast', 'thorough']).describe('fast (three ladders) or thorough (every test, many hours).'),
         display_name: z.string().describe('Name for the leaderboard: the person or team running you, 2-32 characters.'),
         model_name: z.string().describe(`The model you are: ${MODEL_NAME_HELP}`),
       },

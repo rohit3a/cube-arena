@@ -3,7 +3,7 @@ import Link from 'next/link';
 import IndexExplorer, { type SuiteInfo } from '@/components/IndexExplorer';
 import { suiteEntries, testNames } from '@/lib/arena/index-data';
 import { sweepExpired } from '@/lib/arena/service';
-import { EFFICIENCY_WEIGHT, SCRAMBLE_REFERENCE, SUITES, SUITE_KINDS, suiteMinutes } from '@/lib/arena/suites';
+import { SUITES, SUITE_KINDS, suiteTests } from '@/lib/arena/suites';
 
 export const dynamic = 'force-dynamic';
 export const metadata: Metadata = {
@@ -37,13 +37,12 @@ export default async function Benchmark() {
           <div className="card">
             <h3>Two suites</h3>
             <p>
-              <strong>Fast</strong> ({suiteMinutes(fast)} minutes at most): {fast.slots.length} ladders, 2×2 and 3×3 interactive and 3×3 one-shot,
-              15 minutes each. Every model gets it, at every effort level.
+              <strong>Fast</strong>: {fast.slots.length} ladders, 2×2 and 3×3 interactive and 3×3 one-shot. Every model gets it, at every effort
+              level.
             </p>
             <p>
-              <strong>Thorough</strong> (up to {Math.round(suiteMinutes(thorough) / 60)} hours): all 16 model-only tests, 2×2 to 5×5, ladder and
-              full scramble, interactive and one-shot. Ladders get 30 minutes; each full scramble is two cubes of 15 minutes. It goes to the
-              strongest models from Fast.
+              <strong>Thorough</strong>: all {suiteTests(thorough).length} model-only tests, 2×2 to 5×5, ladder and full scramble,
+              interactive and one-shot, with two cubes for each full scramble. It goes to the strongest models from Fast.
             </p>
           </div>
           <div className="card">
@@ -52,12 +51,10 @@ export default async function Benchmark() {
               Each test scores 0 to 100. A <strong>ladder</strong> scores how far up it climbed: level 7 of 20 is 35. A <strong>full scramble</strong>{' '}
               scores 100 for a solve, 0 for a miss.
             </p>
+            <p>The index is the average of the tests. Equal scores rank by the fewest moves, then the lowest cost, then the least time.</p>
             <p>
-              Up to {EFFICIENCY_WEIGHT * 100}% of each test is for <strong>few moves</strong>: a level-N cube needs N moves, a 3×3 scramble{' '}
-              {SCRAMBLE_REFERENCE[3]}. A wasteful solve keeps at least {100 - EFFICIENCY_WEIGHT * 100}%. The index is the average of the tests.
-            </p>
-            <p>
-              <strong>Time</strong> counts through each test&apos;s budget: when it runs out, the test ends where the model got to.
+              <strong>No time limit.</strong> A ladder ends at the top level or on the third miss, however long the model thinks. Time is recorded
+              and only breaks ties, so a fast model never beats a stronger one.
             </p>
           </div>
           <div className="card">

@@ -17,6 +17,7 @@ function headline(r: NonNullable<Awaited<ReturnType<typeof replay>>>) {
   const cube = `${a.size}×${a.size}`;
   if (a.status === 'active') return `${run.model_name} is solving ${what} on a ${cube}`;
   if (a.status === 'solved') return `${run.model_name} solved ${what} on a ${cube} in ${a.move_count} move${a.move_count === 1 ? '' : 's'}`;
+  if (a.status === 'stopped') return `${run.model_name} stopped at ${what} on a ${cube}`;
   return `${run.model_name} missed ${what} on a ${cube}`;
 }
 
@@ -37,6 +38,7 @@ const RESULT: Record<string, string> = {
   invalid: 'Fumbled',
   gave_up: 'Gave up',
   timeout: 'Out of time',
+  stopped: 'Stopped',
   active: 'Live now',
 };
 
@@ -172,7 +174,7 @@ export default async function ReplayPage({ params }: Props) {
             <div className="sibs">
               {siblings.map((s) => (
                 <Link key={s.id} href={`/replay/${s.id}`} className={`chip ${s.id === a.id ? 'on' : ''}`}>
-                  {s.level ? `L${s.level}` : `#${s.seq}`} {s.status === 'solved' ? '✓' : s.status === 'active' ? '…' : '✗'}
+                  {s.level ? `L${s.level}` : `#${s.seq}`} {s.status === 'solved' ? '✓' : s.status === 'active' ? '…' : s.status === 'stopped' ? '–' : '✗'}
                 </Link>
               ))}
             </div>

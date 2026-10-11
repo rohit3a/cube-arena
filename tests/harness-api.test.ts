@@ -116,7 +116,6 @@ const session = (over: Record<string, unknown> = {}, api: Record<string, unknown
     headers: { 'x-arena-model': 'GPT-6-Astra (high)', 'x-arena-tool-use': 'model_only' },
     url: `${mcpUrl}/mcp`,
     token: 'op-token',
-    maxMinutes: 1,
     logPath: join(dir, `session-${++n}.jsonl`),
     api: { baseUrl: `${apiUrl}/api/v1/`, apiKey: 'sk-test', provider: 'openrouter', ...api },
     ...over,
@@ -294,17 +293,6 @@ describe('Direct API harness', () => {
     const out = await session();
 
     expect(out).toMatchObject({ code: 1, stopReason: 'API error 400: tools are not supported for this model', final: null });
-    expect(requests).toHaveLength(1);
-  });
-
-  it("stops at the runner's time limit, aborting the request in flight", async () => {
-    script = () => ({ ...answer({ content: 'Too late.' }), delayMs: 20_000 });
-
-    const out = await session({ maxMinutes: 0.03 });
-
-    expect(out.stopReason).toBe("the runner's 0.03-minute limit");
-    expect(out).toMatchObject({ code: 0, final: null, breach: null });
-    expect(out.minutes * 60).toBeLessThan(5);
     expect(requests).toHaveLength(1);
   });
 

@@ -20,6 +20,7 @@ const END: Record<string, string> = {
   solved: 'solved',
   failed: 'not solved',
   timeout: 'time ran out',
+  stopped: 'stopped',
   gave_up: 'gave up',
   invalid: 'too many invalid moves',
 };
@@ -102,7 +103,7 @@ export default async function SuitePage(props: { params: Promise<{ id: string }>
                   return (
                     <li key={i}>
                       <span className="faint">
-                        Test {i + 1} of {total} · {s.minutes} min
+                        Test {i + 1} of {total}
                       </span>
                       {!r ? (
                         <span className="muted">{e.status === 'active' ? 'not started yet' : 'not played (counts 0)'}</span>

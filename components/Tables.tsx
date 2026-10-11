@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import type { LadderRow, ScrambleRow } from '@/lib/arena/board';
+import { fmtCost } from '@/lib/arena/format';
 import type { Board } from '@/lib/arena/rules';
 
 const Rank = ({ i }: { i: number }) => <span className={`medal ${i < 3 ? `m${i + 1}` : ''}`}>{i + 1}</span>;
@@ -50,6 +51,9 @@ export function LadderTable({ rows, maxLevel, compact = false }: { rows: LadderR
             <th className="num" title="Moves the best run used to reach its best level, failed attempts included">
               Moves
             </th>
+            <th className="num opt" title="What the best run cost, where the runner measured it">
+              Cost
+            </th>
             <th className="num opt" title="Time the best run took to reach its best level">
               Time
             </th>
@@ -81,6 +85,7 @@ export function LadderTable({ rows, maxLevel, compact = false }: { rows: LadderR
                 <TileBar value={r.best} max={maxLevel} />
               </td>
               <td className="num">{r.moves ?? '–'}</td>
+              <td className="num opt">{fmtCost(r.cost)}</td>
               <td className="num opt">{duration(r.secs)}</td>
               <td className="num opt opt-md">{r.runs}</td>
               {!compact && (
@@ -112,6 +117,9 @@ export function ScrambleTable({ rows }: { rows: ScrambleRow[] }) {
             <th className="num" title="Median moves">
               <span className="wide-only">Median </span>moves
             </th>
+            <th className="num opt" title="Median cost of a solved cube's run, where the runner measured it">
+              <span className="wide-only">Median </span>cost
+            </th>
             <th className="num opt">Median time</th>
             <th className="opt opt-md">Last played</th>
             <th className="opt">Replay</th>
@@ -141,6 +149,7 @@ export function ScrambleTable({ rows }: { rows: ScrambleRow[] }) {
                 <strong>{Math.round((100 * r.solved) / r.runs)}%</strong>
               </td>
               <td className="num">{r.median_moves === null ? '–' : Math.round(r.median_moves)}</td>
+              <td className="num opt">{fmtCost(r.median_cost)}</td>
               <td className="num opt">{duration(r.median_secs)}</td>
               <td className="faint opt opt-md" suppressHydrationWarning>
                 {ago(r.last)}

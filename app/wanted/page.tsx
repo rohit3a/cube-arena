@@ -85,7 +85,7 @@ export default async function Wanted() {
           </li>
           <li>
             <strong>Pick a row below and run its command.</strong> It claims that model and effort for {CLAIM_HOURS} hours, plays the{' '}
-            {SUITES.fast.name} suite (about 45 minutes), and posts the result. Claude models run through Claude Code, GPT models through Codex,
+            {SUITES.fast.name} suite (no time limit; often an hour or two at high effort), and posts the result. Claude models run through Claude Code, GPT models through Codex,
             and anything else through OpenRouter (<code>OPENROUTER_API_KEY</code>) or another OpenAI-compatible API (<code>--via api</code>).
           </li>
           <li>
@@ -114,7 +114,7 @@ export default async function Wanted() {
         <header className="ix-head">
           <h2>{SUITES.thorough.name} suite</h2>
           <p>
-            Up to about 8 hours, so only the {THOROUGH_TOP} best models on Fast, at their top effort. This list fills in as Fast results arrive.
+            Every test, so many hours: only the {THOROUGH_TOP} best models on Fast, at their top effort. This list fills in as Fast results arrive.
           </p>
         </header>
         <WantedTable items={thorough.map(item)} empty="Nothing yet: Thorough opens up once models have Fast results." />

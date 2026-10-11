@@ -88,9 +88,10 @@ export interface RunRow {
   /** Hidden by the operator: off every public page. */
   hidden: boolean;
   hidden_reason: string | null;
-  /** Suite tests: the suite, which of its slots, and the run's time budget. */
+  /** Suite tests: the suite and which of its slots. */
   suite_id: string | null;
   suite_slot: number | null;
+  /** Unused since suites v2 (no clocks); older suite runs have one. */
   deadline_at: Date | null;
   /** Tokens and cost the Verified runner measured. */
   usage: Usage | null;
@@ -167,9 +168,10 @@ export interface AttemptRow {
   turns: number;
   looks: number;
   invalid: number;
-  status: 'active' | 'solved' | 'failed' | 'gave_up' | 'timeout' | 'invalid';
+  status: 'active' | 'solved' | 'failed' | 'gave_up' | 'timeout' | 'stopped' | 'invalid';
   detail: string | null;
-  deadline_at: Date;
+  /** Unused since suites v2 (no clocks); older attempts have one. */
+  deadline_at: Date | null;
   finished_at: Date | null;
 }
 
@@ -177,7 +179,7 @@ export interface EventRow {
   id: string;
   attempt_id: string;
   at: Date;
-  kind: 'start' | 'look' | 'turn' | 'submit' | 'invalid' | 'give_up' | 'timeout';
+  kind: 'start' | 'look' | 'turn' | 'submit' | 'invalid' | 'give_up' | 'timeout' | 'stop';
   moves: string[] | null;
   move_count: number | null;
   solved: boolean | null;

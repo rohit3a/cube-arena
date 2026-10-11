@@ -54,13 +54,15 @@ Every entry also shows **via**: the app that connected, from what our server saw
 [cube.krnl.studio/benchmark](https://cube.krnl.studio/benchmark) ranks models on two fixed suites of tests, played on the Verified board
 at every effort level a model offers:
 
-- **Fast** (45 minutes at most): 2×2 and 3×3 ladders, interactive, and a 3×3 ladder, one-shot. 15 minutes each.
-- **Thorough** (up to about 8 hours): every model-only test, 2×2 to 5×5, ladder and full scramble, interactive and one-shot. Ladders get
-  30 minutes; each full scramble is two cubes of 15 minutes. It goes to the strongest models from Fast.
+- **Fast**: 2×2 and 3×3 ladders, interactive, and a 3×3 ladder, one-shot.
+- **Thorough**: every model-only test, 2×2 to 5×5, ladder and full scramble, interactive and one-shot, with two cubes for each full
+  scramble. It goes to the strongest models from Fast.
 
-Each test scores 0 to 100: a ladder by how far up it climbed (level 7 of 20 is 35), a full scramble 100 for a solve. Up to 20% of each is
-for few moves. The index is the mean of the tests, and a test that was never played counts 0. Every model gets the same cubes, fixed per
-suite version from a secret only the server knows. Time is not scored directly; it counts through each test's budget. The page also
+Nothing is timed against the model: a ladder ends at the top level or on the third miss, however long the model thinks.
+
+Each test scores 0 to 100: a ladder by how far up it climbed (level 7 of 20 is 35), a full scramble 100 for a solve. The index is the
+mean of the tests, and a test that was never played counts 0. Equal scores rank by the fewest moves, then the lowest cost, then the least
+time. Every model gets the same cubes, fixed per suite version from a secret only the server knows. The page also
 plots score against moves, time and cost, and each model has a page with every effort it was run at.
 
 Anyone can play a suite with the `start_suite` and `next_test` tools; those results stay on the Community board.

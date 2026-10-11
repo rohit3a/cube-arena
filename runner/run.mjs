@@ -6,16 +6,16 @@
 //
 //   node --env-file=.env.local runner/run.mjs --model claude-opus-5-5 [--effort high] \
 //     [--size 3] [--mode interactive|one_shot] [--challenge ladder|scramble] \
-//     [--url https://cube.krnl.studio/mcp] [--max-minutes 90]
+//     [--url https://cube.krnl.studio/mcp]
 //   node --env-file=.env.local runner/run.mjs --model gpt-6-astra --effort xhigh
 //
 // The board name is worked out from the exact model id and effort
 // ("Claude Opus 5.5 (high)", "GPT-6-Astra (xhigh)"), so it cannot be mistyped,
 // and aliases like "opus" are refused, as are efforts a model does not have.
 //
-// Needs CUBE_OPERATOR_TOKEN. If the agent stops before the run is over (time
-// limit, crash, or it just quits), the run is ended as a timeout. Transcripts
-// go to runner/out/ (gitignored), with image data left out.
+// Needs CUBE_OPERATOR_TOKEN. Nothing times the model out. If the agent stops
+// before the run is over (a crash, or it just quits), the run is stopped.
+// Transcripts go to runner/out/ (gitignored), with image data left out.
 
 import { mkdirSync } from 'node:fs';
 import { homedir } from 'node:os';
@@ -34,7 +34,6 @@ const { values: opt } = parseArgs({
     challenge: { type: 'string', default: 'ladder' },
     url: { type: 'string', default: 'https://cube.krnl.studio/mcp' },
     name: { type: 'string', default: 'Cube Arena' },
-    'max-minutes': { type: 'string', default: '90' },
     'codex-home': { type: 'string', default: join(homedir(), '.codex-bench') },
     probe: { type: 'boolean', default: false },
   },
@@ -75,7 +74,6 @@ const r = await playSession({
   headers: { 'x-arena-model': m.label, 'x-arena-tool-use': 'model_only', 'x-arena-name': opt.name },
   url: opt.url,
   token,
-  maxMinutes: Number(opt['max-minutes']),
   codexHome: opt['codex-home'],
   logPath,
 });

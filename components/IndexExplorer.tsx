@@ -7,6 +7,7 @@ import { fmtCost, fmtDuration, fmtScore, fmtTokens, heat } from '@/lib/arena/for
 import { averageByLabel, resultHref } from '@/lib/arena/aggregate';
 import type { SuiteEntry } from '@/lib/arena/index-data';
 import { EFFORT_ORDER } from '@/lib/arena/makers';
+import { suiteOrder } from '@/lib/arena/ranking';
 import type { SuiteKind } from '@/lib/arena/suites';
 
 export interface SuiteInfo {
@@ -53,12 +54,12 @@ export default function IndexExplorer({ entries, suites, running }: { entries: S
       const best = new Map<string, SuiteEntry>();
       for (const e of shown) {
         const b = best.get(e.model);
-        if (!b || (e.score ?? 0) > (b.score ?? 0)) best.set(e.model, e);
+        if (!b || suiteOrder(e, b) < 0) best.set(e.model, e);
       }
       out = [...best.values()];
     } else if (effort === 'all') out = shown;
     else out = shown.filter((e) => e.effort === effort || e.effort === null);
-    return out.sort((a, b) => (b.score ?? 0) - (a.score ?? 0) || a.moves - b.moves);
+    return out.sort(suiteOrder);
   }, [shown, effort]);
 
   const efforts = useMemo(() => EFFORT_ORDER.filter((x) => pool.some((e) => e.effort === x)), [pool]);
@@ -100,7 +101,7 @@ export default function IndexExplorer({ entries, suites, running }: { entries: S
     const byModel = new Map<string, SuiteEntry[]>();
     for (const e of shown) if (e.effort) byModel.set(e.model, [...(byModel.get(e.model) ?? []), e]);
     return [...byModel.entries()]
-      .sort((a, b) => Math.max(...b[1].map((e) => e.score ?? 0)) - Math.max(...a[1].map((e) => e.score ?? 0)))
+      .sort((a, b) => suiteOrder([...a[1]].sort(suiteOrder)[0], [...b[1]].sort(suiteOrder)[0]))
       .map(([model, es], i) => ({
         key: model,
         label: model,

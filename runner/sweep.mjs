@@ -78,8 +78,8 @@ for (const model of models) {
     const same = mine.filter((s) => s.model_name === m.label);
     const done = same.find((s) => s.status === 'finished');
     const open = same.find((s) => s.status === 'active');
-    // A suite touched in the last 45 minutes (a test lasts at most 36) may still be playing elsewhere.
-    const busy = open && Date.now() - Date.parse(open.updated_at) < 45 * 60_000;
+    // A suite with a heartbeat in the last 30 minutes is still playing elsewhere (runners send one every 5).
+    const busy = open && Date.now() - Date.parse(open.updated_at) < 30 * 60_000;
     const state = done ? `done, ${done.grade?.score?.toFixed(1) ?? '?'}` : busy ? 'playing elsewhere, skipped' : open ? 'resume' : 'to play';
     plan.push({ model, effort: m.effort, label: m.label, agent: m.agent, state, resume: !done && open ? open.id : null });
   }

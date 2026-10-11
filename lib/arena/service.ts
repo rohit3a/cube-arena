@@ -7,9 +7,10 @@ import { MoveError, applyMoves, isSolved, moveCost, parseMoves, stateFromString,
 import { fullScramble } from '../cube/random-state';
 import { levelScramble, rng } from '../cube/scramble';
 import { atlasPng } from '../render/png';
+import { CLAIM_HOURS } from './claims';
 import { type AttemptRow, type RunRow, type SuiteRow, type Tx, UUID, transaction, withDb } from './db';
 import {
-  ATTEMPT_MINUTES, type Board, type Challenge, LADDER_LIVES, LADDER_MAX_LEVEL, MAX_INVALID, MAX_LOOKS, MAX_TURN_BATCH, MODE_LABEL, type Mode,
+  type Board, type Challenge, LADDER_LIVES, LADDER_MAX_LEVEL, MAX_INVALID, MAX_LOOKS, MAX_TURN_BATCH, MODE_LABEL, type Mode,
   MODEL_NAME_HELP, RUNS_PER_HOUR, RUNS_PER_HOUR_TOTAL, SCRAMBLE_MOVE_CAP, type Size, TOOL_USE_LABEL, type ToolUse, isFamilyOnly, ladderMoveCap, scoringLine,
   CHALLENGE_LABEL,
 } from './rules';
@@ -158,13 +159,12 @@ async function newAttempt(tx: Tx, run: RunRow): Promise<AttemptRow> {
     cap = SCRAMBLE_MOVE_CAP[n];
   }
   const seq = run.attempts + 1;
-  const minutes = ATTEMPT_MINUTES[run.mode];
   const [a] = await tx<AttemptRow[]>`
     insert into cube_arena.attempts
-      (run_id, seq, size, mode, level, scramble_kind, scramble, certified, initial_state, state, move_cap, deadline_at)
+      (run_id, seq, size, mode, level, scramble_kind, scramble, certified, initial_state, state, move_cap)
     values
       (${run.id}, ${seq}, ${n}, ${run.mode}, ${run.challenge === 'ladder' ? run.level : null}, ${kind}, ${scramble}, ${certified},
-       ${state}, ${state}, ${cap}, least(now() + make_interval(mins => ${minutes}::int), ${run.deadline_at}::timestamptz))
+       ${state}, ${state}, ${cap})
     returning *`;
   await tx`insert into cube_arena.events (attempt_id, kind, move_count, solved, state) values (${a.id}, 'start', 0, false, ${state})`;
   await tx`update cube_arena.runs set attempts = ${seq}, updated_at = now() where id = ${run.id}`;
@@ -224,7 +224,7 @@ async function advance(tx: Tx, run: RunRow, a: AttemptRow): Promise<AttemptRow |
     await finishRun(tx, run, a.status === 'solved' ? 'solved' : a.status);
     return null;
   }
-  if (a.status === 'gave_up' || a.status === 'timeout') {
+  if (a.status === 'gave_up' || a.status === 'stopped') {
     await finishRun(tx, run, a.status);
     return null;
   }
@@ -244,10 +244,6 @@ async function advance(tx: Tx, run: RunRow, a: AttemptRow): Promise<AttemptRow |
   }
   await tx`update cube_arena.runs set level = ${run.level}, lives = ${run.lives}, best_level = ${run.best_level}, solves = ${run.solves},
            updated_at = now() where id = ${run.id}`;
-  if (run.deadline_at && run.deadline_at.getTime() <= Date.now()) {
-    await finishRun(tx, run, 'timeout');
-    return null;
-  }
   return newAttempt(tx, run);
 }
 
@@ -257,23 +253,6 @@ async function endAttempt(tx: Tx, a: AttemptRow, status: AttemptRow['status'], d
   await tx`update cube_arena.attempts set status = ${status}, detail = ${detail}, finished_at = now() where id = ${a.id}`;
 }
 
-/** Why an attempt ran out: its own clock, or the run's (a suite test's) clock, which caps it. */
-function lateReason(run: RunRow, a: AttemptRow): string {
-  // A capped attempt's deadline is the run's, give or take the microseconds lost on the way through JavaScript.
-  if (!run.deadline_at || a.deadline_at.getTime() < run.deadline_at.getTime() - 1000) return `no result within ${ATTEMPT_MINUTES[a.mode]} minutes`;
-  const minutes = Math.round((run.deadline_at.getTime() - run.created_at.getTime()) / 60_000);
-  return run.suite_id ? `the test's ${minutes} minutes ran out` : `the run's ${minutes} minutes ran out`;
-}
-
-/** Expired attempts end as timeouts, whoever touches them first. */
-async function expireIfLate(tx: Tx, run: RunRow, a: AttemptRow): Promise<boolean> {
-  if (a.status !== 'active' || a.deadline_at.getTime() > Date.now()) return false;
-  await endAttempt(tx, a, 'timeout', lateReason(run, a));
-  await tx`insert into cube_arena.events (attempt_id, kind, move_count) values (${a.id}, 'timeout', ${a.move_count})`;
-  await advance(tx, run, a);
-  return true;
-}
-
 function finishedReply(run: RunRow, a: AttemptRow, next: AttemptRow | null, lead: string[]): Reply {
   if (next) return presentAttempt(run, next, lead);
   const end: Record<string, string> = {
@@ -281,7 +260,7 @@ function finishedReply(run: RunRow, a: AttemptRow, next: AttemptRow | null, lead
     out_of_lives: `Out of lives. Run over: best level ${run.best_level}.`,
     solved: 'Run complete.',
     gave_up: 'Run ended.',
-    timeout: 'Run ended: time ran out.',
+    stopped: 'Run stopped.',
   };
   const after = run.suite_id ? (run.suite_note ?? `Call next_test with suite_id "${run.suite_id}" to go on.`) : 'Call start_run to play again.';
   const text = [...lead, end[run.end_reason ?? ''] ?? `Run ended (${run.end_reason}).`, `Replay: ${replayUrl(a)}`, after].join('\n');
@@ -398,7 +377,7 @@ export async function nextTest(suiteId: string, caller: Caller): Promise<Reply> 
     const active = runs.find((r) => r.status === 'active');
     if (active && (only === undefined || active.suite_slot === only)) {
       const [a] = await tx<AttemptRow[]>`select * from cube_arena.attempts where run_id = ${active.id} and status = 'active' order by seq desc limit 1 for update`;
-      if (a && !(await expireIfLate(tx, active, a))) return presentAttempt(active, a, [`Suite test ${(active.suite_slot ?? 0) + 1} of ${def.slots.length} is in progress:`]);
+      if (a) return presentAttempt(active, a, [`Suite test ${(active.suite_slot ?? 0) + 1} of ${def.slots.length} is in progress:`]);
     }
     if (suite.status === 'finished') return { text: await finishSuite(tx, suite), data: { suite_id: suite.id, suite_status: 'finished' } };
 
@@ -420,15 +399,15 @@ async function startSlot(tx: Tx, suite: SuiteRow, slot: number, caller: Caller):
   const level = t.challenge === 'ladder' ? 1 : 0;
   const [run] = await tx<RunRow[]>`
     insert into cube_arena.runs (board, display_name, model_name, tool_use, client, size, mode, challenge, lives, level, ip_hash,
-                                 suite_id, suite_slot, deadline_at)
+                                 suite_id, suite_slot)
     values (${suite.board}, ${suite.display_name}, ${suite.model_name}, 'model_only', ${caller.client}, ${t.size}, ${t.mode}, ${t.challenge},
-            ${lives}, ${level}, ${caller.ipHash}, ${suite.id}, ${slot}, now() + make_interval(mins => ${t.minutes}::int))
+            ${lives}, ${level}, ${caller.ipHash}, ${suite.id}, ${slot})
     returning *`;
   await tx`update cube_arena.suites set updated_at = now() where id = ${suite.id}`;
   const a = await newAttempt(tx, run);
   return presentAttempt(run, a, [
     `${def.name} suite ${def.version}, test ${slot + 1} of ${def.slots.length}: ${t.size}×${t.size} ${CHALLENGE_LABEL[t.challenge]}, ${MODE_LABEL[t.mode]}. ` +
-      `You have ${t.minutes} minutes for this test. suite_id: ${suite.id}`,
+      `No time limit. suite_id: ${suite.id}`,
     SUITE_SCORING,
   ]);
 }
@@ -436,7 +415,6 @@ async function startSlot(tx: Tx, suite: SuiteRow, slot: number, caller: Caller):
 export async function look(attemptId: string, caller?: Caller): Promise<Reply> {
   return transaction(async (tx) => {
     const { run, a } = await lock(tx, attemptId, caller);
-    if (await expireIfLate(tx, run, a)) return finishedReply(run, a, null, ['Time is up for this attempt.']);
     if (a.status !== 'active') {
       const [next] = await tx<AttemptRow[]>`select * from cube_arena.attempts where run_id = ${run.id} and status = 'active' order by seq desc limit 1`;
       if (next) return presentAttempt(run, next, [`That attempt is over (${a.status}). This is the run's current attempt:`]);
@@ -479,7 +457,6 @@ function parse(a: AttemptRow, raw: string | string[]) {
 export async function turn(attemptId: string, raw: string | string[], caller?: Caller): Promise<Reply> {
   return transaction(async (tx) => {
     const { run, a } = await lock(tx, attemptId, caller);
-    if (await expireIfLate(tx, run, a)) return finishedReply(run, a, null, ['Time is up for this attempt.']);
     if (a.status !== 'active') throw new ArenaError('over', `That attempt is over (${a.status}). Use the attempt_id from the latest reply, or call look.`);
     if (a.mode !== 'interactive') throw new ArenaError('wrong_mode', 'This is a one-shot run: send every move at once with submit_solution.');
     const p = parse(a, raw);
@@ -518,7 +495,6 @@ export async function turn(attemptId: string, raw: string | string[], caller?: C
 export async function submitSolution(attemptId: string, raw: string | string[], caller?: Caller): Promise<Reply> {
   return transaction(async (tx) => {
     const { run, a } = await lock(tx, attemptId, caller);
-    if (await expireIfLate(tx, run, a)) return finishedReply(run, a, null, ['Time is up for this attempt.']);
     if (a.status !== 'active') throw new ArenaError('over', `That attempt is over (${a.status}). Use the attempt_id from the latest reply, or call look.`);
     if (a.mode !== 'one_shot') throw new ArenaError('wrong_mode', 'This is an interactive run: use turn.');
     // Unreadable or over-long lists are refused without using up the one
@@ -558,39 +534,65 @@ export async function giveUp(attemptId: string, caller?: Caller): Promise<Reply>
   });
 }
 
-/** End attempts and runs nobody came back to, and suites left unfinished. Cheap; called by pages. */
+/** How long a Verified runner may go without a heartbeat (it sends one every few minutes) before its suite counts as abandoned. */
+const RUNNER_QUIET = '30 minutes';
+/** How long a Community cube may go without a move before it counts as abandoned. There is no runner to ask. */
+const PLAYER_QUIET = '24 hours';
+
+/**
+ * Close what nobody is playing any more. Cheap; called by pages. This never
+ * limits thinking: a Verified runner sends a heartbeat while it plays, so its
+ * suite closes only once the runner itself has gone quiet (crashed, killed,
+ * the machine asleep). A dead runner says nothing about the model, so that
+ * suite is hidden rather than scored. A Community player has no runner, so its
+ * cube is let go after a day without a move, and that does count.
+ */
 export async function sweepExpired(): Promise<void> {
-  // A runner always closes its suite itself, so a Verified suite left idle means
-  // the runner died: hide it rather than count its unplayed tests as 0. A
-  // Community suite left idle is the player giving up, which does count.
+  await transaction(async (tx) => {
+    const quiet = await tx<{ id: string }[]>`
+      update cube_arena.suites set status = 'finished', finished_at = now(), updated_at = now(), hidden = true,
+        hidden_reason = coalesce(hidden_reason, 'abandoned: the runner stopped before the end')
+      where status = 'active' and board = 'verified' and updated_at < now() - ${RUNNER_QUIET}::interval
+      returning id`;
+    if (!quiet.length) return;
+    const ids = quiet.map((q) => q.id);
+    const open = await tx<{ id: string; move_count: number }[]>`
+      update cube_arena.attempts set status = 'stopped', detail = 'abandoned: the runner stopped', finished_at = now()
+      where status = 'active' and run_id in (select id from cube_arena.runs where suite_id in ${tx(ids)})
+      returning id, move_count`;
+    for (const a of open) await tx`insert into cube_arena.events (attempt_id, kind, move_count) values (${a.id}, 'stop', ${a.move_count})`;
+    await tx`
+      update cube_arena.runs set hidden = true, hidden_reason = coalesce(hidden_reason, 'abandoned: the runner stopped before the end'),
+        end_reason = case when status = 'active' then 'stopped' else end_reason end, status = 'finished'
+      where suite_id in ${tx(ids)}`;
+    await tx`update cube_arena.claims set released_at = now() where suite_id in ${tx(ids)} and released_at is null`;
+  });
+
+  const idle = await withDb((sql) => sql<{ run_id: string }[]>`
+    select a.run_id from cube_arena.attempts a join cube_arena.runs r on r.id = a.run_id
+    where a.status = 'active' and r.board = 'community'
+      and coalesce((select e.at from cube_arena.events e where e.attempt_id = a.id order by e.id desc limit 1), a.created_at)
+          < now() - ${PLAYER_QUIET}::interval
+    limit 25`);
+  for (const { run_id } of idle) await stopRun(run_id, 'abandoned: no move for a day');
+
+  // Community suites with nothing in play and no next test asked for: the player gave up, which counts.
   await withDb((sql) => sql`
     with gone as (
-      update cube_arena.suites s set status = 'finished', finished_at = now(),
-        hidden = s.hidden or s.board = 'verified',
-        hidden_reason = case when s.board = 'verified' and not s.hidden then 'abandoned: the runner stopped before the end' else s.hidden_reason end
-      where s.status = 'active' and s.updated_at < now() - interval '2 hours'
+      update cube_arena.suites s set status = 'finished', finished_at = now()
+      where s.status = 'active' and s.board = 'community' and s.updated_at < now() - ${PLAYER_QUIET}::interval
         and not exists (select 1 from cube_arena.runs r where r.suite_id = s.id and r.status = 'active')
-      returning s.id, s.board
-    ), runs as (
-      update cube_arena.runs set hidden = true, hidden_reason = 'abandoned: the runner stopped before the end'
-      where suite_id in (select id from gone where board = 'verified') and not hidden
+      returning s.id
     )
     update cube_arena.claims set released_at = now() where suite_id in (select id from gone) and released_at is null`);
-  const late = await withDb((sql) => sql<{ id: string }[]>`
-    select id from cube_arena.attempts where status = 'active' and deadline_at < now() order by deadline_at limit 25`);
-  for (const { id } of late) {
-    await transaction(async (tx) => {
-      const { run, a } = await lock(tx, id);
-      await expireIfLate(tx, run, a);
-    });
-  }
 }
 
 /**
- * Operator only: ends a run now, its open attempt as a timeout. The Verified
- * runner calls this when it hits its own time limit. `id` is the run id or
- * any of its attempt ids. Returns false if there was no such run or it had
- * already ended.
+ * Ends a run now, its open attempt as stopped. The runner calls this when its
+ * session ends before the run does (the model quit, the CLI crashed, a
+ * lockdown breach), and so does the sweep for abandoned Community cubes. `id`
+ * is the run id or any of its attempt ids. Returns false if there was no such
+ * run or it had already ended.
  */
 export async function stopRun(id: string, detail: string): Promise<boolean> {
   if (!UUID.test(id)) return false;
@@ -600,12 +602,24 @@ export async function stopRun(id: string, detail: string): Promise<boolean> {
     if (!run || run.status !== 'active') return false;
     const [a] = await tx<AttemptRow[]>`select * from cube_arena.attempts where run_id = ${run.id} and status = 'active' order by seq desc limit 1 for update`;
     if (!a) {
-      await finishRun(tx, run, 'timeout');
+      await finishRun(tx, run, 'stopped');
       return true;
     }
-    await endAttempt(tx, a, 'timeout', detail);
-    await tx`insert into cube_arena.events (attempt_id, kind, move_count) values (${a.id}, 'timeout', ${a.move_count})`;
+    await endAttempt(tx, a, 'stopped', detail);
+    await tx`insert into cube_arena.events (attempt_id, kind, move_count) values (${a.id}, 'stop', ${a.move_count})`;
     await advance(tx, run, a);
+    return true;
+  });
+}
+
+/** A Verified runner is still playing this suite; its claim on the model stays too. Returns false if the suite isn't active. */
+export async function heartbeat(suiteId: string): Promise<boolean> {
+  if (!UUID.test(suiteId)) return false;
+  return transaction(async (tx) => {
+    const rows = await tx`update cube_arena.suites set updated_at = now() where id = ${suiteId} and status = 'active' returning id`;
+    if (!rows.length) return false;
+    await tx`update cube_arena.claims set expires_at = greatest(expires_at, now() + make_interval(hours => ${CLAIM_HOURS}))
+             where suite_id = ${suiteId} and released_at is null`;
     return true;
   });
 }

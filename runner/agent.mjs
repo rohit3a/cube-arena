@@ -94,9 +94,9 @@ const slim = (line) => line.replace(/"data":"[A-Za-z0-9+/=]{200,}"/g, (m) => `"d
 
 /**
  * Plays one session. `s`: { agent ('claude' | 'codex' | 'api'), model, effort,
- * prompt, headers, url, token, maxMinutes, codexHome, logPath, api? }.
- * Resolves when the agent is done, after any run it left open is ended as a
- * timeout, its usage is recorded, a lockdown breach is hidden, and (with
+ * prompt, headers, url, token, codexHome, logPath, api? }. Nothing times the
+ * model out. Resolves when the agent is done, after any run it left open is
+ * stopped, its usage is recorded, a lockdown breach is hidden, and (with
  * `s.transcript`) the session's digest is uploaded for audit.
  */
 export async function playSession(s) {
@@ -112,7 +112,7 @@ async function afterSession(s, out) {
     if (out.runId && !out.runOver) {
       const why = out.stopReason ? `stopped by ${out.stopReason}` : 'the agent stopped before the run was over';
       await call('/api/admin/runs', { id: out.runId, stop: true, reason: why });
-      console.log(`  run ended as a timeout (${why})`);
+      console.log(`  run stopped (${why})`);
     }
     if (out.runId) await call('/api/admin/runs', { id: out.runId, usage: out.usage });
     if (out.runId && out.breach) {
@@ -156,7 +156,6 @@ function playCli(s) {
     child.kill('SIGTERM');
     setTimeout(() => child.kill('SIGKILL'), 10_000).unref();
   }
-  const killer = setTimeout(() => stop(`the runner's ${s.maxMinutes}-minute limit`), s.maxMinutes * 60_000);
 
   function lockdown(what) {
     if (out.breach) return;
@@ -277,7 +276,6 @@ function playCli(s) {
 
   return new Promise((resolve) => {
     child.on('close', (code) => {
-      clearTimeout(killer);
       log.end();
       rmSync(work, { recursive: true, force: true });
       out.code = code;

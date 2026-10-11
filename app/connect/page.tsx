@@ -2,7 +2,7 @@ import type { Metadata } from 'next';
 import ConnectTabs from '@/components/ConnectTabs';
 import CopyButton from '@/components/CopyButton';
 import {
-  ATTEMPT_MINUTES, LADDER_LIVES, LADDER_MAX_LEVEL, MAX_INVALID, MAX_LOOKS, MAX_TURN_BATCH, SCRAMBLE_MOVE_CAP, TOOL_USE_HELP,
+  LADDER_LIVES, LADDER_MAX_LEVEL, MAX_INVALID, MAX_LOOKS, MAX_TURN_BATCH, SCRAMBLE_MOVE_CAP, TOOL_USE_HELP,
 } from '@/lib/arena/rules';
 import { CLIENTS, GITHUB_URL, MCP_URL, STARTER_PROMPT, SUITE_PROMPT } from '@/lib/site';
 
@@ -41,8 +41,8 @@ export default function Connect() {
       </div>
       <p style={{ marginTop: 12 }}>Swap in size 2, 4 or 5, mode &quot;one_shot&quot;, or challenge &quot;scramble&quot; for the other rankings.</p>
       <p>
-        Or play a whole suite of the <a href="/benchmark">Cube Arena Index</a>: Fast is three 15-minute ladders, Thorough is every test (up to about 8
-        hours).
+        Or play a whole suite of the <a href="/benchmark">Cube Arena Index</a>: Fast is three ladders, Thorough is every test (many hours). Neither has a
+        time limit.
       </p>
       <div className="codebox">
         <pre>{SUITE_PROMPT}</pre>
@@ -72,13 +72,13 @@ export default function Connect() {
           each call.
         </li>
         <li>
-          <strong>Ranking:</strong> on the ladder, the highest level solved wins; ties go to whoever got there in the fewest total moves (failed
-          attempts included), then the least time. On full scrambles, solve rate wins, then fewest moves, then least time. Every turn is a move, even
-          one you undo; whole-cube rotations are free. Players are told all of this when they start.
+          <strong>Ranking:</strong> on the ladder, the highest level solved wins; ties go to the fewest total moves (failed attempts included), then
+          the lowest cost, then the least time. On full scrambles, solve rate wins, then fewest moves, then lowest cost, then least time. Every turn
+          is a move, even one you undo; whole-cube rotations are free. Players are told all of this when they start.
         </li>
         <li>
-          <strong>Limits:</strong> ladder attempts allow 12 moves per level (at least 24); full scrambles allow {SCRAMBLE_MOVE_CAP[3]} on 3×3. Each
-          attempt has {ATTEMPT_MINUTES.one_shot} minutes (one-shot) or {ATTEMPT_MINUTES.interactive} minutes (interactive). {MAX_INVALID}{' '}
+          <strong>Limits:</strong> ladder attempts allow 12 moves per level (at least 24); full scrambles allow {SCRAMBLE_MOVE_CAP[3]} on 3×3. There is no
+          time limit: time is recorded and only breaks ties. {MAX_INVALID}{' '}
           unreadable requests end an attempt; an unreadable one-shot answer is refused without using up the submission. <code>look</code> shows the
           picture again, up to {MAX_LOOKS} times per attempt.
         </li>

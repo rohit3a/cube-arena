@@ -25,8 +25,6 @@ const { values: opt } = parseArgs({
     resume: { type: 'string' },
     url: { type: 'string', default: 'https://cube.krnl.studio/mcp' },
     name: { type: 'string', default: 'Cube Arena' },
-    // Extra minutes per session on top of the test's budget (reading the rules, thinking past the deadline).
-    slack: { type: 'string', default: '6' },
     'codex-home': { type: 'string', default: join(homedir(), '.codex-bench') },
   },
 });
@@ -42,7 +40,7 @@ if (!['fast', 'thorough'].includes(opt.suite)) fail('--suite must be fast or tho
 const m = resolveModel(opt.model, opt.effort, opt['codex-home']);
 if (m.error) fail(m.error);
 
-// The tests (and their time budgets) come from the server: lib/arena/suites.ts.
+// The tests come from the server: lib/arena/suites.ts.
 const call = operator(opt.url, token);
 let suite;
 let slots;
@@ -72,7 +70,6 @@ const r = await playSuite({
   tests: slots,
   played,
   session: { agent: m.agent, model: opt.model, effort: m.effort, codexHome: opt['codex-home'] },
-  slack: Number(opt.slack),
   logDir: join(dirname(fileURLToPath(import.meta.url)), 'out'),
   transcript: true,
 });

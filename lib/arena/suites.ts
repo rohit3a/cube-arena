@@ -1,7 +1,8 @@
 // Suites: fixed sets of tests played one after another and graded together
 // into one score out of 100. Model only: the index measures the model, not
-// its tools. Every model gets the same cubes (seeded per suite version), and
-// each test has a time budget, so speed counts through how far a model gets.
+// its tools. Every model gets the same cubes (seeded per suite version).
+// Nothing is timed against the model: a test ends on its own terms (lives,
+// the top level, a solve or a miss). Moves, cost and time only break ties.
 //
 // Changing the tests or the grading means a new version: scores only compare
 // within one version.
@@ -18,8 +19,6 @@ export interface SuiteSlot {
   size: Size;
   challenge: Challenge;
   mode: Mode;
-  /** Time budget for this slot's run. */
-  minutes: number;
 }
 
 export interface SuiteDef {
@@ -31,29 +30,29 @@ export interface SuiteDef {
 }
 
 const testId = (size: Size, challenge: Challenge, mode: Mode) => `${size}x${size}-${challenge}-${mode}`;
-const slot = (size: Size, challenge: Challenge, mode: Mode, minutes: number): SuiteSlot => ({ test: testId(size, challenge, mode), size, challenge, mode, minutes });
+const slot = (size: Size, challenge: Challenge, mode: Mode): SuiteSlot => ({ test: testId(size, challenge, mode), size, challenge, mode });
 
 export const SUITES: Record<SuiteKind, SuiteDef> = {
   fast: {
     kind: 'fast',
-    version: 'v1',
+    version: 'v2',
     name: 'Fast',
-    blurb: 'Three ladders with 15 minutes each: 2×2 and 3×3 interactive, and 3×3 one-shot. About 45 minutes at most.',
-    slots: [slot(2, 'ladder', 'interactive', 15), slot(3, 'ladder', 'interactive', 15), slot(3, 'ladder', 'one_shot', 15)],
+    blurb: 'Three ladders: 2×2 and 3×3 interactive, and 3×3 one-shot. No time limit; each ends at the top level or on the third miss.',
+    slots: [slot(2, 'ladder', 'interactive'), slot(3, 'ladder', 'interactive'), slot(3, 'ladder', 'one_shot')],
   },
   thorough: {
     kind: 'thorough',
-    version: 'v1',
+    version: 'v2',
     name: 'Thorough',
     blurb:
-      'Every model-only test: 2×2 to 5×5, ladder and full scramble, interactive and one-shot. Ladders get 30 minutes, and each full scramble two cubes of 15 minutes. Up to about 8 hours.',
+      'Every model-only test: 2×2 to 5×5, ladder and full scramble, interactive and one-shot, with two cubes for each full scramble. No time limit, so it can take many hours.',
     slots: SIZES.flatMap((s) => [
-      slot(s, 'ladder', 'interactive', 30),
-      slot(s, 'ladder', 'one_shot', 30),
-      slot(s, 'scramble', 'interactive', 15),
-      slot(s, 'scramble', 'interactive', 15),
-      slot(s, 'scramble', 'one_shot', 15),
-      slot(s, 'scramble', 'one_shot', 15),
+      slot(s, 'ladder', 'interactive'),
+      slot(s, 'ladder', 'one_shot'),
+      slot(s, 'scramble', 'interactive'),
+      slot(s, 'scramble', 'interactive'),
+      slot(s, 'scramble', 'one_shot'),
+      slot(s, 'scramble', 'one_shot'),
     ]),
   },
 };
@@ -69,8 +68,6 @@ export function suiteTests(def: SuiteDef): { test: string; size: Size; challenge
   return out;
 }
 
-export const suiteMinutes = (def: SuiteDef) => def.slots.reduce((a, s) => a + s.minutes, 0);
-
 /**
  * The seed for one cube of a suite: the same for every model, unknowable
  * without the server's secret. `attempt` counts tries at that level, so a
@@ -83,12 +80,6 @@ export function suiteSeed(kind: SuiteKind, version: string, slotIndex: number, l
 
 // ---------------------------------------------------------------------------
 // Grading
-
-/** How much of a test's points depend on using few moves. Solving counts for the rest. */
-export const EFFICIENCY_WEIGHT = 0.2;
-
-/** Full scrambles: the move count that counts as fully efficient. 2×2 and 3×3: the most any position needs; 4×4 and 5×5: our scramble length. */
-export const SCRAMBLE_REFERENCE: Record<Size, number> = { 2: 11, 3: 20, 4: 40, 5: 60 };
 
 export interface GradedAttempt {
   level: number | null;
@@ -103,24 +94,17 @@ export interface GradedRun {
   attempts: GradedAttempt[];
 }
 
-/** 1 when a cube took no more moves than its reference, less the more it took. */
-export const efficiency = (reference: number, moves: number) => (moves <= 0 ? 1 : Math.min(1, reference / moves));
-
-const blend = (eff: number) => 1 - EFFICIENCY_WEIGHT + EFFICIENCY_WEIGHT * eff;
 const mean = (xs: number[]) => (xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : 0);
 
-/** Ladder: share of the ladder climbed, scaled by efficiency (a level-N cube is N moves from solved). */
+/** Ladder: the share of the ladder climbed. */
 export function ladderScore(run: GradedRun): number {
-  const solved = run.attempts.filter((a) => a.status === 'solved' && a.level);
-  if (!solved.length || run.best_level <= 0) return 0;
-  const eff = mean(solved.map((a) => efficiency(a.level as number, a.move_count)));
-  return (100 * run.best_level * blend(eff)) / LADDER_MAX_LEVEL[run.size];
+  const solved = run.attempts.some((a) => a.status === 'solved' && a.level);
+  return solved && run.best_level > 0 ? (100 * run.best_level) / LADDER_MAX_LEVEL[run.size] : 0;
 }
 
-/** Full scramble: 100 for a solve at or under the reference, less for long solves, 0 for a miss. */
+/** Full scramble: 100 for a solve, 0 for a miss. */
 export function scrambleScore(run: GradedRun): number {
-  const a = run.attempts.find((x) => x.status === 'solved');
-  return a ? 100 * blend(efficiency(SCRAMBLE_REFERENCE[run.size], a.move_count)) : 0;
+  return run.attempts.some((x) => x.status === 'solved') ? 100 : 0;
 }
 
 export const runScore = (run: GradedRun) => (run.challenge === 'ladder' ? ladderScore(run) : scrambleScore(run));
@@ -156,5 +140,5 @@ export function gradeSuite(def: SuiteDef, runsBySlot: Map<number, GradedRun>, fi
 
 /** Told to players at the start of every suite test. */
 export const SUITE_SCORING =
-  `Suite scoring: each test scores 0-100. Ladder: how far up you climb; full scramble: whether you solve it. Up to ${EFFICIENCY_WEIGHT * 100}% of each test is for using few moves (a level-N cube needs N). ` +
-  'Time counts through the budget: when it runs out, the test ends where you are. The suite score is the average of its tests.';
+  'Suite scoring: each test scores 0-100. Ladder: the share of the ladder you climb; full scramble: whether you solve it. The suite score is the average of its tests. ' +
+  'Equal scores rank by the fewest moves (failed attempts included), then the lowest cost, then the least time. There is no time limit: take as long as you need.';
