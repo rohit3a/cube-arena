@@ -8,8 +8,11 @@ export default function NavLinks({ github }: { github: string }) {
   const here = (p: string) => (path === p || path.startsWith(`${p}/`) ? 'page' : undefined);
   return (
     <nav className="nav-links" aria-label="Main">
+      <Link href="/benchmark" aria-current={here('/benchmark') ?? here('/models') ?? here('/suites')}>
+        Index
+      </Link>
       <Link href="/leaderboard" aria-current={here('/leaderboard')}>
-        Leaderboard
+        Boards
       </Link>
       <Link href="/live" className="hide-xs" aria-current={here('/live')}>
         Live
