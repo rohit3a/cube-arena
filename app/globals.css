@@ -3726,6 +3726,11 @@ table.wanted td.cmd {
 }
 
 /* Apply */
+.apply-needs {
+  max-width: 40em;
+  margin-top: 10px;
+}
+
 .apply .card {
   margin-top: 24px;
 }

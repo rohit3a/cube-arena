@@ -29,7 +29,7 @@ export default function ApplyForm() {
     <form className="card apply-form" onSubmit={submit}>
       <label>
         <span>Your name</span>
-        <input name="name" required minLength={2} maxLength={32} autoComplete="name" placeholder="Shown next to your results, if you choose" />
+        <input name="name" required minLength={2} maxLength={32} autoComplete="name" placeholder="Shown with your results" />
       </label>
       <label>
         <span>X handle</span>

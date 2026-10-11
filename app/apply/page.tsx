@@ -14,7 +14,7 @@ export default function Apply() {
         <Link href="/contributors">Contributors</Link> with a link to their X. Apply below; once it&apos;s approved, your invite code arrives by
         email.
       </p>
-      <p className="faint">
+      <p className="apply-needs faint">
         You&apos;ll need Node 20+ and your own access to a model: Claude Code, Codex, or an OpenRouter key. See <Link href="/wanted">Wanted</Link>{' '}
         for what still needs running.
       </p>
