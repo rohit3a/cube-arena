@@ -90,6 +90,11 @@ function codexCommand(s, work) {
 }
 
 // Transcripts keep everything but the pictures, which the site can redraw.
+/** The model name on messages Claude Code writes itself: API errors, usage limits. */
+const SYNTHETIC = '<synthetic>';
+/** Claude Code's notice that one reply ran past the model's output token maximum. */
+const OUTPUT_CAP = /exceeded the \d+ output token maximum/i;
+
 const slim = (line) => line.replace(/"data":"[A-Za-z0-9+/=]{200,}"/g, (m) => `"data":"<${m.length - 9} base64 chars>"`);
 
 /**
@@ -109,7 +114,9 @@ export async function playSession(s) {
 async function afterSession(s, out) {
   const call = operator(s.url, s.token);
   try {
-    if (out.runId && !out.runOver) {
+    if (out.runId && !out.runOver && out.apiError) {
+      console.log('  left open: the same test picks up again once the API answers');
+    } else if (out.runId && !out.runOver) {
       const why = out.stopReason ? `stopped by ${out.stopReason}` : 'the agent stopped before the run was over';
       await call('/api/admin/runs', { id: out.runId, stop: true, reason: why });
       console.log(`  run stopped (${why})`);
@@ -139,7 +146,7 @@ function playCli(s) {
   const secs = () => `${Math.round((Date.now() - started) / 1000)}s`;
   const child = spawn(cmd, args, { cwd: work, env, stdio: ['ignore', 'pipe', 'pipe'] });
 
-  const out = { runId: null, runOver: false, last: null, calls: 0, breach: null, stopReason: null, final: null, usage: {}, code: null, minutes: 0, events: [] };
+  const out = { runId: null, runOver: false, last: null, calls: 0, breach: null, stopReason: null, apiError: null, final: null, usage: {}, code: null, minutes: 0, events: [] };
   // The audit digest: what the model said and called, no pictures.
   const note = (kind, text, tool) => out.events.push({ t: Math.round((Date.now() - started) / 1000), kind, ...(tool && { tool }), text: String(text ?? '') });
   // Claude Code's session totals come with its result event. Each assistant
@@ -190,6 +197,16 @@ function playCli(s) {
       if (ev.model !== s.model) lockdown(`asked for ${s.model}, the CLI started ${ev.model}`);
       const extra = (ev.tools ?? []).filter((t) => !t.startsWith('mcp__cube-arena__'));
       if (extra.length) lockdown(`tools besides the cube: ${extra.join(', ')}`);
+    }
+    if (ev.type === 'assistant' && ev.message?.model === SYNTHETIC) {
+      // Claude Code's own notice (an API error, a usage limit), not a model answering.
+      const text = (ev.message.content ?? []).map((p) => p.text ?? '').join(' ').trim();
+      note('error', text);
+      console.log(`  [${secs()}] Claude Code: ${text.slice(0, 200)}`);
+      // A reply past the model's output limit is the model's own doing: the test ends there.
+      if (OUTPUT_CAP.test(text)) out.stopReason ??= "a reply over the model's output token limit";
+      else out.apiError ??= text || 'an API error';
+      return;
     }
     if (ev.type === 'assistant') {
       if (ev.message?.model && ev.message.model !== s.model) lockdown(`${ev.message.model} answered, not ${s.model}`);

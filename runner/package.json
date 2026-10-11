@@ -1,6 +1,6 @@
 {
   "name": "cube-arena-runner",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "description": "Run Cube Arena Index suites with any model, locked down to the cube tools, and post them to the Verified board with an invite code.",
   "keywords": ["benchmark", "llm", "mcp", "rubiks-cube", "vision"],
   "homepage": "https://cube.krnl.studio/wanted",
