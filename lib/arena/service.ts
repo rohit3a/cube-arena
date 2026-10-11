@@ -39,6 +39,8 @@ export interface Caller {
     /** Suite sessions: this session may only play this slot (one fresh agent per test). */
     suiteSlot?: number;
   };
+  /** An invitee's runner: it may only play suites made under its own invite. */
+  invite?: { id: string; name: string };
 }
 
 /** What a tool call returns: words for the model, and the cube picture when relevant. */
@@ -170,11 +172,14 @@ async function newAttempt(tx: Tx, run: RunRow): Promise<AttemptRow> {
   return a;
 }
 
-async function lock(tx: Tx, attemptId: string): Promise<{ run: RunRow; a: AttemptRow }> {
+async function lock(tx: Tx, attemptId: string, caller?: Caller): Promise<{ run: RunRow; a: AttemptRow }> {
   if (!UUID.test(attemptId)) throw new ArenaError('bad_attempt', 'That attempt_id is not valid. Use the attempt_id from the latest reply.');
   const [a] = await tx<AttemptRow[]>`select * from cube_arena.attempts where id = ${attemptId} for update`;
   if (!a) throw new ArenaError('bad_attempt', 'No attempt with that attempt_id.');
   const [run] = await tx<RunRow[]>`select * from cube_arena.runs where id = ${a.run_id} for update`;
+  // Attempt ids show up in replay links, so a Verified run only takes moves
+  // from a Verified caller; nobody else can play (or spoil) it.
+  if (caller && run.board === 'verified' && caller.board !== 'verified') throw new ArenaError('bad_attempt', 'That attempt is on the Verified board.');
   return { run, a };
 }
 
@@ -203,6 +208,8 @@ async function afterSuiteTest(tx: Tx, suiteId: string, slot: number): Promise<st
 async function finishSuite(tx: Tx, suite: SuiteRow): Promise<string> {
   if (suite.status !== 'finished') {
     await tx`update cube_arena.suites set status = 'finished', finished_at = now(), updated_at = now() where id = ${suite.id}`;
+    // Its claim, if any, is done: the model and effort are free for another run.
+    await tx`update cube_arena.claims set released_at = now() where suite_id = ${suite.id} and released_at is null`;
     suite.status = 'finished';
   }
   const grade = (await gradeSuites(tx, [suite])).get(suite.id);
@@ -305,7 +312,14 @@ async function checkRate(caller: Caller) {
   if (everyone >= RUNS_PER_HOUR_TOTAL) throw new ArenaError('slow_down', 'Cube Arena is very busy right now. Try again in a little while.');
 }
 
+// Invite codes are for suites the runner sets up (names come from the model
+// catalog), not for one-off runs or suites a model starts itself.
+function noInvite(caller: Caller) {
+  if (caller.invite) throw new ArenaError('invite_suites_only', 'An invite code only plays suites set up by the Cube Arena runner (npx cube-arena-runner). Remove it to play on the Community board.');
+}
+
 export async function startRun(input: StartInput, caller: Caller): Promise<Reply> {
+  noInvite(caller);
   const { display, model } = namesFor(input, caller);
   const toolUse = caller.operator?.toolUse ?? input.tool_use;
   await checkRate(caller);
@@ -331,19 +345,30 @@ export async function createSuite(
   kind: SuiteKind,
   names: { display: string; model: string },
   caller: Caller,
-  meta: { model?: string | null; model_id?: string | null; effort?: string | null; agent?: string | null } = {},
+  meta: {
+    model?: string | null;
+    model_id?: string | null;
+    effort?: string | null;
+    agent?: string | null;
+    harness?: string | null;
+    invite_id?: string | null;
+    credit?: boolean;
+  } = {},
 ): Promise<SuiteRow> {
   const def = SUITES[kind];
   const [suite] = await withDb((sql) => sql<SuiteRow[]>`
-    insert into cube_arena.suites (kind, version, board, display_name, model_name, model, model_id, effort, agent, client, ip_hash)
+    insert into cube_arena.suites (kind, version, board, display_name, model_name, model, model_id, effort, agent, client, ip_hash,
+                                   harness, invite_id, credit)
     values (${kind}, ${def.version}, ${caller.board}, ${names.display}, ${names.model}, ${meta.model ?? null}, ${meta.model_id ?? null},
-            ${meta.effort ?? null}, ${meta.agent ?? null}, ${caller.client}, ${caller.ipHash})
+            ${meta.effort ?? null}, ${meta.agent ?? null}, ${caller.client}, ${caller.ipHash},
+            ${meta.harness ?? meta.agent ?? null}, ${meta.invite_id ?? null}, ${meta.credit ?? false})
     returning *`);
   return suite;
 }
 
 export async function startSuite(kind: SuiteKind, input: { display_name: string; model_name: string }, caller: Caller): Promise<Reply> {
   if (!SUITES[kind]) throw new ArenaError('bad_suite', 'suite must be "fast" or "thorough".');
+  noInvite(caller);
   const names = namesFor(input, caller);
   await checkRate(caller);
   const suite = await createSuite(kind, names, caller);
@@ -357,6 +382,7 @@ export async function nextTest(suiteId: string, caller: Caller): Promise<Reply> 
     const [suite] = await tx<SuiteRow[]>`select * from cube_arena.suites where id = ${suiteId} for update`;
     if (!suite) throw new ArenaError('bad_suite', 'No suite with that suite_id.');
     if (suite.board !== caller.board) throw new ArenaError('bad_suite', `That suite is on the ${suite.board} board.`);
+    if (caller.invite && suite.invite_id !== caller.invite.id) throw new ArenaError('bad_suite', 'That suite was not made with this invite code.');
     const def = SUITES[suite.kind];
     const only = caller.operator?.suiteSlot;
     const runs = await tx<RunRow[]>`select * from cube_arena.runs where suite_id = ${suite.id} order by suite_slot`;
@@ -399,9 +425,9 @@ async function startSlot(tx: Tx, suite: SuiteRow, slot: number, caller: Caller):
   ]);
 }
 
-export async function look(attemptId: string): Promise<Reply> {
+export async function look(attemptId: string, caller?: Caller): Promise<Reply> {
   return transaction(async (tx) => {
-    const { run, a } = await lock(tx, attemptId);
+    const { run, a } = await lock(tx, attemptId, caller);
     if (await expireIfLate(tx, run, a)) return finishedReply(run, a, null, ['Time is up for this attempt.']);
     if (a.status !== 'active') {
       const [next] = await tx<AttemptRow[]>`select * from cube_arena.attempts where run_id = ${run.id} and status = 'active' order by seq desc limit 1`;
@@ -442,9 +468,9 @@ function parse(a: AttemptRow, raw: string | string[]) {
   }
 }
 
-export async function turn(attemptId: string, raw: string | string[]): Promise<Reply> {
+export async function turn(attemptId: string, raw: string | string[], caller?: Caller): Promise<Reply> {
   return transaction(async (tx) => {
-    const { run, a } = await lock(tx, attemptId);
+    const { run, a } = await lock(tx, attemptId, caller);
     if (await expireIfLate(tx, run, a)) return finishedReply(run, a, null, ['Time is up for this attempt.']);
     if (a.status !== 'active') throw new ArenaError('over', `That attempt is over (${a.status}). Use the attempt_id from the latest reply, or call look.`);
     if (a.mode !== 'interactive') throw new ArenaError('wrong_mode', 'This is a one-shot run: send every move at once with submit_solution.');
@@ -481,9 +507,9 @@ export async function turn(attemptId: string, raw: string | string[]): Promise<R
   });
 }
 
-export async function submitSolution(attemptId: string, raw: string | string[]): Promise<Reply> {
+export async function submitSolution(attemptId: string, raw: string | string[], caller?: Caller): Promise<Reply> {
   return transaction(async (tx) => {
-    const { run, a } = await lock(tx, attemptId);
+    const { run, a } = await lock(tx, attemptId, caller);
     if (await expireIfLate(tx, run, a)) return finishedReply(run, a, null, ['Time is up for this attempt.']);
     if (a.status !== 'active') throw new ArenaError('over', `That attempt is over (${a.status}). Use the attempt_id from the latest reply, or call look.`);
     if (a.mode !== 'one_shot') throw new ArenaError('wrong_mode', 'This is an interactive run: use turn.');
@@ -513,9 +539,9 @@ export async function submitSolution(attemptId: string, raw: string | string[]):
   });
 }
 
-export async function giveUp(attemptId: string): Promise<Reply> {
+export async function giveUp(attemptId: string, caller?: Caller): Promise<Reply> {
   return transaction(async (tx) => {
-    const { run, a } = await lock(tx, attemptId);
+    const { run, a } = await lock(tx, attemptId, caller);
     if (a.status !== 'active') throw new ArenaError('over', `That attempt is already over (${a.status}).`);
     await endAttempt(tx, a, 'gave_up', null);
     await tx`insert into cube_arena.events (attempt_id, kind, move_count) values (${a.id}, 'give_up', ${a.move_count})`;
@@ -526,10 +552,22 @@ export async function giveUp(attemptId: string): Promise<Reply> {
 
 /** End attempts and runs nobody came back to, and suites left unfinished. Cheap; called by pages. */
 export async function sweepExpired(): Promise<void> {
+  // A runner always closes its suite itself, so a Verified suite left idle means
+  // the runner died: hide it rather than count its unplayed tests as 0. A
+  // Community suite left idle is the player giving up, which does count.
   await withDb((sql) => sql`
-    update cube_arena.suites s set status = 'finished', finished_at = now()
-    where s.status = 'active' and s.updated_at < now() - interval '2 hours'
-      and not exists (select 1 from cube_arena.runs r where r.suite_id = s.id and r.status = 'active')`);
+    with gone as (
+      update cube_arena.suites s set status = 'finished', finished_at = now(),
+        hidden = s.hidden or s.board = 'verified',
+        hidden_reason = case when s.board = 'verified' and not s.hidden then 'abandoned: the runner stopped before the end' else s.hidden_reason end
+      where s.status = 'active' and s.updated_at < now() - interval '2 hours'
+        and not exists (select 1 from cube_arena.runs r where r.suite_id = s.id and r.status = 'active')
+      returning s.id, s.board
+    ), runs as (
+      update cube_arena.runs set hidden = true, hidden_reason = 'abandoned: the runner stopped before the end'
+      where suite_id in (select id from gone where board = 'verified') and not hidden
+    )
+    update cube_arena.claims set released_at = now() where suite_id in (select id from gone) and released_at is null`);
   const late = await withDb((sql) => sql<{ id: string }[]>`
     select id from cube_arena.attempts where status = 'active' and deadline_at < now() order by deadline_at limit 25`);
   for (const { id } of late) {

@@ -60,6 +60,10 @@ export function demoEntries(): SuiteEntry[] {
           cost_estimated: slug.startsWith('gpt'),
           runs: [],
           progress: { started: tests.length, of: tests.length },
+          n: 1,
+          ids: [`00000000-0000-4000-8000-${String(n).padStart(12, '0')}`],
+          run_by: ['Cube Arena'],
+          harness: slug.startsWith('gpt') ? 'Codex' : 'Claude Code',
         });
       }
     }

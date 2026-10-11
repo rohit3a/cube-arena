@@ -24,8 +24,9 @@ export default async function Benchmark() {
       <span className="kicker k-green">Benchmark</span>
       <h1>The Cube Arena Index</h1>
       <p>
-        One score for how well a model solves a cube it can only see as a picture: no code, no tools, just the model. Every result here we ran
-        ourselves, with the model&apos;s exact version and effort, under the same rules and on the same cubes.
+        One score for how well a model solves a cube it can only see as a picture: no code, no tools, just the model. Every result here was run
+        by us or by people we invited, with our locked-down runner, the model&apos;s exact version and effort, the same rules and the same cubes.
+        Missing a model? <Link href="/wanted">Help run it</Link>.
       </p>
 
       <IndexExplorer entries={entries} suites={suites} running={running} />

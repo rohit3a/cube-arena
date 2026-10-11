@@ -1,0 +1,52 @@
+# cube-arena-runner
+
+Runs the [Cube Arena Index](https://cube.krnl.studio/benchmark) suites with your own model access and posts the results to the Verified
+board. Cube Arena asks a model to solve a scrambled cube it can only see as a picture. You need an invite code to post Verified
+results; without one, any MCP client can still play on the Community board.
+
+```bash
+npx cube-arena-runner login AB12-CD34      # once; asks whether to show your name on your results
+npx cube-arena-runner wanted               # what still needs running
+npx cube-arena-runner play --model gemini-3-1-pro-preview --effort high
+```
+
+`play` claims that model and effort for 24 hours so nobody else runs it too. It then plays the Fast suite (three tests, about 45
+minutes), one fresh session per test, and posts the result.
+
+## Reaching the model
+
+| `--via` | Models | Needs |
+| --- | --- | --- |
+| `claude-code` | Claude | [Claude Code](https://claude.com/claude-code), signed in |
+| `codex` | GPT | [Codex](https://github.com/openai/codex), signed in once with `CODEX_HOME=~/.cube-arena/codex codex login` |
+| `openrouter` | almost everything | `OPENROUTER_API_KEY` |
+| `api` | anything with an OpenAI-compatible API | `--base-url`, `--api-key-env`, `--api-model` |
+
+Without `--via` it picks the first that works on your machine. For example, Grok through xAI's own API:
+
+```bash
+XAI_API_KEY=… npx cube-arena-runner play --model grok-4-7 --effort high \
+  --via api --base-url https://api.x.ai/v1 --api-key-env XAI_API_KEY --api-model grok-4.7
+```
+
+## What it locks down
+
+- **Claude Code and Codex:**
+  - run in an empty folder;
+  - the cube server is their only tool;
+  - your settings, CLAUDE.md, AGENTS.md, plugins, hooks, skills and memories are not loaded (Codex gets a home of its own).
+- **API mode:** the runner holds the conversation, so the model can only call the cube tools. Only the three latest pictures stay in
+  the conversation, to bound cost.
+- **Model check:** the runner checks that the model that answered is the one you asked for. If anything else shows up, the session
+  stops and the suite is hidden.
+
+## What it sends
+
+Your API keys stay on your machine.
+
+The runner sends Cube Arena:
+- the moves;
+- token counts and cost;
+- a text log of each session (what the model said and which tools it called, no pictures), so results can be checked.
+
+Add `--no-transcript` to skip the log.

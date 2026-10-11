@@ -3,9 +3,12 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { BarChart } from '@/components/charts';
 import { fmtCost, fmtDuration, fmtScore, fmtTokens, heat } from '@/lib/arena/format';
+import { averageByLabel, resultHref } from '@/lib/arena/aggregate';
+import { type CatalogModel, catalogModel, harnessLabel } from '@/lib/arena/catalog';
 import { type SuiteEntry, suiteEntries, testNames } from '@/lib/arena/index-data';
 import { effortRank } from '@/lib/arena/makers';
 import { SUITES, SUITE_KINDS } from '@/lib/arena/suites';
+import { commandFor } from '@/lib/arena/wanted';
 
 export const dynamic = 'force-dynamic';
 
@@ -16,15 +19,21 @@ async function entriesFor(slug: string): Promise<SuiteEntry[]> {
 }
 
 export async function generateMetadata(props: { params: Promise<{ slug: string }> }): Promise<Metadata> {
-  const es = await entriesFor((await props.params).slug);
-  return { title: es[0]?.model ?? 'Model' };
+  const slug = (await props.params).slug;
+  const es = await entriesFor(slug);
+  return { title: es[0]?.model ?? catalogModel(slug)?.name ?? 'Model' };
 }
 
 export default async function ModelPage(props: { params: Promise<{ slug: string }> }) {
   const slug = (await props.params).slug;
   const es = await entriesFor(slug);
-  if (es.length === 0) notFound();
+  const listed = catalogModel(slug);
+  if (es.length === 0) {
+    if (!listed) notFound();
+    return <NotRunYet slug={slug} />;
+  }
   const { model, maker, color, board } = es[0];
+  const invited = es.some((e) => !e.run_by.includes('Cube Arena'));
   const finished = es.filter((e) => e.status === 'finished');
   const best = (kind: string) => finished.filter((e) => e.kind === kind && e.version === SUITES[e.kind].version).sort((a, b) => (b.score ?? 0) - (a.score ?? 0))[0];
 
@@ -35,7 +44,8 @@ export default async function ModelPage(props: { params: Promise<{ slug: string 
       <p>
         {board === 'verified' ? (
           <>
-            <span className="badge verified">Verified</span> Model id <code>{slug}</code>, run by us at each effort level it offers.
+            <span className="badge verified">Verified</span> Model id <code>{slug}</code>, run at each effort level it offers
+            {invited ? ' by us and by people we invited' : ' by us'}. Runs of the same effort are averaged.
           </>
         ) : (
           <>
@@ -62,11 +72,12 @@ export default async function ModelPage(props: { params: Promise<{ slug: string 
       </div>
 
       {SUITE_KINDS.map((k) => {
-        const rows = latestPerEffort(finished.filter((e) => e.kind === k && e.version === SUITES[k].version));
+        const all = finished.filter((e) => e.kind === k && e.version === SUITES[k].version);
+        const rows = averageByLabel(all).sort((a, b) => effortRank(a.effort) - effortRank(b.effort));
         if (rows.length === 0) return null;
         const tests = testNames(k);
         return (
-          <section key={k} className="card ix-card">
+          <section key={k} id={k} className="card ix-card">
             <header className="ix-head">
               <h2>
                 {SUITES[k].name} {SUITES[k].version} by effort
@@ -75,7 +86,7 @@ export default async function ModelPage(props: { params: Promise<{ slug: string 
             </header>
             <BarChart
               height={180}
-              items={rows.map((e) => ({ key: e.id, label: e.effort ?? 'default', value: e.score, color, href: `/suites/${e.id}` }))}
+              items={rows.map((e) => ({ key: e.id, label: e.effort ?? 'default', value: e.score, color, href: resultHref(e) }))}
             />
             <div className="table-wrap flat">
               <table className="heat">
@@ -92,13 +103,14 @@ export default async function ModelPage(props: { params: Promise<{ slug: string 
                     <th className="num">Time</th>
                     <th className="num">Tokens</th>
                     <th className="num">Cost</th>
+                    <th className="num">Runs</th>
                   </tr>
                 </thead>
                 <tbody>
                   {rows.map((e) => (
                     <tr key={e.id}>
                       <td>
-                        <Link href={`/suites/${e.id}`}>{e.effort ?? 'default'}</Link>
+                        <Link href={e.n > 1 ? `#${k}-runs` : `/suites/${e.id}`}>{e.effort ?? 'default'}</Link>
                       </td>
                       <td className="num strong">{fmtScore(e.score)}</td>
                       {tests.map((t) => {
@@ -113,11 +125,33 @@ export default async function ModelPage(props: { params: Promise<{ slug: string 
                       <td className="num">{fmtDuration(e.secs)}</td>
                       <td className="num">{fmtTokens(e.output_tokens === null ? null : (e.input_tokens ?? 0) + e.output_tokens)}</td>
                       <td className="num">{fmtCost(e.cost_usd)}</td>
+                      <td className="num">{e.n}</td>
                     </tr>
                   ))}
                 </tbody>
               </table>
             </div>
+            <details id={`${k}-runs`} className="runs-list" open={all.length > rows.length}>
+              <summary>
+                Every run ({all.length})
+              </summary>
+              <ul>
+                {all
+                  .sort((a, b) => effortRank(a.effort) - effortRank(b.effort) || (b.finished_at ?? '').localeCompare(a.finished_at ?? ''))
+                  .map((e) => (
+                    <li key={e.id}>
+                      <Link href={`/suites/${e.id}`}>
+                        <strong>{fmtScore(e.score)}</strong> at {e.effort ?? 'default'}
+                      </Link>{' '}
+                      <span className="muted">
+                        · run by {e.run_by.join(', ')}
+                        {e.harness ? ` via ${e.harness}` : ''} ·{' '}
+                        <span suppressHydrationWarning>{e.finished_at ? new Date(e.finished_at).toLocaleDateString(undefined, { day: 'numeric', month: 'short' }) : ''}</span>
+                      </span>
+                    </li>
+                  ))}
+              </ul>
+            </details>
           </section>
         );
       })}
@@ -142,9 +176,32 @@ export default async function ModelPage(props: { params: Promise<{ slug: string 
   );
 }
 
-/** One row per effort, the most recent result for each, low to max. */
-function latestPerEffort(es: SuiteEntry[]): SuiteEntry[] {
-  const seen = new Map<string, SuiteEntry>();
-  for (const e of es) if (!seen.has(e.effort ?? '')) seen.set(e.effort ?? '', e);
-  return [...seen.values()].sort((a, b) => effortRank(a.effort) - effortRank(b.effort));
+/** A catalog model nobody has run yet: what it is and how to run it. */
+function NotRunYet({ slug }: { slug: string }) {
+  const m = catalogModel(slug) as CatalogModel;
+  const efforts = m.efforts.length ? m.efforts : [null];
+  return (
+    <div className="wrap page-head">
+      <span className="kicker k-orange">{m.maker}</span>
+      <h1>{m.name}</h1>
+      <p>
+        Not run yet. {m.efforts.length ? `It takes effort ${m.efforts.join(', ')}.` : 'It has no effort setting.'} Reached via{' '}
+        {Object.keys(m.via).map((h) => harnessLabel(h)).join(', ')}.
+      </p>
+      <section className="card ix-card">
+        <header className="ix-head">
+          <h2>Run it</h2>
+          <p>
+            With an invite code, each of these plays the Fast suite and posts it to the Verified board. See <Link href="/wanted">what&apos;s wanted</Link>.
+          </p>
+        </header>
+        <div className="codebox">
+          <pre>{efforts.map((e) => commandFor(m.id, e, 'fast')).join('\n')}</pre>
+        </div>
+      </section>
+      <p className="board-foot">
+        <Link href="/benchmark">Compare with every model</Link> · <Link href="/wanted">Wanted</Link>
+      </p>
+    </div>
+  );
 }

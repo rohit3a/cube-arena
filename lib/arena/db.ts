@@ -126,6 +126,24 @@ export interface SuiteRow {
   status: 'active' | 'finished';
   hidden: boolean;
   hidden_reason: string | null;
+  /** Set when an invitee's runner made it (Verified). */
+  invite_id: string | null;
+  /** The invitee chose to show their name on it. */
+  credit: boolean;
+  /** How the model was reached: claude-code, codex, openrouter, or an API host. */
+  harness: string | null;
+}
+
+export interface InviteRow {
+  id: string;
+  created_at: Date;
+  name: string;
+  note: string | null;
+  code_hash: string;
+  code_hint: string;
+  expires_at: Date | null;
+  revoked_at: Date | null;
+  last_used_at: Date | null;
 }
 
 export interface AttemptRow {

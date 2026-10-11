@@ -3,6 +3,7 @@
 // boards (board.ts): dates arrive as strings after the round trip.
 
 import { unstable_cache } from 'next/cache';
+import { catalogCost, harnessLabel } from './catalog';
 import { clientLabel } from './clients';
 import { type SuiteRow, type Usage, UUID, withDb } from './db';
 import { estimateCost, makerOf, slugOf, splitLabel } from './makers';
@@ -58,16 +59,24 @@ export interface SuiteEntry {
   runs: SuiteRunInfo[];
   /** Tests started so far, of how many: "test 2 of 3" while it runs. */
   progress: { started: number; of: number };
+  /** Suites this entry stands for: 1, or more once averaged (aggregate.ts). */
+  n: number;
+  ids: string[];
+  /** Who ran it: "Cube Arena", an invitee who chose to show their name, or "an invited tester". */
+  run_by: string[];
+  /** How the model was reached: "Claude Code", "Codex", "OpenRouter", an API host. */
+  harness: string | null;
 }
 
 interface Row extends SuiteRow {
+  invite_name: string | null;
   runs: (Omit<SuiteRunInfo, 'via'> & { usage: Usage | null; client: string | null })[];
 }
 
 async function suiteEntriesQuery(): Promise<SuiteEntry[]> {
   return withDb(async (sql) => {
     const rows = await sql<Row[]>`
-      select s.*,
+      select s.*, i.name as invite_name,
         coalesce((
           select json_agg(json_build_object(
             'slot', r.suite_slot, 'run_id', r.id, 'status', r.status, 'end_reason', r.end_reason,
@@ -83,7 +92,7 @@ async function suiteEntriesQuery(): Promise<SuiteEntry[]> {
           ) a on true
           where r.suite_id = s.id
         ), '[]'::json) as runs
-      from cube_arena.suites s
+      from cube_arena.suites s left join cube_arena.invites i on i.id = s.invite_id
       where not s.hidden
       order by s.created_at desc
       limit 1000`;
@@ -101,7 +110,7 @@ async function suiteEntriesQuery(): Promise<SuiteEntry[]> {
       let estimated = false;
       for (const r of s.runs) {
         const reported = r.usage?.cost_usd;
-        const est = r.usage ? estimateCost(s.model_id, r.usage) : null;
+        const est = r.usage ? (estimateCost(s.model_id, r.usage) ?? catalogCost(s.model_id, r.usage)) : null;
         if (Number.isFinite(reported)) cost = (cost ?? 0) + (reported as number);
         else if (est !== null) {
           cost = (cost ?? 0) + est;
@@ -141,6 +150,10 @@ async function suiteEntriesQuery(): Promise<SuiteEntry[]> {
           started: new Set(s.runs.map((r) => SUITES[s.kind].slots[r.slot]?.test)).size,
           of: suiteTests(SUITES[s.kind]).length,
         },
+        n: 1,
+        ids: [s.id],
+        run_by: [s.board === 'community' ? s.display_name : !s.invite_id ? 'Cube Arena' : s.credit && s.invite_name ? s.invite_name : 'an invited tester'],
+        harness: harnessLabel(s.harness ?? s.agent),
       };
     });
   });

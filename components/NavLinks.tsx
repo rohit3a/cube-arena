@@ -14,7 +14,10 @@ export default function NavLinks({ github }: { github: string }) {
       <Link href="/leaderboard" aria-current={here('/leaderboard')}>
         Boards
       </Link>
-      <Link href="/live" className="hide-xs" aria-current={here('/live')}>
+      <Link href="/wanted" className="hide-xs" aria-current={here('/wanted')}>
+        Wanted
+      </Link>
+      <Link href="/live" className="hide-sm" aria-current={here('/live')}>
         Live
       </Link>
       <a href={github} className="hide-sm">

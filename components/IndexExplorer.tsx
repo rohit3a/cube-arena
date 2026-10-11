@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useMemo, useState } from 'react';
 import { BarChart, LineChart, ScatterChart, type Series } from '@/components/charts';
 import { fmtCost, fmtDuration, fmtScore, fmtTokens, heat } from '@/lib/arena/format';
+import { averageByLabel, resultHref } from '@/lib/arena/aggregate';
 import type { SuiteEntry } from '@/lib/arena/index-data';
 import { EFFORT_ORDER } from '@/lib/arena/makers';
 import type { SuiteKind } from '@/lib/arena/suites';
@@ -37,15 +38,11 @@ export default function IndexExplorer({ entries, suites, running }: { entries: S
   const [tradeoff, setTradeoff] = useState<'moves' | 'time' | 'cost'>('moves');
   const suite = suites.find((s) => s.kind === kind) as SuiteInfo;
 
-  // The latest finished result for each model and effort, this suite version.
-  const pool = useMemo(() => {
-    const seen = new Map<string, SuiteEntry>();
-    for (const e of entries) {
-      if (e.kind !== kind || e.version !== suite.version || e.status !== 'finished' || e.board !== 'verified') continue;
-      if (!seen.has(e.label)) seen.set(e.label, e);
-    }
-    return [...seen.values()];
-  }, [entries, kind, suite.version]);
+  // One result per model and effort, this suite version: the average when it was run more than once.
+  const pool = useMemo(
+    () => averageByLabel(entries.filter((e) => e.kind === kind && e.version === suite.version && e.status === 'finished' && e.board === 'verified')),
+    [entries, kind, suite.version],
+  );
 
   const models = useMemo(() => [...new Set(pool.map((e) => e.model))].sort(), [pool]);
   const shown = pool.filter((e) => !hidden.has(e.model));
@@ -74,7 +71,7 @@ export default function IndexExplorer({ entries, suites, running }: { entries: S
     href: `/models/${e.slug}`,
   }));
 
-  const point = (e: SuiteEntry, x: number | null) => (x === null ? [] : [{ key: e.id, label: e.label, x, y: e.score ?? 0, color: e.color, href: `/suites/${e.id}` }]);
+  const point = (e: SuiteEntry, x: number | null) => (x === null ? [] : [{ key: e.id, label: e.label, x, y: e.score ?? 0, color: e.color, href: resultHref(e) }]);
   const scatter = {
     moves: {
       points: rows.flatMap((e) => point(e, e.moves_per_solve)),
@@ -234,7 +231,7 @@ export default function IndexExplorer({ entries, suites, running }: { entries: S
                   {rows.map((e) => (
                     <tr key={e.id}>
                       <td>
-                        <Link href={`/suites/${e.id}`} className="model-link">
+                        <Link href={resultHref(e)} className="model-link">
                           <i className="swatch" style={{ background: e.color }} />
                           {e.label}
                         </Link>
@@ -277,8 +274,8 @@ export default function IndexExplorer({ entries, suites, running }: { entries: S
           <ScatterChart points={scatter.points} xLabel={scatter.xLabel} xFormat={scatter.xFormat} log={scatter.log} empty={scatter.empty} />
           {tradeoff === 'cost' && (
             <p className="ix-foot">
-              Claude: the API-equivalent cost Claude Code reports. GPT models: tokens used, at OpenAI&apos;s list prices. Runs themselves used
-              subscriptions.
+              The cost a CLI or API reports when it does (Claude Code, OpenRouter); otherwise the tokens used at list prices, marked *. Many runs
+              themselves used subscriptions.
             </p>
           )}
         </section>
@@ -294,7 +291,10 @@ export default function IndexExplorer({ entries, suites, running }: { entries: S
         <section id="table" className="card ix-card">
           <header className="ix-head">
             <h2>All results</h2>
-            <p>Every Verified {suite.name} result shown above. Click a score for each test and its replays, or a model for all its efforts.</p>
+            <p>
+              Every Verified {suite.name} result shown above. A model and effort run more than once shows the average. Click a score for each test and its
+              replays, or a model for all its efforts.
+            </p>
           </header>
           {rows.length === 0 ? (
             <div className="chart-empty">No results yet.</div>
@@ -312,7 +312,8 @@ export default function IndexExplorer({ entries, suites, running }: { entries: S
                     <th className="num">Time</th>
                     <th className="num">Tokens</th>
                     <th className="num">Cost</th>
-                    <th>Played</th>
+                    <th className="num" title="Suites averaged into this result">Runs</th>
+                    <th>Run by</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -327,7 +328,7 @@ export default function IndexExplorer({ entries, suites, running }: { entries: S
                       </td>
                       <td className="muted">{e.maker}</td>
                       <td className="num strong">
-                        <Link href={`/suites/${e.id}`} title="Every test, with replays">
+                        <Link href={resultHref(e)} title={e.n > 1 ? `The average of ${e.n} runs` : 'Every test, with replays'}>
                           {fmtScore(e.score)}
                         </Link>
                       </td>
@@ -339,8 +340,10 @@ export default function IndexExplorer({ entries, suites, running }: { entries: S
                         {fmtCost(e.cost_usd)}
                         {e.cost_estimated && <sup title="Estimated from tokens at list prices">*</sup>}
                       </td>
-                      <td className="muted" suppressHydrationWarning>
-                        {e.finished_at ? new Date(e.finished_at).toLocaleDateString(undefined, { day: 'numeric', month: 'short' }) : '–'}
+                      <td className="num">{e.n}</td>
+                      <td className="muted">
+                        {e.run_by.join(', ')}
+                        {e.harness && <span className="via-note"> · via {e.harness}</span>}
                       </td>
                     </tr>
                   ))}

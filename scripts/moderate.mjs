@@ -7,6 +7,7 @@
 //   node --env-file=.env.local scripts/moderate.mjs hide <run id | attempt id | replay URL> [--reason "fake model name"]
 //   node --env-file=.env.local scripts/moderate.mjs unhide <run id | attempt id | replay URL>
 //   node --env-file=.env.local scripts/moderate.mjs rename <run id | attempt id | replay URL> "GPT-6-Astra"
+//   node --env-file=.env.local scripts/moderate.mjs transcript <run id>    what the model said and called in that test
 //
 // --url defaults to https://cube.krnl.studio. Boards catch up within ~20 s.
 import { parseArgs } from 'node:util';
@@ -58,7 +59,19 @@ const line = (r) =>
 const idFrom = (s) => s?.match(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i)?.[0];
 
 const [cmd, target, newName] = positionals;
-if (cmd === 'list') {
+if (cmd === 'transcript') {
+  const res = await fetch(`${opt.url.replace(/\/$/, '')}/api/admin/transcripts?run_id=${idFrom(target) ?? ''}`, { headers });
+  const body = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    console.error(`${res.status}: ${body.error ?? res.statusText}`);
+    process.exit(1);
+  }
+  console.log(`${body.model} (${body.effort ?? 'default'}) via ${body.agent}, ${body.minutes?.toFixed(1)} min${body.breach ? `, BREACH: ${body.breach}` : ''}`);
+  for (const e of body.events ?? []) {
+    const text = e.text.replace(/\s+/g, ' ');
+    console.log(`[${String(e.t).padStart(4)}s] ${e.kind.padEnd(6)} ${e.tool ? `${e.tool} ` : ''}${e.kind === 'think' ? text.slice(0, 300) : text}`);
+  }
+} else if (cmd === 'list') {
   const { runs } = await call({ method: 'GET' }, `?limit=${Number(opt.limit) || 30}${opt.hidden ? '&hidden=1' : ''}`);
   for (const r of runs) console.log(line(r));
   if (runs.length === 0) console.log(opt.hidden ? 'no hidden runs' : 'no runs');

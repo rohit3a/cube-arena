@@ -39,7 +39,8 @@ export default async function SuitePage(props: { params: Promise<{ id: string }>
       <p>
         {e.board === 'verified' ? (
           <>
-            <span className="badge verified">Verified</span> Run by us through {e.runs[0]?.via ?? 'the official CLI'}, locked to the cube tools.
+            <span className="badge verified">Verified</span> Run by {e.run_by[0] === 'Cube Arena' ? 'us' : e.run_by[0]} through{' '}
+            {e.harness ?? e.runs[0]?.via ?? 'the official CLI'}, locked to the cube tools.
           </>
         ) : (
           <>

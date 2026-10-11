@@ -1,0 +1,19 @@
+{
+  "name": "cube-arena-runner",
+  "version": "0.1.0",
+  "description": "Run Cube Arena Index suites with any model, locked down to the cube tools, and post them to the Verified board with an invite code.",
+  "keywords": ["benchmark", "llm", "mcp", "rubiks-cube", "vision"],
+  "homepage": "https://cube.krnl.studio/wanted",
+  "license": "MIT",
+  "type": "module",
+  "bin": {
+    "cube-arena-runner": "cli.mjs"
+  },
+  "files": ["cli.mjs", "agent.mjs", "harness-api.mjs", "play-suite.mjs", "system.mjs", "README.md"],
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "1.30.1"
+  }
+}

@@ -15,7 +15,7 @@ export const EFFORTS = ['low', 'medium', 'high', 'xhigh', 'max'];
  * word, so the runner has to refuse the ones a model lacks. An empty list
  * means no effort setting: the name carries none and the CLI gets none.
  */
-const CLAUDE_EFFORT_LIMITS = {
+export const CLAUDE_EFFORT_LIMITS = {
   'claude-opus-4-6': ['low', 'medium', 'high', 'max'],
   'claude-sonnet-4-6': ['low', 'medium', 'high', 'max'],
   'claude-opus-4-5': ['low', 'medium', 'high'],

@@ -1,11 +1,11 @@
 // The MCP server: the tools a model uses to play. Stateless; every request
 // builds a fresh server, and all game state lives in the database.
 
-import { timingSafeEqual } from 'node:crypto';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import { parseMoves, solvedState, applyMoves } from '../cube/engine';
 import { atlasPng } from '../render/png';
+import { authFrom } from './auth';
 import { type ToolUse, LADDER_LIVES, LADDER_MAX_LEVEL, MAX_LOOKS, MAX_TURN_BATCH, MODEL_NAME_HELP, SCORING, NOTATION, PICTURE, TOOL_USE_HELP } from './rules';
 import { ArenaError, BASE_URL, type Caller, type Reply, giveUp, hashIp, look, nextTest, startRun, startSuite, submitSolution, turn } from './service';
 import { SUITES, suiteMinutes } from './suites';
@@ -138,7 +138,7 @@ export function buildServer(caller: Caller): McpServer {
       inputSchema: { attempt_id: attemptId },
       annotations: { readOnlyHint: true, openWorldHint: false },
     },
-    (args) => guard(() => look(args.attempt_id)),
+    (args) => guard(() => look(args.attempt_id, caller)),
   );
 
   server.registerTool(
@@ -149,7 +149,7 @@ export function buildServer(caller: Caller): McpServer {
       inputSchema: { attempt_id: attemptId, moves: movesArg },
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
     },
-    (args) => guard(() => turn(args.attempt_id, args.moves)),
+    (args) => guard(() => turn(args.attempt_id, args.moves, caller)),
   );
 
   server.registerTool(
@@ -160,7 +160,7 @@ export function buildServer(caller: Caller): McpServer {
       inputSchema: { attempt_id: attemptId, moves: movesArg },
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
     },
-    (args) => guard(() => submitSolution(args.attempt_id, args.moves)),
+    (args) => guard(() => submitSolution(args.attempt_id, args.moves, caller)),
   );
 
   server.registerTool(
@@ -171,7 +171,7 @@ export function buildServer(caller: Caller): McpServer {
       inputSchema: { attempt_id: attemptId },
       annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
     },
-    (args) => guard(() => giveUp(args.attempt_id)),
+    (args) => guard(() => giveUp(args.attempt_id, caller)),
   );
 
   server.registerTool(
@@ -199,19 +199,16 @@ export function buildServer(caller: Caller): McpServer {
 
 const TOOL_USES = new Set<ToolUse>(['model_only', 'code', 'solver']);
 
-export function tokenMatches(given: string, expected: string | undefined): boolean {
-  if (!expected || !given) return false;
-  const a = Buffer.from(given);
-  const b = Buffer.from(expected);
-  return a.length === b.length && timingSafeEqual(a, b);
-}
-
-/** Who is calling: the operator's runner (verified board) or anyone (community). */
-export function callerFrom(req: Request): Caller {
+/**
+ * Who is calling: the operator's runner or an invitee's (verified board), or
+ * anyone (community). Null when the token is an invite code that isn't live.
+ */
+export async function callerFrom(req: Request): Promise<Caller | null> {
   const ip = (req.headers.get('x-forwarded-for') ?? '').split(',')[0].trim() || req.headers.get('x-real-ip');
   const client = (req.headers.get('user-agent') ?? '').slice(0, 120) || null;
-  const bearer = (req.headers.get('authorization') ?? '').replace(/^Bearer\s+/i, '');
-  if (tokenMatches(bearer, process.env.CUBE_OPERATOR_TOKEN)) {
+  const { auth, bad } = await authFrom(req);
+  if (bad) return null;
+  if (auth) {
     const toolUse = req.headers.get('x-arena-tool-use') as ToolUse | null;
     const slot = Number.parseInt(req.headers.get('x-arena-suite-slot') ?? '', 10);
     return {
@@ -224,6 +221,7 @@ export function callerFrom(req: Request): Caller {
         toolUse: toolUse && TOOL_USES.has(toolUse) ? toolUse : undefined,
         suiteSlot: Number.isInteger(slot) && slot >= 0 ? slot : undefined,
       },
+      invite: auth.role === 'invite' ? { id: auth.invite.id, name: auth.invite.name } : undefined,
     };
   }
   return { board: 'community', ipHash: hashIp(ip), client };

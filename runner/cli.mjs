@@ -1,0 +1,256 @@
+#!/usr/bin/env node
+// cube-arena-runner: play Cube Arena Index suites with your own model access,
+// locked down to the cube tools, and post them to the Verified board with an
+// invite code. https://cube.krnl.studio/wanted
+//
+//   npx cube-arena-runner login AB12-CD34
+//   npx cube-arena-runner wanted
+//   npx cube-arena-runner play --model gemini-3-1-pro-preview --effort high
+
+import { execFileSync } from 'node:child_process';
+import { chmodSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { homedir } from 'node:os';
+import { join } from 'node:path';
+import { createInterface } from 'node:readline/promises';
+import { parseArgs } from 'node:util';
+import { operator } from './agent.mjs';
+import { playSuite } from './play-suite.mjs';
+
+const VERSION = '0.1.0';
+const DEFAULT_URL = 'https://cube.krnl.studio/mcp';
+const HOME = process.env.CUBE_ARENA_HOME || join(homedir(), '.cube-arena');
+const CONFIG = join(HOME, 'config.json');
+const VIA = ['claude-code', 'codex', 'openrouter', 'api'];
+
+const HELP = `cube-arena-runner ${VERSION}: run Cube Arena Index suites for the Verified board.
+
+  login <code> [--show-name | --hide-name]   save your invite code (once)
+  whoami                                      who your code belongs to
+  wanted [--suite thorough] [--all]           what still needs running
+  models                                      every model the runner knows
+  play --model <id> [options]                 play a suite and post the result
+  logout                                      forget your code
+
+play options:
+  --effort <level>         low, medium, high, xhigh or max (what the model takes; see wanted)
+  --suite fast|thorough    default fast (about 45 minutes); thorough is up to 8 hours
+  --via <how>              claude-code, codex, openrouter or api (default: the first you have)
+  --base-url <url>         with --via api: an OpenAI-compatible endpoint, e.g. https://api.x.ai/v1
+  --api-key-env <NAME>     with --via api: the environment variable holding its key
+  --api-model <id>         with --via api: the model's id on that endpoint
+  --codex-home <dir>       a Codex home just for this (default ~/.cube-arena/codex)
+  --resume <suite id>      carry on a suite that stopped part way
+  --force                  play even if someone else has claimed this one
+  --no-transcript          don't upload the session logs (they help us check results)
+
+Your keys stay on your machine: the runner talks to the model provider directly,
+and only sends Cube Arena the moves, token counts and a text log of each session.`;
+
+const fail = (msg) => {
+  console.error(msg);
+  process.exit(2);
+};
+
+const readConfig = () => {
+  try {
+    return JSON.parse(readFileSync(CONFIG, 'utf8'));
+  } catch {
+    return {};
+  }
+};
+const writeConfig = (c) => {
+  mkdirSync(HOME, { recursive: true });
+  writeFileSync(CONFIG, `${JSON.stringify(c, null, 2)}\n`, { mode: 0o600 });
+  chmodSync(CONFIG, 0o600);
+};
+
+const has = (cmd) => {
+  try {
+    execFileSync(cmd, ['--version'], { stdio: 'ignore' });
+    return true;
+  } catch {
+    return false;
+  }
+};
+
+async function ask(question) {
+  if (!process.stdin.isTTY) return '';
+  const rl = createInterface({ input: process.stdin, output: process.stdout });
+  try {
+    return (await rl.question(question)).trim();
+  } finally {
+    rl.close();
+  }
+}
+
+async function get(site, path, token) {
+  const res = await fetch(`${site}${path}`, { headers: token ? { Authorization: `Bearer ${token}` } : {} });
+  const json = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(json.error ?? `${path}: ${res.status}`);
+  return json;
+}
+
+const [command, ...rest] = process.argv.slice(2);
+const { values: opt, positionals } = parseArgs({
+  args: rest,
+  allowPositionals: true,
+  options: {
+    model: { type: 'string' },
+    effort: { type: 'string' },
+    suite: { type: 'string', default: 'fast' },
+    via: { type: 'string' },
+    'base-url': { type: 'string' },
+    'api-key-env': { type: 'string' },
+    'api-model': { type: 'string' },
+    'codex-home': { type: 'string' },
+    resume: { type: 'string' },
+    force: { type: 'boolean', default: false },
+    'no-transcript': { type: 'boolean', default: false },
+    'show-name': { type: 'boolean' },
+    'hide-name': { type: 'boolean' },
+    all: { type: 'boolean', default: false },
+    url: { type: 'string' },
+    slack: { type: 'string', default: '6' },
+  },
+});
+
+const config = readConfig();
+const url = opt.url ?? process.env.CUBE_ARENA_URL ?? config.url ?? DEFAULT_URL;
+const site = url.replace(/\/mcp\/?$/, '');
+// An invite code from login or CUBE_INVITE; the operator's token works too.
+const token = process.env.CUBE_INVITE || config.invite || process.env.CUBE_OPERATOR_TOKEN || null;
+
+if (!command || command === 'help' || command === '--help' || command === '-h') {
+  console.log(HELP);
+} else if (command === '--version' || command === 'version') {
+  console.log(VERSION);
+} else if (command === 'login') {
+  const code = positionals[0];
+  if (!code) fail('Usage: cube-arena-runner login AB12-CD34');
+  let me;
+  try {
+    ({ me } = await get(site, '/api/admin/suites?limit=1', code));
+  } catch (e) {
+    fail(`That code didn't work: ${e.message}`);
+  }
+  let credit = opt['show-name'] ? true : opt['hide-name'] ? false : null;
+  if (credit === null) credit = /^y/i.test(await ask(`Hi ${me.name}! Show your name next to your results on the boards? [y/N] `));
+  writeConfig({ ...config, invite: code, credit, url: opt.url ?? config.url });
+  console.log(`Saved to ${CONFIG}. Your results will show ${credit ? `"run by ${me.name}"` : '"run by an invited tester"'}.`);
+  console.log('Next: npx cube-arena-runner wanted');
+} else if (command === 'logout') {
+  if (existsSync(CONFIG)) rmSync(CONFIG);
+  console.log('Forgot your invite code.');
+} else if (command === 'whoami') {
+  if (!token) fail('No invite code yet: npx cube-arena-runner login AB12-CD34');
+  const { me } = await get(site, '/api/admin/suites?limit=1', token).catch((e) => fail(e.message));
+  console.log(`${me.name} (${me.role}), names ${config.credit ? 'shown' : 'hidden'}, ${site}`);
+} else if (command === 'models') {
+  const { models } = await get(site, '/api/catalog');
+  for (const m of models.filter((x) => opt.all || x.wanted)) {
+    console.log(`${m.id.padEnd(28)} ${m.name.padEnd(28)} ${m.maker.padEnd(18)} ${(m.efforts.join(' ') || '-').padEnd(30)} via ${Object.keys(m.via).join(', ')}`);
+  }
+} else if (command === 'wanted') {
+  const { rows } = await get(site, '/api/wanted', token);
+  const kind = opt.suite === 'thorough' ? 'thorough' : 'fast';
+  const list = rows.filter((r) => r.kind === kind && (opt.all || (r.runs === 0 && !r.claim)));
+  if (list.length === 0) console.log(opt.all ? 'Nothing listed.' : 'Everything has a result or a claim. Add --all to see them.');
+  for (const r of list) {
+    const status = r.runs ? `${r.runs} run${r.runs > 1 ? 's' : ''}, ${r.mean.toFixed(1)}` : r.claim ? `claimed${r.claim.by ? ` by ${r.claim.by}` : ''}${r.claim.mine ? ' (you)' : ''}` : 'needed';
+    console.log(`${`${r.name}${r.effort ? ` (${r.effort})` : ''}`.padEnd(36)} ${status.padEnd(26)} ${r.command}`);
+  }
+} else if (command === 'play') {
+  await play();
+} else {
+  fail(`Unknown command "${command}".\n\n${HELP}`);
+}
+
+async function play() {
+  if (!token) fail('No invite code yet. Run: npx cube-arena-runner login AB12-CD34');
+  if (!opt.model) fail('--model is required. See: npx cube-arena-runner wanted');
+  if (!['fast', 'thorough'].includes(opt.suite)) fail('--suite must be fast or thorough');
+  const { models } = await get(site, '/api/catalog');
+  const model = models.find((m) => m.id === opt.model);
+  if (!model) fail(`"${opt.model}" isn't in the catalog. See: npx cube-arena-runner models`);
+  const effort = opt.effort ?? null;
+  if (model.efforts.length && !model.efforts.includes(effort)) fail(`${model.name} takes --effort ${model.efforts.join(', ')}`);
+  if (!model.efforts.length && effort) fail(`${model.name} has no effort setting; leave out --effort`);
+
+  // How to reach the model: what you asked for, else the first that works here.
+  const via = opt.via ?? (opt['base-url'] ? 'api' : pickVia(model));
+  if (!VIA.includes(via)) fail(`--via must be one of ${VIA.join(', ')}`);
+  let session;
+  let harness = via;
+  if (via === 'claude-code') {
+    if (!model.via['claude-code']) fail(`${model.name} doesn't run in Claude Code.`);
+    if (!has('claude')) fail('Claude Code is not installed: https://claude.com/claude-code');
+    session = { agent: 'claude', model: model.via['claude-code'], effort };
+  } else if (via === 'codex') {
+    if (!model.via.codex) fail(`${model.name} doesn't run in Codex.`);
+    if (!has('codex')) fail('Codex is not installed: npm i -g @openai/codex');
+    // A Codex home of its own, so your config, AGENTS.md, skills and memories don't reach the model.
+    const codexHome = opt['codex-home'] ?? join(HOME, 'codex');
+    mkdirSync(codexHome, { recursive: true });
+    if (!existsSync(join(codexHome, 'auth.json'))) {
+      fail(`Sign Codex in for the runner once (its own home, so nothing else of yours leaks in):\n  CODEX_HOME=${codexHome} codex login`);
+    }
+    session = { agent: 'codex', model: model.via.codex, effort, codexHome };
+  } else if (via === 'openrouter') {
+    if (!model.via.openrouter) fail(`${model.name} isn't on OpenRouter; try --via api with the provider's endpoint.`);
+    const apiKey = process.env.OPENROUTER_API_KEY;
+    if (!apiKey) fail('Set OPENROUTER_API_KEY (https://openrouter.ai/keys).');
+    session = { agent: 'api', model: model.via.openrouter, effort, api: { baseUrl: 'https://openrouter.ai/api/v1', apiKey, provider: 'openrouter' } };
+  } else {
+    const baseUrl = opt['base-url'];
+    const keyEnv = opt['api-key-env'];
+    const apiModel = opt['api-model'];
+    if (!baseUrl || !keyEnv || !apiModel) fail('--via api needs --base-url, --api-key-env and --api-model.');
+    if (!process.env[keyEnv]) fail(`${keyEnv} is not set.`);
+    const host = new URL(baseUrl).host;
+    harness = `api:${host}`;
+    session = { agent: 'api', model: apiModel, effort, api: { baseUrl: baseUrl.replace(/\/$/, ''), apiKey: process.env[keyEnv], provider: host === 'openrouter.ai' ? 'openrouter' : 'openai-compatible' } };
+  }
+
+  const call = operator(url, token);
+  let suite;
+  let tests;
+  let played = new Set();
+  if (opt.resume) {
+    ({ suite, tests } = await call(`/api/admin/suites?id=${opt.resume}`));
+    if (suite.model_id !== model.id || (suite.effort ?? null) !== effort || suite.kind !== opt.suite) {
+      fail(`That suite is ${suite.kind} for ${suite.model_name}, not ${opt.suite} for ${model.name}${effort ? ` (${effort})` : ''}.`);
+    }
+    if (suite.status === 'finished') fail('That suite is already finished.');
+    played = new Set(suite.slots_played ?? []);
+  } else {
+    // Someone else on it already? Then pick another row, unless --force.
+    const { claims } = await get(site, '/api/claims', token);
+    const held = claims.find((c) => c.model_id === model.id && (c.effort ?? null) === effort && c.kind === opt.suite && !c.mine);
+    if (held && !opt.force) fail(`${held.by ?? 'Someone'} claimed this one until ${new Date(held.expires_at).toLocaleString()}. Pick another (npx cube-arena-runner wanted), or add --force.`);
+    ({ suite, tests } = await call('/api/admin/suites', { kind: opt.suite, model_id: model.id, effort, harness, credit: !!config.credit }).catch((e) => fail(e.message)));
+  }
+
+  console.log(`${suite.model_name} via ${harness}: ${opt.suite} suite ${suite.version}, ${tests.length} tests → ${site}`);
+  console.log(`suite ${suite.id} (resume with --resume ${suite.id})`);
+  const r = await playSuite({
+    url,
+    token,
+    suite,
+    tests,
+    played,
+    session,
+    slack: Number(opt.slack),
+    logDir: join(HOME, 'logs'),
+    transcript: !opt['no-transcript'],
+  });
+  if (r.result) console.log(`\nThanks! Results: ${site}/suites/${suite.id}`);
+  process.exit(r.breach ? 3 : r.result ? 0 : 1);
+}
+
+function pickVia(model) {
+  if (model.via['claude-code'] && has('claude')) return 'claude-code';
+  if (model.via.codex && has('codex')) return 'codex';
+  if (model.via.openrouter && process.env.OPENROUTER_API_KEY) return 'openrouter';
+  const ways = Object.keys(model.via).join(', ');
+  return fail(`No way to reach ${model.name} here. It runs via ${ways}: install that CLI, or set OPENROUTER_API_KEY, or use --via api.`);
+}

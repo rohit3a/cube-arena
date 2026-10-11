@@ -1,6 +1,7 @@
-// One agent session against Cube Arena: Claude Code or Codex, locked down to
-// the cube tools, watched as it plays. Used by run.mjs (one run) and
-// suite.mjs (one fresh session per suite test).
+// One agent session against Cube Arena: Claude Code, Codex or a model called
+// directly over an API (harness-api.mjs), locked down to the cube tools and
+// watched as it plays. Used by run.mjs (one run) and play-suite.mjs (one fresh
+// session per suite test).
 //
 // Lockdown: the agent gets the cube tools and nothing else (no shell, files,
 // code or web). Anything else showing up in the stream stops the session and
@@ -15,19 +16,25 @@ import { spawn } from 'node:child_process';
 import { createWriteStream, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { gzipSync } from 'node:zlib';
+import { playApiSession } from './harness-api.mjs';
+import { SYSTEM } from './system.mjs';
 
-export const SYSTEM =
-  'You are taking part in Cube Arena, a benchmark where an AI solves a twisty cube puzzle from pictures. ' +
-  'Your only tools are the cube-arena tools. Work everything out yourself from the images; there is nothing else to use.';
+export { SYSTEM } from './system.mjs';
 
-/** Operator calls to the site, to end, hide or annotate runs and suites. */
+/**
+ * Calls to the site's runner API with the operator token or an invite code:
+ * make and close suites, end, hide or annotate runs. A Buffer body is sent as
+ * gzip bytes (transcripts); anything else as JSON.
+ */
 export function operator(url, token) {
   const site = url.replace(/\/mcp\/?$/, '');
   return async (path, body) => {
+    const raw = Buffer.isBuffer(body);
     const res = await fetch(`${site}${path}`, {
       method: body ? 'POST' : 'GET',
-      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-      body: body ? JSON.stringify(body) : undefined,
+      headers: { Authorization: `Bearer ${token}`, 'Content-Type': raw ? 'application/gzip' : 'application/json' },
+      body: raw ? body : body ? JSON.stringify(body) : undefined,
     });
     const json = await res.json().catch(() => ({}));
     if (!res.ok) throw new Error(`${path}: ${res.status} ${json.error ?? ''}`);
@@ -86,20 +93,55 @@ function codexCommand(s, work) {
 const slim = (line) => line.replace(/"data":"[A-Za-z0-9+/=]{200,}"/g, (m) => `"data":"<${m.length - 9} base64 chars>"`);
 
 /**
- * Plays one session. `s`: { agent, model, effort, prompt, headers, url, token,
- * maxMinutes, codexHome, logPath }. Resolves when the agent exits, after any
- * run it left open is ended as a timeout and a lockdown breach is hidden.
+ * Plays one session. `s`: { agent ('claude' | 'codex' | 'api'), model, effort,
+ * prompt, headers, url, token, maxMinutes, codexHome, logPath, api? }.
+ * Resolves when the agent is done, after any run it left open is ended as a
+ * timeout, its usage is recorded, a lockdown breach is hidden, and (with
+ * `s.transcript`) the session's digest is uploaded for audit.
  */
-export function playSession(s) {
+export async function playSession(s) {
+  const out = s.agent === 'api' ? await playApiSession(s) : await playCli(s);
+  await afterSession(s, out);
+  return out;
+}
+
+/** The operator side of a finished session. Failures are reported, not thrown. */
+async function afterSession(s, out) {
+  const call = operator(s.url, s.token);
+  try {
+    if (out.runId && !out.runOver) {
+      const why = out.stopReason ? `stopped by ${out.stopReason}` : 'the agent stopped before the run was over';
+      await call('/api/admin/runs', { id: out.runId, stop: true, reason: why });
+      console.log(`  run ended as a timeout (${why})`);
+    }
+    if (out.runId) await call('/api/admin/runs', { id: out.runId, usage: out.usage });
+    if (out.runId && out.breach) {
+      await call('/api/admin/runs', { id: out.runId, hidden: true, reason: `runner lockdown: ${out.breach}` });
+      console.log('  hidden from the boards');
+    }
+    if (out.runId && s.transcript) {
+      const digest = { model: s.model, effort: s.effort ?? null, agent: s.agent, minutes: out.minutes, stop: out.stopReason, breach: out.breach, usage: out.usage, events: out.events };
+      let gz = gzipSync(JSON.stringify(digest));
+      // Keep under the server's limit: drop the longest thoughts first.
+      if (gz.length > 500_000) gz = gzipSync(JSON.stringify({ ...digest, events: digest.events.map((e) => (e.kind === 'think' ? { ...e, text: e.text.slice(0, 200) } : e)) }));
+      await call(`/api/admin/transcripts?run_id=${out.runId}`, gz);
+    }
+  } catch (e) {
+    console.log(`  (operator call failed: ${e.message})`);
+  }
+}
+
+function playCli(s) {
   const work = mkdtempSync(join(tmpdir(), 'cube-runner-'));
   const { cmd, args, env } = s.agent === 'claude' ? claudeCommand(s, work) : codexCommand(s, work);
-  const call = operator(s.url, s.token);
   const log = createWriteStream(s.logPath);
   const started = Date.now();
   const secs = () => `${Math.round((Date.now() - started) / 1000)}s`;
   const child = spawn(cmd, args, { cwd: work, env, stdio: ['ignore', 'pipe', 'pipe'] });
 
-  const out = { runId: null, runOver: false, last: null, calls: 0, breach: null, stopReason: null, final: null, usage: {}, code: null, minutes: 0 };
+  const out = { runId: null, runOver: false, last: null, calls: 0, breach: null, stopReason: null, final: null, usage: {}, code: null, minutes: 0, events: [] };
+  // The audit digest: what the model said and called, no pictures.
+  const note = (kind, text, tool) => out.events.push({ t: Math.round((Date.now() - started) / 1000), kind, ...(tool && { tool }), text: String(text ?? '') });
   const claudeUsage = new Map(); // message id → usage (stream-json repeats a message per content block)
 
   function stop(reason) {
@@ -117,7 +159,8 @@ export function playSession(s) {
     stop(`lockdown broken: ${what}`);
   }
 
-  function seeReply(text) {
+  function seeReply(text, tool) {
+    note('result', text.slice(0, 300), tool);
     const first = text.split('\n')[0];
     if (first) console.log(`      → ${first.slice(0, 140)}`);
     try {
@@ -132,6 +175,7 @@ export function playSession(s) {
   }
 
   function seeCall(tool, input) {
+    note('call', JSON.stringify(input ?? {}), tool);
     out.calls += 1;
     console.log(`  [${secs()}] ${tool} ${JSON.stringify(input ?? {}).slice(0, 120)}`);
   }
@@ -148,6 +192,8 @@ export function playSession(s) {
       if (ev.message?.id && ev.message.usage) claudeUsage.set(ev.message.id, ev.message.usage);
     }
     for (const part of ev.message?.content ?? []) {
+      if (ev.type === 'assistant' && part.type === 'text' && part.text) note('say', part.text);
+      if (ev.type === 'assistant' && part.type === 'thinking' && part.thinking) note('think', part.thinking.slice(0, 2000));
       if (part.type === 'tool_use') {
         if (!part.name.startsWith('mcp__cube-arena__')) lockdown(`called ${part.name}`);
         seeCall(part.name.replace('mcp__cube-arena__', ''), part.input);
@@ -173,9 +219,11 @@ export function playSession(s) {
     if (ev.type === 'item.completed') {
       if (item.type === 'mcp_tool_call') {
         if (item.error) console.log(`      → error: ${JSON.stringify(item.error).slice(0, 140)}`);
-        seeReply((item.result?.content ?? []).find((c) => c.type === 'text')?.text ?? '');
+        seeReply((item.result?.content ?? []).find((c) => c.type === 'text')?.text ?? '', item.tool);
       }
+      if (item.type === 'reasoning' && item.text) note('think', item.text.slice(0, 2000));
       if (item.type === 'agent_message') {
+        note('say', item.text);
         out.final = item.text;
         console.log(`  [${secs()}] says: ${item.text.replace(/\s+/g, ' ').slice(0, 160)}`);
       }
@@ -190,6 +238,7 @@ export function playSession(s) {
       add('output_tokens', u.output_tokens);
       add('reasoning_tokens', u.reasoning_output_tokens);
     }
+    if (ev.type === 'turn.failed' || ev.type === 'error') note('error', JSON.stringify(ev.error ?? ev.message));
     if (ev.type === 'turn.failed' || ev.type === 'error') console.log(`  [${secs()}] ${ev.type}: ${JSON.stringify(ev.error ?? ev.message).slice(0, 200)}`);
   }
 
@@ -221,7 +270,7 @@ export function playSession(s) {
   });
 
   return new Promise((resolve) => {
-    child.on('close', async (code) => {
+    child.on('close', (code) => {
       clearTimeout(killer);
       log.end();
       rmSync(work, { recursive: true, force: true });
@@ -235,20 +284,6 @@ export function playSession(s) {
           out.usage.cached_input_tokens = (out.usage.cached_input_tokens ?? 0) + (u.cache_read_input_tokens ?? 0);
           out.usage.output_tokens = (out.usage.output_tokens ?? 0) + (u.output_tokens ?? 0);
         }
-      }
-      try {
-        if (out.runId && !out.runOver) {
-          const why = out.stopReason ? `stopped by ${out.stopReason}` : 'the agent stopped before the run was over';
-          await call('/api/admin/runs', { id: out.runId, stop: true, reason: why });
-          console.log(`  run ended as a timeout (${why})`);
-        }
-        if (out.runId) await call('/api/admin/runs', { id: out.runId, usage: out.usage });
-        if (out.runId && out.breach) {
-          await call('/api/admin/runs', { id: out.runId, hidden: true, reason: `runner lockdown: ${out.breach}` });
-          console.log('  hidden from the boards');
-        }
-      } catch (e) {
-        console.log(`  (operator call failed: ${e.message})`);
       }
       resolve(out);
     });

@@ -1,8 +1,10 @@
-// Operator moderation: list recent runs, hide or unhide one. Only reachable
-// with the operator token (app/api/admin/runs/route.ts).
+// Operator moderation (list, hide, rename runs and suites; invites; audit
+// transcripts), plus the few calls an invitee's runner may make on its own
+// suites. Reached through app/api/admin/*.
 
 import { clientLabel } from './clients';
 import { type SuiteRow, type Usage, UUID, transaction, withDb } from './db';
+import { formatCode, hashCode, newCode } from './invites';
 import { gradeSuites } from './suite-data';
 import type { SuiteGrade } from './suites';
 
@@ -91,9 +93,12 @@ export interface AdminSuite extends SuiteRow {
   slots_played?: number[];
 }
 
-export async function listSuites(limit: number): Promise<AdminSuite[]> {
+/** Recent suites; only one invite's when `inviteId` is given. */
+export async function listSuites(limit: number, inviteId?: string): Promise<AdminSuite[]> {
   return withDb(async (sql) => {
-    const suites = await sql<SuiteRow[]>`select * from cube_arena.suites order by created_at desc limit ${limit}`;
+    const suites = await sql<SuiteRow[]>`
+      select * from cube_arena.suites where (${inviteId ?? null}::uuid is null or invite_id = ${inviteId ?? null}::uuid)
+      order by created_at desc limit ${limit}`;
     const grades = await gradeSuites(sql, suites);
     return suites.map((s) => ({ ...s, grade: grades.get(s.id) ?? null }));
   });
@@ -111,3 +116,97 @@ export async function getSuite(id: string): Promise<AdminSuite | null> {
 
 /** Fixes a run's model name, e.g. a vague "GPT-6" once we know it was GPT-6-Astra. */
 export const rename = (id: string, modelName: string) => change(id, { model_name: modelName });
+
+/**
+ * The suite a suite, run or attempt id belongs to, and the invite it was made
+ * under (null for the operator's own). Null when the id names nothing.
+ */
+export async function suiteOf(id: string): Promise<{ suiteId: string | null; inviteId: string | null } | null> {
+  if (!UUID.test(id)) return null;
+  const [row] = await withDb((sql) => sql<{ suite_id: string | null; invite_id: string | null }[]>`
+    select s.id as suite_id, s.invite_id from cube_arena.suites s where s.id = ${id}
+    union all
+    select r.suite_id, s.invite_id from cube_arena.runs r left join cube_arena.suites s on s.id = r.suite_id
+    where r.id = coalesce((select run_id from cube_arena.attempts where id = ${id}), ${id}::uuid)
+    limit 1`);
+  return row ? { suiteId: row.suite_id, inviteId: row.invite_id } : null;
+}
+
+// ---------------------------------------------------------------------------
+// Invites
+
+export interface AdminInvite {
+  id: string;
+  created_at: Date;
+  name: string;
+  note: string | null;
+  code_hint: string;
+  expires_at: Date | null;
+  revoked_at: Date | null;
+  last_used_at: Date | null;
+  suites: number;
+  finished: number;
+}
+
+export async function listInvites(): Promise<AdminInvite[]> {
+  return withDb((sql) => sql<AdminInvite[]>`
+    select i.id, i.created_at, i.name, i.note, i.code_hint, i.expires_at, i.revoked_at, i.last_used_at,
+           count(s.id)::int as suites, count(s.id) filter (where s.status = 'finished' and not s.hidden)::int as finished
+    from cube_arena.invites i left join cube_arena.suites s on s.invite_id = i.id
+    group by i.id order by i.created_at desc`);
+}
+
+/** Makes an invite and returns its code: the only time the code is shown. */
+export async function createInvite(name: string, note: string | null, expiresAt: Date | null): Promise<{ invite: AdminInvite; code: string }> {
+  const code = newCode();
+  const [row] = await withDb((sql) => sql<AdminInvite[]>`
+    insert into cube_arena.invites (name, note, code_hash, code_hint, expires_at)
+    values (${name}, ${note}, ${hashCode(code)}, ${code.slice(-2)}, ${expiresAt})
+    returning id, created_at, name, note, code_hint, expires_at, revoked_at, last_used_at, 0 as suites, 0 as finished`);
+  return { invite: row, code: formatCode(code) };
+}
+
+/** A new code for the same person; the old one stops working. */
+export async function rotateInvite(id: string): Promise<string | null> {
+  if (!UUID.test(id)) return null;
+  const code = newCode();
+  const rows = await withDb((sql) => sql`
+    update cube_arena.invites set code_hash = ${hashCode(code)}, code_hint = ${code.slice(-2)}, revoked_at = null where id = ${id} returning id`);
+  return rows.length ? formatCode(code) : null;
+}
+
+/** Stops a code working; optionally hides every suite made with it. Returns how many suites were hidden. */
+export async function revokeInvite(id: string, hideSuites: boolean): Promise<number | null> {
+  if (!UUID.test(id)) return null;
+  return transaction(async (tx) => {
+    const rows = await tx`update cube_arena.invites set revoked_at = coalesce(revoked_at, now()) where id = ${id} returning id`;
+    if (!rows.length) return null;
+    await tx`update cube_arena.claims set released_at = now() where invite_id = ${id} and released_at is null`;
+    if (!hideSuites) return 0;
+    const why = 'invite revoked';
+    const suites = await tx`update cube_arena.suites set hidden = true, hidden_reason = ${why} where invite_id = ${id} and not hidden returning id`;
+    await tx`update cube_arena.runs set hidden = true, hidden_reason = ${why}
+             where suite_id in (select id from cube_arena.suites where invite_id = ${id})`;
+    return suites.length;
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Audit transcripts: gzipped JSON digests of each test session, no pictures.
+
+export const TRANSCRIPT_MAX_BYTES = 512 * 1024;
+
+export async function saveTranscript(runId: string, gz: Buffer): Promise<boolean> {
+  if (!UUID.test(runId)) return false;
+  const rows = await withDb((sql) => sql`
+    insert into cube_arena.transcripts (run_id, bytes, gz) values (${runId}, ${gz.length}, ${gz})
+    on conflict (run_id) do update set gz = excluded.gz, bytes = excluded.bytes, created_at = now()
+    returning run_id`);
+  return rows.length > 0;
+}
+
+export async function getTranscript(runId: string): Promise<Buffer | null> {
+  if (!UUID.test(runId)) return null;
+  const [row] = await withDb((sql) => sql<{ gz: Buffer }[]>`select gz from cube_arena.transcripts where run_id = ${runId}`);
+  return row?.gz ?? null;
+}

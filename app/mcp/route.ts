@@ -9,7 +9,7 @@ const CORS = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Methods': 'GET, POST, DELETE, OPTIONS',
   'Access-Control-Allow-Headers':
-    'Content-Type, Accept, Authorization, Mcp-Session-Id, Mcp-Protocol-Version, Last-Event-ID, X-Arena-Name, X-Arena-Model, X-Arena-Tool-Use',
+    'Content-Type, Accept, Authorization, Mcp-Session-Id, Mcp-Protocol-Version, Last-Event-ID, X-Arena-Name, X-Arena-Model, X-Arena-Tool-Use, X-Arena-Suite-Slot',
   'Access-Control-Expose-Headers': 'Mcp-Session-Id, Mcp-Protocol-Version',
 };
 
@@ -20,7 +20,12 @@ function withCors(res: Response): Response {
 }
 
 export async function POST(req: Request): Promise<Response> {
-  const server = buildServer(callerFrom(req));
+  const caller = await callerFrom(req);
+  if (!caller) {
+    const message = 'That invite code is not valid any more (typo, revoked or expired). Remove it to play on the Community board.';
+    return withCors(Response.json({ jsonrpc: '2.0', error: { code: -32001, message }, id: null }, { status: 401 }));
+  }
+  const server = buildServer(caller);
   // Stateless: a fresh transport per request; plain JSON replies, no SSE.
   const transport = new WebStandardStreamableHTTPServerTransport({ sessionIdGenerator: undefined, enableJsonResponse: true });
   await server.connect(transport);

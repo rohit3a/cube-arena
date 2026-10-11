@@ -3243,3 +3243,58 @@ tbody tr:hover td.heat-cell {
     font-size: 1.5rem;
   }
 }
+
+/* Help wanted */
+.steps {
+  margin: 0;
+  padding-left: 1.3rem;
+  display: grid;
+  gap: 14px;
+}
+
+.steps .codebox {
+  margin-top: 8px;
+}
+
+table.wanted td.cmd {
+  white-space: nowrap;
+}
+
+
+
+.status {
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.status.done {
+  color: var(--green);
+}
+
+.status.claimed {
+  color: var(--orange);
+}
+
+.status.needed {
+  color: var(--text-3);
+}
+
+.runs-list {
+  margin-top: 14px;
+}
+
+.runs-list summary {
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.runs-list ul {
+  margin: 10px 0 0;
+  padding-left: 1.2rem;
+  display: grid;
+  gap: 6px;
+}
+
+.via-note {
+  white-space: nowrap;
+}
