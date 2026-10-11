@@ -88,11 +88,15 @@ if (command === 'create') {
     console.error(matches.length ? `"${arg}" matches ${matches.length} applications; give more of the id.` : `No application starts with "${arg}".`);
     process.exit(1);
   }
+  const settled = (a) => `${a.name} (@${a.x_handle}) was already ${a.status}${a.decided_at ? ` on ${a.decided_at.slice(0, 10)}` : ''}; nothing changed.`;
+  if (matches[0].status !== 'pending') {
+    console.log(settled(matches[0]));
+    process.exit(0);
+  }
   const { application: a } = await api({ id: matches[0].id, approve: command === 'approve' }, '/api/admin/applications');
   if (a.status === 'pending') console.log(`${a.name} (@${a.x_handle}) is still waiting.`);
-  else if (a.status === (command === 'approve' ? 'approved' : 'declined'))
-    console.log(command === 'approve' ? `Approved ${a.name} (@${a.x_handle}): their invite code is on its way to ${a.email}.` : `Declined ${a.name} (@${a.x_handle}). Nothing was sent.`);
-  else console.log(`${a.name} (@${a.x_handle}) was already ${a.status}${a.decided_at ? ` on ${a.decided_at.slice(0, 10)}` : ''}; nothing changed.`);
+  else if (a.status !== (command === 'approve' ? 'approved' : 'declined')) console.log(settled(a));
+  else console.log(command === 'approve' ? `Approved ${a.name} (@${a.x_handle}): their invite code is on its way to ${a.email}.` : `Declined ${a.name} (@${a.x_handle}). Nothing was sent.`);
 } else {
   console.log('Usage: invite.mjs create "Name" | list | rotate <id> | revoke <id> [--hide] | x <id> <handle|-> | applications [--all] | approve <id> | decline <id>');
 }
