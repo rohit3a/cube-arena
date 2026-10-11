@@ -17,6 +17,7 @@ import { createWriteStream, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { gzipSync } from 'node:zlib';
+import { commandFor } from './command.mjs';
 import { playApiSession } from './harness-api.mjs';
 import { SYSTEM } from './system.mjs';
 
@@ -149,7 +150,8 @@ function playCli(s) {
   const log = createWriteStream(s.logPath);
   const started = Date.now();
   const secs = () => `${Math.round((Date.now() - started) / 1000)}s`;
-  const child = spawn(cmd, args, { cwd: work, env, stdio: ['ignore', 'pipe', 'pipe'] });
+  const run = commandFor(cmd, args);
+  const child = spawn(run.file, run.args, { cwd: work, env, stdio: ['ignore', 'pipe', 'pipe'] });
 
   const out = { runId: null, runOver: false, last: null, calls: 0, breach: null, stopReason: null, apiError: null, final: null, usage: {}, code: null, minutes: 0, events: [] };
   // The audit digest: what the model said and called, no pictures.
@@ -165,9 +167,18 @@ function playCli(s) {
     if (out.stopReason) return;
     out.stopReason = reason;
     console.log(`  stopping: ${reason}`);
-    child.kill('SIGTERM');
-    setTimeout(() => child.kill('SIGKILL'), 10_000).unref();
+    if (process.platform === 'win32') {
+      // No signals on Windows: end the whole tree (Codex runs a native binary under Node).
+      spawn('taskkill', ['/pid', String(child.pid), '/T', '/F'], { stdio: 'ignore' }).on('error', () => child.kill());
+    } else {
+      child.kill('SIGTERM');
+      setTimeout(() => child.kill('SIGKILL'), 10_000).unref();
+    }
   }
+  child.on('error', (e) => {
+    out.stopReason ??= `could not start ${cmd}: ${e.message}`;
+    console.log(`  ${out.stopReason}`);
+  });
 
   function lockdown(what) {
     if (out.breach) return;
@@ -299,7 +310,7 @@ function playCli(s) {
   return new Promise((resolve) => {
     child.on('close', (code) => {
       log.end();
-      rmSync(work, { recursive: true, force: true });
+      rmSync(work, { recursive: true, force: true, maxRetries: 5 });
       out.code = code;
       out.minutes = (Date.now() - started) / 60_000;
       if (s.agent === 'claude') {

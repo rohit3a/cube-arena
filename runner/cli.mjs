@@ -15,9 +15,10 @@ import { join } from 'node:path';
 import { createInterface } from 'node:readline/promises';
 import { parseArgs } from 'node:util';
 import { operator } from './agent.mjs';
+import { commandFor } from './command.mjs';
 import { playSuite } from './play-suite.mjs';
 
-const VERSION = '0.2.3';
+const VERSION = '0.2.4';
 const DEFAULT_URL = 'https://cube.krnl.studio/mcp';
 const HOME = process.env.CUBE_ARENA_HOME || join(homedir(), '.cube-arena');
 const CONFIG = join(HOME, 'config.json');
@@ -69,7 +70,8 @@ const writeConfig = (c) => {
 
 const has = (cmd) => {
   try {
-    execFileSync(cmd, ['--version'], { stdio: 'ignore' });
+    const run = commandFor(cmd, ['--version']);
+    execFileSync(run.file, run.args, { stdio: 'ignore' });
     return true;
   } catch {
     return false;
@@ -246,7 +248,8 @@ async function play() {
     const codexHome = opt['codex-home'] ?? join(HOME, 'codex');
     mkdirSync(codexHome, { recursive: true });
     if (!existsSync(join(codexHome, 'auth.json'))) {
-      fail(`Sign Codex in for the runner once (its own home, so nothing else of yours leaks in):\n  CODEX_HOME=${codexHome} codex login`);
+      const login = process.platform === 'win32' ? `$env:CODEX_HOME="${codexHome}"; codex login; Remove-Item Env:CODEX_HOME` : `CODEX_HOME=${codexHome} codex login`;
+      fail(`Sign Codex in for the runner once (its own home, so nothing else of yours leaks in):\n  ${login}`);
     }
     session = { agent: 'codex', model: model.via.codex, effort, codexHome };
   } else if (via === 'openrouter') {

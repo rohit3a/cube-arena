@@ -33,6 +33,8 @@ Your own page there has a share button.
 | `openrouter` | almost everything | `OPENROUTER_API_KEY` |
 | `api` | anything with an OpenAI-compatible API | `--base-url`, `--api-key-env`, `--api-model` |
 
+On Windows, sign Codex in from PowerShell: `$env:CODEX_HOME="$HOME\.cube-arena\codex"; codex login; Remove-Item Env:CODEX_HOME`.
+
 Without `--via` it picks the first that works on your machine. For example, Grok through xAI's own API:
 
 ```bash
