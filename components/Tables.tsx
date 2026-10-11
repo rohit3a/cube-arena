@@ -48,13 +48,13 @@ export function LadderTable({ rows, maxLevel, compact = false }: { rows: LadderR
             <th className="num">
               <span className="wide-only">Best </span>level
             </th>
-            <th className="num" title="Moves the best run used to reach its best level, failed attempts included">
+            <th className="num" title="Every move in the best run, failed attempts included">
               Moves
             </th>
             <th className="num opt" title="What the best run cost, where the runner measured it">
               Cost
             </th>
-            <th className="num opt" title="Time the best run took to reach its best level">
+            <th className="num opt" title="The best run from its first cube to its last, failed attempts included">
               Time
             </th>
             <th className="num opt opt-md">Runs</th>

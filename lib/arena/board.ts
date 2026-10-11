@@ -16,12 +16,11 @@ import type { Board, Challenge, Mode, Size, ToolUse } from './rules';
 // row says which); nothing else mixes.
 //
 // Ranking, which the players are told up front (rules.ts SCORING):
-//   ladder:   highest level, then fewest moves to get there, then lowest cost, then least time
+//   ladder:   highest level, then fewest moves, then lowest cost, then least time
 //   scramble: solve rate, then fewest moves, then lowest cost, then least time
-// "To get there" counts every attempt up to the solve that set the best
-// level, failed ones included. Cost is the whole run's, where the runner
-// measured it (unknown ranks last). Time is how long each cube was in front
-// of the player (attempt start to finish); nothing limits it.
+// A ladder's moves, cost and time are all the whole run's, failed attempts
+// included: moves and time from the first cube to the last, cost where the
+// runner measured it (unknown ranks last). Nothing limits the time.
 
 export interface LadderRow {
   model_name: string;
@@ -31,7 +30,7 @@ export interface LadderRow {
   best: number;
   /** The app that connected for the best run, from its User-Agent (see clients.ts). */
   via: string;
-  /** Moves and seconds the best run took to reach its best level; null if it never solved one. */
+  /** Moves and seconds over the best run's whole ladder, failed attempts included. */
   moves: number | null;
   /** What the best run cost, in US dollars; null where nobody measured it. */
   cost: number | null;
@@ -93,17 +92,19 @@ async function allBoardsQuery(): Promise<BoardSection[]> {
   const [ladder, scramble] = await withDb(async (sql) => {
     const l = await sql<Keyed<LadderRow>[]>`
       with best as (
-        -- per run: the solve that set its best level, and what reaching it cost
+        -- per run: the solve that set its best level (for the replay), and the whole run's moves, cost and time
         select r.id, r.size, r.mode, r.tool_use, r.board, r.model_name, r.display_name, r.best_level, r.updated_at, r.client, b.id as best_attempt,
-               (r.usage->>'cost_usd')::float as cost,
-               (select sum(a.move_count) from cube_arena.attempts a where a.run_id = r.id and a.seq <= b.seq)::int as moves,
-               (select sum(extract(epoch from a.finished_at - a.created_at)) from cube_arena.attempts a
-                 where a.run_id = r.id and a.seq <= b.seq)::float as secs
+               (r.usage->>'cost_usd')::float as cost, t.moves, t.secs
         from cube_arena.runs r
         left join lateral (
-          select a.id, a.seq from cube_arena.attempts a
+          select a.id from cube_arena.attempts a
           where a.run_id = r.id and a.status = 'solved' and a.level = r.best_level order by a.seq limit 1
         ) b on true
+        left join lateral (
+          select sum(a.move_count)::int as moves,
+                 extract(epoch from max(coalesce(a.finished_at, now())) - min(a.created_at))::float as secs
+          from cube_arena.attempts a where a.run_id = r.id
+        ) t on true
         where r.challenge = 'ladder' and not r.hidden
       )
       select size, mode, tool_use, board, model_name, display_name,
