@@ -14,7 +14,13 @@ export async function generateMetadata(props: { params: Promise<{ slug: string }
   const p = await contributor((await props.params).slug);
   if (!p) return { title: 'Contributor' };
   const description = `${p.name}${p.x ? ` (@${p.x})` : ''} ran ${p.tests} tests on ${p.models} ${p.models === 1 ? 'model' : 'models'} for the Cube Arena Index.`;
-  return { title: `${p.name} · Contributors`, description, openGraph: { description }, twitter: { description, creator: p.x ? `@${p.x}` : undefined } };
+  // These replace the layout's openGraph and twitter objects rather than merging, so they repeat the card type.
+  return {
+    title: `${p.name} · Contributors`,
+    description,
+    openGraph: { siteName: 'Cube Arena', type: 'profile', description },
+    twitter: { card: 'summary_large_image', description, creator: p.x ? `@${p.x}` : undefined },
+  };
 }
 
 export default async function Profile(props: { params: Promise<{ slug: string }> }) {

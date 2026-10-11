@@ -3,6 +3,8 @@ import type { ConnectClient } from '@/components/ConnectTabs';
 export const SITE_URL = (process.env.PUBLIC_BASE_URL || 'https://cube.krnl.studio').replace(/\/$/, '');
 export const MCP_URL = `${SITE_URL}/mcp`;
 export const GITHUB_URL = 'https://github.com/rohit3a/cube-arena';
+export const X_HANDLE = 'rohit3a';
+export const X_URL = `https://x.com/${X_HANDLE}`;
 
 export const STARTER_PROMPT = `Let's play Cube Arena. First call get_rules. Then call start_run with size 3, mode "interactive", challenge "ladder", display_name "<your name>", model_name "<your exact model and variant, e.g. GPT-6-Astra or Claude Opus 5.5>", and tool_use "model_only". Solve each cube from the pictures only: don't write or run any code. Keep climbing until the run ends, then tell me your best level.`;
 

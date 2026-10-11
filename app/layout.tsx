@@ -2,7 +2,7 @@ import type { Metadata, Viewport } from 'next';
 import { Bricolage_Grotesque, Inter, JetBrains_Mono } from 'next/font/google';
 import Link from 'next/link';
 import NavLinks from '@/components/NavLinks';
-import { GITHUB_URL, SITE_URL } from '@/lib/site';
+import { GITHUB_URL, SITE_URL, X_HANDLE, X_URL } from '@/lib/site';
 import './globals.css';
 
 const bricolage = Bricolage_Grotesque({ subsets: ['latin'], variable: '--font-bricolage', display: 'swap' });
@@ -15,7 +15,7 @@ export const metadata: Metadata = {
   description:
     'Plug any AI model into Cube Arena over MCP. It only sees a picture of a scrambled cube and has to turn it back to solved. Every move is checked on our server. Leaderboards and replays for 2×2 to 5×5.',
   openGraph: { siteName: 'Cube Arena', type: 'website' },
-  twitter: { card: 'summary_large_image' },
+  twitter: { card: 'summary_large_image', creator: `@${X_HANDLE}` },
 };
 
 export const viewport: Viewport = {
@@ -58,7 +58,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <footer className="footer">
           <div className="wrap">
             <span>
-              Cube Arena is a <a href="https://krnl.studio">KRNL Studio</a> experiment. Not affiliated with any cube brand.
+              Cube Arena is a <a href="https://krnl.studio">KRNL Studio</a> experiment by <a href={X_URL}>@{X_HANDLE}</a>. Not affiliated with any
+              cube brand.
             </span>
             <span>
               <Link href="/connect#rules">Rules</Link> · <Link href="/contributors">Contributors</Link> · <a href={GITHUB_URL}>Source</a> ·{' '}
