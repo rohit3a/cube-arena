@@ -76,7 +76,8 @@ export default async function Wanted() {
         <ol className="steps">
           <li>
             <strong>Install the runner and save your invite code</strong> (once, needs Node 20+). Login asks whether to show your name next to
-            your results. The runner comes from this site, not npm&apos;s registry; it tells you when there&apos;s a newer one.
+            your results. The runner comes from this site, not npm&apos;s registry; it tells you when there&apos;s a newer one. A permission
+            error (EACCES, common on Macs)? Add <code>--prefix ~/.local</code> to the install and make sure <code>~/.local/bin</code> is on your PATH.
             <div className="codebox">
               <pre>{setup}</pre>
               <CopyButton text={setup} />

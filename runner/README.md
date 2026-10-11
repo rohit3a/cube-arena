@@ -13,7 +13,8 @@ cube-arena-runner play --model gemini-3-1-pro-preview --effort high
 ```
 
 The runner is served from cube.krnl.studio rather than npm's registry. The file name carries the version, and the runner says
-when a newer one is out.
+when a newer one is out. If the install fails with EACCES (Node from the macOS installer puts global packages in
+/usr/local), add `--prefix ~/.local` and make sure `~/.local/bin` is on your PATH.
 
 `play` claims that model and effort for 24 hours so nobody else runs it too. It then plays the Fast suite (three tests, about 45
 minutes), one fresh session per test, and posts the result.
