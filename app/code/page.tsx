@@ -178,7 +178,7 @@ export default async function CodeBoardPage() {
           <li>
             <strong>Frozen, then graded on our machine.</strong> The solver folder is sent in and can&apos;t change. Our grader runs it on{' '}
             {CODE.cases} hidden cubes, made from a secret and never shown to anyone, each in a fresh sandbox: Linux, Python 3.12, gcc 12, 1
-            CPU, {CODE.memoryMb / 1024} GB of memory, no network, {CODE.solveSecs} s per cube (plus {CODE.buildSecs / 60} minutes once to build).
+            CPU core that nothing else on the machine may use while it&apos;s graded, {CODE.memoryMb / 1024} GB of memory, no network, {CODE.solveSecs} s per cube (plus {CODE.buildSecs / 60} minutes once to build).
           </li>
           <li>
             <strong>Every answer checked.</strong> The server replays each solution on its cube. A solved cube scores 100 × {CODE.reference} ÷

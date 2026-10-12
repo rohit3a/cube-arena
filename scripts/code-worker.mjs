@@ -6,38 +6,93 @@
 //
 //   node --env-file=.env.local scripts/code-worker.mjs           keep polling
 //   node --env-file=.env.local scripts/code-worker.mjs --once    grade at most one, then exit
+//   node scripts/code-worker.mjs --release                      give the grader's core back, then exit
 //
 // The solver is untrusted code. Every step (unpacking, build.py, each cube)
 // runs in a fresh container: no network, no capabilities, a read-only root,
 // one CPU and the memory limit, as this machine's ordinary user, with only
 // that submission's folder mounted (read-only while solving). Its folder may
 // not grow past MAX_SOLVER_BYTES. Needs CUBE_OPERATOR_TOKEN and Docker.
+//
+// The ROG is shared with other work, so the grader gets a core of its own:
+// containers run on one thread of the last core, and while a submission is
+// graded everything else (system services, other containers, this user's
+// programs) is kept off both of that core's threads. Runtime settings only,
+// through sudo; given back after each submission, at start and on stop.
 
 import { spawn, spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { existsSync, mkdirSync, rmSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, rmSync } from 'node:fs';
 import { cpus, hostname, userInfo } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseArgs } from 'node:util';
 
 const { values: opt } = parseArgs({
-  options: { once: { type: 'boolean', default: false }, url: { type: 'string', default: process.env.CUBE_ARENA_SITE ?? 'https://cube.krnl.studio' } },
+  options: {
+    once: { type: 'boolean', default: false },
+    release: { type: 'boolean', default: false },
+    url: { type: 'string', default: process.env.CUBE_ARENA_SITE ?? 'https://cube.krnl.studio' },
+  },
 });
 const SITE = opt.url.replace(/\/$/, '');
 const TOKEN = process.env.CUBE_OPERATOR_TOKEN;
-if (!TOKEN) {
-  console.error('CUBE_OPERATOR_TOKEN is not set');
-  process.exit(2);
-}
 
 const IMAGE = 'cube-arena-code:v1';
 const ROOT = process.env.CODE_GRADER_DIR || '/mnt/rog-data/cube-arena-grader';
 const POLL_MS = 60_000;
 /** What build.py may leave in solver/. */
 const MAX_SOLVER_BYTES = 2 * 1024 ** 3;
+/** The grader's containers go here, beside system.slice and user.slice rather than in them. */
+const SLICE = 'grader.slice';
 const { uid, gid } = userInfo();
 const log = (...a) => console.log(new Date().toISOString().slice(11, 19), ...a);
+
+/** "0-2,4,6-7" → [0, 1, 2, 4, 6, 7] */
+const cpuList = (s) =>
+  s.trim().split(',').filter(Boolean).flatMap((part) => {
+    const [a, b = a] = part.split('-').map(Number);
+    return Array.from({ length: b - a + 1 }, (_, i) => a + i);
+  });
+
+/** The last core (or the one CODE_GRADER_CPU is on): the thread the cubes run on, both its threads, and every other CPU. */
+function pickCore() {
+  try {
+    const online = cpuList(readFileSync('/sys/devices/system/cpu/online', 'utf8'));
+    const cpu = Number(process.env.CODE_GRADER_CPU ?? online.at(-1));
+    const threads = cpuList(readFileSync(`/sys/devices/system/cpu/cpu${cpu}/topology/thread_siblings_list`, 'utf8'));
+    const others = online.filter((c) => !threads.includes(c));
+    return others.length ? { cpu: threads[0], threads, others } : null;
+  } catch {
+    return null;
+  }
+}
+const CORE = pickCore();
+
+/** Keeps everything else off the grader's core (true), or gives it back (false). Reports whether every slice took it. */
+function reserveCore(on) {
+  if (!CORE) return false;
+  let ok = true;
+  for (const slice of ['system.slice', 'user.slice']) {
+    const r = spawnSync('sudo', ['systemctl', 'set-property', '--runtime', slice, `AllowedCPUs=${on ? CORE.others.join(',') : ''}`], {
+      encoding: 'utf8',
+      timeout: 120_000,
+    });
+    if (r.status !== 0) {
+      ok = false;
+      log(`could not ${on ? 'reserve' : 'give back'} CPUs ${CORE.threads.join('+')} on ${slice}: ${(r.stderr || r.error?.message || `exit ${r.status}`).trim().slice(0, 200)}`);
+    }
+  }
+  return ok;
+}
+
+if (opt.release) {
+  process.exit(reserveCore(false) ? 0 : 1);
+}
+if (!TOKEN) {
+  console.error('CUBE_OPERATOR_TOKEN is not set');
+  process.exit(2);
+}
 
 async function api(path, body) {
   const res = await fetch(`${SITE}${path}`, {
@@ -79,6 +134,8 @@ function docker(args, { input, timeoutMs, name, maxOut = 1 << 20 }) {
 const sandbox = (name, limits, solverDir, mode) => [
   'run', '--rm', '-i', '--name', name,
   '--network', 'none',
+  '--cgroup-parent', SLICE,
+  ...(CORE ? ['--cpuset-cpus', String(CORE.cpu)] : []),
   '--cpus', String(limits.cpus),
   '--memory', `${limits.memoryMb}m`, '--memory-swap', `${limits.memoryMb}m`,
   '--pids-limit', '256',
@@ -104,9 +161,9 @@ function ensureImage() {
   if (r.status !== 0) throw new Error(`could not build ${IMAGE}`);
 }
 
-function graderName() {
+function graderName(ownCore) {
   const id = spawnSync('docker', ['image', 'inspect', IMAGE, '--format', '{{.Id}}'], { encoding: 'utf8' }).stdout.trim();
-  return `${hostname()} · ${IMAGE} ${id.slice(7, 19)} · ${cpus()[0]?.model ?? 'cpu'}`;
+  return `${hostname()} · ${IMAGE} ${id.slice(7, 19)} · ${cpus()[0]?.model ?? 'cpu'} · ${ownCore ? 'own core' : 'shared core'}`;
 }
 
 async function grade(job) {
@@ -116,6 +173,8 @@ async function grade(job) {
   const solver = join(dir, 'solver');
   rmSync(dir, { recursive: true, force: true });
   mkdirSync(solver, { recursive: true });
+  const ownCore = reserveCore(true);
+  if (CORE) log(`${short}: ${ownCore ? `CPU ${CORE.cpu} to itself (CPUs ${CORE.threads.join('+')} kept clear)` : `CPU ${CORE.cpu}, shared: the reservation failed`}`);
   try {
     const bundle = await api(`/api/code/files?id=${job.id}&kind=bundle`);
     const sha = createHash('sha256').update(bundle).digest('hex');
@@ -179,19 +238,22 @@ async function grade(job) {
         log(`${short}: cube ${c.n} → ${res.timed_out ? 'timeout' : res.exit_code === 0 ? `${res.stdout.trim().split(/\s+/).filter(Boolean).length} tokens` : `exit ${res.exit_code}`} in ${(res.ms / 1000).toFixed(1)} s`);
       }
     }
-    const { submission } = await api('/api/code/jobs', { id: job.id, grader: graderName(), build, results });
+    const { submission } = await api('/api/code/jobs', { id: job.id, grader: graderName(ownCore), build, results });
     log(`${short}: graded: ${submission.solved}/${submission.cases} solved, score ${Number(submission.score).toFixed(2)}`);
   } catch (e) {
     log(`${short}: grader error: ${e.message}`);
     await api('/api/code/jobs', { id: job.id, error: `grader: ${e.message}` }).catch((err) => log(`(could not report it: ${err.message})`));
   } finally {
+    if (CORE) reserveCore(false);
     rmSync(dir, { recursive: true, force: true });
   }
 }
 
 ensureImage();
 mkdirSync(join(ROOT, 'jobs'), { recursive: true });
-log(`grading for ${SITE} with ${IMAGE}${opt.once ? ' (once)' : ''}`);
+// Left reserved by a worker that was killed mid-grade.
+if (CORE) reserveCore(false);
+log(`grading for ${SITE} with ${IMAGE}${opt.once ? ' (once)' : ''}${CORE ? `, on CPU ${CORE.cpu}` : ''}`);
 let stopping = false;
 for (const sig of ['SIGTERM', 'SIGINT']) process.on(sig, () => (stopping = true));
 while (!stopping) {
