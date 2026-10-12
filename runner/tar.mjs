@@ -46,10 +46,9 @@ function header(path, size, mode, dir) {
   return h;
 }
 
-/** Every file under `dir`, as a gzipped tar with paths relative to it. Throws past `maxBytes` unpacked. */
-export function tarGz(dir, maxBytes = 64 * 1024 * 1024) {
-  const parts = [];
-  let total = 0;
+/** Every plain file under `dir` that goes in the archive, with its size, in archive order (folders as well, size 0). */
+export function listFiles(dir) {
+  const out = [];
   const walk = (rel) => {
     const entries = readdirSync(join(dir, rel), { withFileTypes: true }).sort((a, b) => (a.name < b.name ? -1 : 1));
     for (const e of entries) {
@@ -57,17 +56,29 @@ export function tarGz(dir, maxBytes = 64 * 1024 * 1024) {
       const path = rel ? `${rel}/${e.name}` : e.name;
       const st = lstatSync(join(dir, path));
       if (st.isDirectory()) {
-        parts.push(header(`${path}/`, 0, 0o755, true));
+        out.push({ path, size: 0, dir: true, mode: 0o755 });
         walk(path);
-      } else if (st.isFile()) {
-        const data = readFileSync(join(dir, path));
-        total += data.length;
-        if (total > maxBytes) throw new Error(`solver/ is over ${maxBytes} bytes; build big tables in build.py instead`);
-        parts.push(header(path, data.length, st.mode & 0o111 ? 0o755 : 0o644, false), data, Buffer.alloc((BLOCK - (data.length % BLOCK)) % BLOCK));
-      }
+      } else if (st.isFile()) out.push({ path, size: st.size, dir: false, mode: st.mode & 0o111 ? 0o755 : 0o644 });
     }
   };
   walk('');
+  return out;
+}
+
+/** Every file under `dir`, as a gzipped tar with paths relative to it. Throws past `maxBytes` unpacked, before reading anything. */
+export function tarGz(dir, maxBytes = 64 * 1024 * 1024) {
+  const files = listFiles(dir);
+  const total = files.reduce((a, f) => a + f.size, 0);
+  if (total > maxBytes) throw new Error(`solver/ is over ${maxBytes} bytes; build big tables in build.py instead`);
+  const parts = [];
+  for (const f of files) {
+    if (f.dir) {
+      parts.push(header(`${f.path}/`, 0, 0o755, true));
+      continue;
+    }
+    const data = readFileSync(join(dir, f.path));
+    parts.push(header(f.path, data.length, f.mode, false), data, Buffer.alloc((BLOCK - (data.length % BLOCK)) % BLOCK));
+  }
   parts.push(Buffer.alloc(BLOCK * 2));
   return gzipSync(Buffer.concat(parts), { level: 9 });
 }

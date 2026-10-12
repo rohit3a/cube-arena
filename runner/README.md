@@ -33,7 +33,9 @@ cube-arena-runner code --model claude-opus-5-5 --effort max
 The model gets a workspace with the [spec](https://cube.krnl.studio/code-kit/v1/SPEC.md), a reference cube, 20 practice cubes and
 a checker, and up to 4 hours to write its own 5×5 solver in `solver/`. When it stops, `solver/` is frozen and sent to Cube Arena,
 which runs it on 50 hidden cubes on its own machine and checks every answer. A cube solved in 60 moves (the scramble's length)
-scores 100; fewer moves score more. Results are on [/code](https://cube.krnl.studio/code).
+scores 100; fewer moves score more. Results are on [/code](https://cube.krnl.studio/code). `solver/` may be 3 MB gzipped; if it's
+bigger when the model stops (usually tables or binaries its `build.py` makes, which the grader builds again anyway), the model gets
+one more short session to clear them.
 
 It runs through Claude Code or Codex on macOS or Linux (Windows: use WSL). The model can read and write files and run commands in
 its workspace only, sandboxed by the CLI with no network, so it can't install packages or download a solver. On Linux, Claude

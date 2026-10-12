@@ -18,7 +18,7 @@ import { join } from 'node:path';
 import { gunzipSync, gzipSync } from 'node:zlib';
 import { MAX_OUTPUT_TOKENS, OUTPUT_CAP, SYNTHETIC, operator, slim } from './agent.mjs';
 import { commandFor } from './command.mjs';
-import { tarGz } from './tar.mjs';
+import { listFiles, tarGz } from './tar.mjs';
 
 const RETRY_MINUTES = [1, 5, 15, 30, 60];
 const RETRY_HOURS = 12;
@@ -94,7 +94,10 @@ export async function setUpWorkspace(site, dir) {
   return kit;
 }
 
-const hm = (ms) => `${Math.floor(ms / 3_600_000)} h ${Math.round((ms % 3_600_000) / 60_000)} min`;
+const hm = (ms) => {
+  const min = Math.round(ms / 60_000);
+  return `${Math.floor(min / 60)} h ${min % 60} min`;
+};
 
 function promptFor(first, remainingMs, limits) {
   const deadline = new Date(Date.now() + remainingMs).toISOString().slice(0, 16).replace('T', ' ');
@@ -112,6 +115,40 @@ function promptFor(first, remainingMs, limits) {
     `it is graded on ${limits.cases} hidden cubes, and every move counts. Work on your own, with no internet access; ` +
     `test with \`python3 check.py\` and keep improving the move count while you have time. ${time} ` +
     'When you stop, solver/ is frozen and submitted as it stands.'
+  );
+}
+
+const UNPACKED_MAX = 64 * 1024 * 1024;
+/** Sessions the model gets to make an oversized solver/ fit, and the least time each one has. */
+const PACK_FIXES = 2;
+const PACK_GRACE_MS = 15 * 60_000;
+const mb = (n) => `${(n / 1e6).toFixed(1)} MB`;
+
+/** solver/ as a gzipped tar ({ gz }), or why it can't be sent and its biggest files ({ problem, biggest }). */
+export function packSolver(solver, limits) {
+  const files = listFiles(solver).filter((f) => !f.dir);
+  const total = files.reduce((a, f) => a + f.size, 0);
+  const sorted = [...files].sort((a, b) => b.size - a.size);
+  const biggest = sorted.filter((f) => f.size >= 100_000).slice(0, 8);
+  if (!biggest.length) biggest.push(...sorted.slice(0, 3));
+  if (total > UNPACKED_MAX) return { problem: `${mb(total)} before compression`, biggest };
+  try {
+    const gz = tarGz(solver, UNPACKED_MAX);
+    if (gz.length > limits.bundleMaxBytes) return { problem: `${mb(gz.length)} gzipped`, biggest };
+    return { gz };
+  } catch (e) {
+    return { problem: e.message, biggest };
+  }
+}
+
+export function packPrompt(packed, budgetMs, limits) {
+  const deadline = new Date(Date.now() + budgetMs).toISOString().slice(0, 16).replace('T', ' ');
+  return (
+    `Cube Arena coding benchmark (SPEC.md): your solver/ folder can't be submitted as it stands. It is ${packed.problem}; ` +
+    `the limit is ${mb(limits.bundleMaxBytes)} gzipped. Its biggest files: ${packed.biggest.map((f) => `${f.path} (${mb(f.size)})`).join(', ')}. ` +
+    'build.py runs again on the grader before any cube, so the files it makes need not be in solver/: delete them, and anything else ' +
+    'build.py and solve.py do not need. `python3 check.py` builds into solver/, so delete them after your last check. ' +
+    `You have ${hm(budgetMs)} (until ${deadline} UTC). When solver/ fits, stop: it is then submitted as it stands.`
   );
 }
 
@@ -342,39 +379,51 @@ export async function playCoding(p) {
   beat();
   const heart = setInterval(beat, HEARTBEAT_MS);
   let waited = 0;
+  // One session of the agent, its time, usage and events recorded. Returns { r }, or { end } when that ends the run.
+  const runSession = async (prompt, budgetMs) => {
+    const stamp = new Date().toISOString().replace(/[:.]/g, '-');
+    const r = await codingSession({
+      ...p.session,
+      dir: p.dir,
+      prompt,
+      budgetMs,
+      logPath: join(p.logDir, `${stamp}-${p.session.model}-${p.session.effort ?? 'default'}-code-${state.sessions + 1}.jsonl`),
+    });
+    state.usedMs += r.ms;
+    state.sessions += 1;
+    save();
+    for (const e of r.events) appendFileSync(eventsFile, `${JSON.stringify({ session: state.sessions, ...e })}\n`);
+    const cost = r.usage.cost_usd !== undefined ? `, $${r.usage.cost_usd.toFixed(2)}` : '';
+    console.log(`  session over after ${(r.ms / 60_000).toFixed(1)} min${cost} (${hm(state.usedMs)} used of ${p.limits.devHours} h)`);
+    await call('/api/code/submissions', { id, usage: r.usage, dev_minutes: state.usedMs / 60_000 }).catch((e) => console.log(`  (could not record usage: ${e.message})`));
+
+    if (r.breach) {
+      await call('/api/code/submissions', { id, hidden: true, reason: `runner lockdown: ${r.breach}` }).catch(() => {});
+      await uploadTranscript(call, id, p, eventsFile, state);
+      console.log(`!!! lockdown broken (${r.breach}); the submission is hidden. Stopping.`);
+      return { end: { breach: r.breach } };
+    }
+    if (r.harnessError) {
+      console.log(`!!! ${r.harnessError}. Stopping; fix that and carry on within 30 minutes with --resume ${id}`);
+      return { end: { stopped: r.harnessError } };
+    }
+    return { r };
+  };
+
+  const solver = join(p.dir, 'solver');
+  let packed;
   try {
-    for (let tries = 0; ; tries++) {
+    for (let tries = 0; !state.ended; tries++) {
       const remaining = budget - state.usedMs;
       if (remaining < 60_000) break;
       console.log(`\n=== coding session ${state.sessions + 1}: ${hm(remaining)} left ===`);
-      const stamp = new Date().toISOString().replace(/[:.]/g, '-');
-      const r = await codingSession({
-        ...p.session,
-        dir: p.dir,
-        prompt: promptFor(state.sessions === 0, remaining, p.limits),
-        budgetMs: remaining,
-        logPath: join(p.logDir, `${stamp}-${p.session.model}-${p.session.effort ?? 'default'}-code-${state.sessions + 1}.jsonl`),
-      });
-      state.usedMs += r.ms;
-      state.sessions += 1;
-      save();
-      for (const e of r.events) appendFileSync(eventsFile, `${JSON.stringify({ session: state.sessions, ...e })}\n`);
-      const cost = r.usage.cost_usd !== undefined ? `, $${r.usage.cost_usd.toFixed(2)}` : '';
-      console.log(`  session over after ${(r.ms / 60_000).toFixed(1)} min${cost} (${hm(state.usedMs)} used of ${p.limits.devHours} h)`);
-      await call('/api/code/submissions', { id, usage: r.usage, dev_minutes: state.usedMs / 60_000 }).catch((e) => console.log(`  (could not record usage: ${e.message})`));
-
-      if (r.breach) {
-        await call('/api/code/submissions', { id, hidden: true, reason: `runner lockdown: ${r.breach}` }).catch(() => {});
-        await uploadTranscript(call, id, p, eventsFile, state);
-        console.log(`!!! lockdown broken (${r.breach}); the submission is hidden. Stopping.`);
-        return { breach: r.breach };
+      const { r, end } = await runSession(promptFor(state.sessions === 0, remaining, p.limits), remaining);
+      if (end) return end;
+      if (r.quit && !r.apiError) {
+        state.ended = true;
+        save();
+        break;
       }
-      if (r.harnessError) {
-        console.log(`!!! ${r.harnessError}. Stopping; fix that and carry on within 30 minutes with --resume ${id}`);
-        return { stopped: r.harnessError };
-      }
-      const ended = r.quit && !r.apiError;
-      if (ended) break;
       // Not the model's doing: the files wait as they are, and a fresh session carries on.
       const why = r.apiError ?? r.stopReason ?? `the agent ended unexpectedly (exit ${r.code})`;
       const wait = RETRY_MINUTES[Math.min(tries, RETRY_MINUTES.length - 1)];
@@ -386,13 +435,29 @@ export async function playCoding(p) {
       await new Promise((res) => setTimeout(res, wait * 60_000));
       waited += wait;
     }
+
+    // solver/ goes as it stands, unless it's too big to send: usually tables
+    // and binaries from build.py, which check.py runs in place. The model gets
+    // a session to clear them, from its own time or, once that's gone, a few
+    // minutes past it.
+    packed = packSolver(solver, p.limits);
+    for (let fix = 1; packed.problem && fix <= PACK_FIXES; fix++) {
+      const budgetMs = Math.max(budget - state.usedMs, PACK_GRACE_MS);
+      console.log(`\n=== solver/ is too big to send (${packed.problem}). Session ${state.sessions + 1} to fix that: ${hm(budgetMs)} ===`);
+      const { end } = await runSession(packPrompt(packed, budgetMs, p.limits), budgetMs);
+      if (end) return end;
+      packed = packSolver(solver, p.limits);
+    }
   } finally {
     clearInterval(heart);
   }
 
   await uploadTranscript(call, id, p, eventsFile, state);
-  const solver = join(p.dir, 'solver');
-  const gz = tarGz(solver);
+  if (packed.problem) {
+    console.log(`!!! solver/ is still too big to send (${packed.problem}). Delete what build.py makes, then carry on within 30 minutes with --resume ${id}`);
+    return { stopped: `solver/ is too big: ${packed.problem}` };
+  }
+  const gz = packed.gz;
   // The solver is published: never with the runner's invite code in it.
   if (p.token && gunzipSync(gz).includes(Buffer.from(p.token))) {
     console.log('!!! solver/ contains your invite code. Not sending it; remove it and carry on with --resume.');
