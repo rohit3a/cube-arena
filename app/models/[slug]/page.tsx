@@ -34,6 +34,8 @@ export default async function ModelPage(props: { params: Promise<{ slug: string 
     return <NotRunYet slug={slug} />;
   }
   const { model, maker, color, board } = es[0];
+  // Some models (Composer) have no effort setting: one row each, named after the model.
+  const hasEffort = es.some((e) => e.effort);
   const invited = es.some((e) => !e.run_by.includes('Cube Arena'));
   const finished = es.filter((e) => e.status === 'finished');
   const best = (kind: string) => finished.filter((e) => e.kind === kind && e.version === SUITES[e.kind].version).sort(suiteOrder)[0];
@@ -45,8 +47,9 @@ export default async function ModelPage(props: { params: Promise<{ slug: string 
       <p>
         {board === 'verified' ? (
           <>
-            <span className="badge verified">Verified</span> Model id <code>{slug}</code>, run at each effort level it offers
-            {invited ? ' by us and by people we invited' : ' by us'}. Runs of the same effort are averaged.
+            <span className="badge verified">Verified</span> Model id <code>{slug}</code>, run{hasEffort ? ' at each effort level it offers' : ''}
+            {invited ? ' by us and by people we invited' : ' by us'}.{' '}
+            {hasEffort ? 'Runs of the same effort are averaged.' : 'It has no effort setting, so its runs are averaged together.'}
           </>
         ) : (
           <>
@@ -81,19 +84,20 @@ export default async function ModelPage(props: { params: Promise<{ slug: string 
           <section key={k} id={k} className="card ix-card">
             <header className="ix-head">
               <h2>
-                {SUITES[k].name} {SUITES[k].version} by effort
+                {SUITES[k].name} {SUITES[k].version}
+                {hasEffort && ' by effort'}
               </h2>
               <p>{SUITES[k].blurb}</p>
             </header>
             <BarChart
               height={180}
-              items={rows.map((e) => ({ key: e.id, label: e.effort ?? 'default', value: e.score, color, href: resultHref(e) }))}
+              items={rows.map((e) => ({ key: e.id, label: e.effort ?? model, value: e.score, color, href: resultHref(e) }))}
             />
             <div className="table-wrap flat">
               <table className="heat">
                 <thead>
                   <tr>
-                    <th>Effort</th>
+                    <th>{hasEffort ? 'Effort' : 'Model'}</th>
                     <th className="num">Index</th>
                     {tests.map((t) => (
                       <th key={t.test} className="num" title={t.name}>
@@ -111,7 +115,7 @@ export default async function ModelPage(props: { params: Promise<{ slug: string 
                   {rows.map((e) => (
                     <tr key={e.id}>
                       <td>
-                        <Link href={e.n > 1 ? `#${k}-runs` : `/suites/${e.id}`}>{e.effort ?? 'default'}</Link>
+                        <Link href={e.n > 1 ? `#${k}-runs` : `/suites/${e.id}`}>{e.effort ?? model}</Link>
                       </td>
                       <td className="num strong">{fmtScore(e.score)}</td>
                       {tests.map((t) => {
@@ -154,7 +158,8 @@ export default async function ModelPage(props: { params: Promise<{ slug: string 
                   .map((e) => (
                     <li key={e.id}>
                       <Link href={`/suites/${e.id}`}>
-                        <strong>{fmtScore(e.score)}</strong> at {e.effort ?? 'default'}
+                        <strong>{fmtScore(e.score)}</strong>
+                        {e.effort && ` at ${e.effort}`}
                       </Link>{' '}
                       <span className="muted">
                         · run by {e.contributor ? <Link href={`/contributors/${e.contributor.slug}`}>{e.contributor.name}</Link> : e.run_by.join(', ')}
