@@ -5,15 +5,24 @@
 // Runs before every build (package.json prebuild). The version is in the file
 // name because npm caches installs by URL: a new runner needs a new URL.
 import { execFileSync } from 'node:child_process';
-import { mkdirSync, readFileSync, readdirSync, rmSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
-const { version } = JSON.parse(readFileSync(join(root, 'runner/package.json'), 'utf8'));
+const { version, files } = JSON.parse(readFileSync(join(root, 'runner/package.json'), 'utf8'));
 const cli = readFileSync(join(root, 'runner/cli.mjs'), 'utf8');
 const stated = cli.match(/const VERSION = '([^']+)'/)?.[1];
 if (stated !== version) throw new Error(`runner/cli.mjs says ${stated} but runner/package.json says ${version}; bump both together.`);
+
+// Every file the shipped code imports must ship too: a missing one only shows up
+// when someone installs the package and it fails to start.
+for (const f of files.filter((x) => x.endsWith('.mjs'))) {
+  for (const [, dep] of readFileSync(join(root, 'runner', f), 'utf8').matchAll(/(?:from|import\()\s*'\.\/([^']+)'/g)) {
+    if (!files.includes(dep)) throw new Error(`runner/${f} imports ./${dep}, which is not in runner/package.json "files".`);
+    if (!existsSync(join(root, 'runner', dep))) throw new Error(`runner/${f} imports ./${dep}, which does not exist.`);
+  }
+}
 
 const out = join(root, 'public/runner');
 mkdirSync(out, { recursive: true });
