@@ -3195,6 +3195,45 @@ th.num {
   border-right: var(--bw) solid var(--line);
 }
 
+/* A fixed reference mark across the bars (the coding benchmark's 100). */
+.hbar-track:has(.hbar-ref) {
+  position: relative;
+}
+
+.hbar-ref {
+  position: absolute;
+  top: -2px;
+  bottom: -2px;
+  border-left: 2px dashed var(--text);
+}
+
+.hbar-ref-note {
+  font-size: 0.85rem;
+  color: var(--text-2);
+}
+
+.hbar-ref-key {
+  display: inline-block;
+  width: 0;
+  height: 0.9em;
+  margin-right: 4px;
+  vertical-align: -0.1em;
+  border-left: 2px dashed var(--text);
+}
+
+.chart .ref-line {
+  stroke: var(--text);
+  stroke-width: 2;
+  stroke-dasharray: 6 5;
+}
+
+.chart .ref-label {
+  fill: var(--text-2);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 700;
+}
+
 .hbar-num {
   grid-area: num;
   font-family: var(--font-mono);
@@ -3783,4 +3822,74 @@ table.wanted td.cmd {
 .apply-status {
   margin-top: 24px;
   font-weight: 600;
+}
+
+/* Coding benchmark: one cell per hidden cube, and the in-progress list. */
+.case-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(64px, 1fr));
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.case {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+  padding: 8px 4px;
+  border: var(--bw) solid var(--line);
+  border-radius: 10px;
+  background: var(--card);
+  text-align: center;
+}
+
+.case strong {
+  font-family: var(--font-display);
+  font-size: 1.15rem;
+  line-height: 1.1;
+}
+
+.case-n,
+.case-s {
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  color: var(--text-3);
+}
+
+.case-s {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.case-solved {
+  background: var(--green-t);
+}
+
+.case-unsolved,
+.case-illegal {
+  background: var(--orange-t);
+}
+
+.case-timeout,
+.case-crash {
+  background: var(--red-t);
+}
+
+.code-pending {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0 0 24px;
+  padding: 0;
+  list-style: none;
+}
+
+.small-note {
+  margin-top: 12px;
+  font-size: 0.88rem;
 }

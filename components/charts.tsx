@@ -38,22 +38,56 @@ export interface BarItem {
   hatch?: boolean;
 }
 
-export function BarChart({ items, max = 100, format = fmt1, height = 230, empty }: { items: BarItem[]; max?: number; format?: (v: number) => string; height?: number; empty?: ReactNode }) {
+/** A fixed mark across the bars, e.g. the coding benchmark's 100-point reference. */
+export interface Reference {
+  value: number;
+  label: string;
+}
+
+export function BarChart({
+  items,
+  max = 100,
+  format = fmt1,
+  height = 230,
+  empty,
+  reference,
+}: {
+  items: BarItem[];
+  max?: number;
+  format?: (v: number) => string;
+  height?: number;
+  empty?: ReactNode;
+  reference?: Reference;
+}) {
   const [ref, width] = useWidth<HTMLDivElement>();
   return (
     <div ref={ref} className="chart-wrap">
       {items.length === 0 ? (
         <div className="chart-empty">{empty ?? 'No results yet.'}</div>
       ) : width > 0 && width < 560 ? (
-        <HBars items={items} max={max} format={format} />
+        <HBars items={items} max={max} format={format} reference={reference} />
       ) : (
-        width > 0 && <VBars items={items} max={max} format={format} height={height} width={width} />
+        width > 0 && <VBars items={items} max={max} format={format} height={height} width={width} reference={reference} />
       )}
     </div>
   );
 }
 
-function VBars({ items, max, format, height, width }: { items: BarItem[]; max: number; format: (v: number) => string; height: number; width: number }) {
+function VBars({
+  items,
+  max,
+  format,
+  height,
+  width,
+  reference,
+}: {
+  items: BarItem[];
+  max: number;
+  format: (v: number) => string;
+  height: number;
+  width: number;
+  reference?: Reference;
+}) {
   // Slanted names run down and to the left of their bar: leave room for the
   // first one on the left and for the longest one underneath.
   const rad = (42 * Math.PI) / 180;
@@ -112,15 +146,31 @@ function VBars({ items, max, format, height, width }: { items: BarItem[]; max: n
               <g key={it.key}>{body}</g>
             );
           })}
+          {reference && reference.value <= max && (
+            <g className="ref-g">
+              <line x1={left - 8} x2={W} y1={y(reference.value)} y2={y(reference.value)} className="ref-line" />
+              <text x={W - 4} y={y(reference.value) - 6} textAnchor="end" className="ref-label">
+                {reference.label}
+              </text>
+            </g>
+          )}
         </svg>
       )}
     </div>
   );
 }
 
-function HBars({ items, max, format }: { items: BarItem[]; max: number; format: (v: number) => string }) {
+function HBars({ items, max, format, reference }: { items: BarItem[]; max: number; format: (v: number) => string; reference?: Reference }) {
+  const refPct = reference && reference.value <= max ? (100 * reference.value) / max : null;
   return (
     <ol className="hbars">
+      {refPct !== null && (
+        <li className="hbar-ref-note" aria-hidden>
+          <span className="hbar-label">
+            <span className="hbar-ref-key" /> {reference?.label}
+          </span>
+        </li>
+      )}
       {items.map((it) => {
         const pct = it.value === null ? 0 : (100 * Math.max(0, Math.min(it.value, max))) / max;
         const name = (
@@ -134,6 +184,7 @@ function HBars({ items, max, format }: { items: BarItem[]; max: number; format: 
             <span className="hbar-label">{it.href ? <Link href={it.href}>{name}</Link> : name}</span>
             <span className="hbar-track">
               <span className={`hbar-fill${it.hatch ? ' hatch' : ''}`} style={{ width: `${Math.max(pct, 1.5)}%`, background: it.color }} />
+              {refPct !== null && <i className="hbar-ref" style={{ left: `${refPct}%` }} />}
             </span>
             <span className="hbar-num">{it.value === null ? '–' : format(it.value)}</span>
           </li>

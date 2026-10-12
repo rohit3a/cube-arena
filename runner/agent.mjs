@@ -95,13 +95,13 @@ function codexCommand(s, work) {
 
 // Transcripts keep everything but the pictures, which the site can redraw.
 /** The model name on messages Claude Code writes itself: API errors, usage limits. */
-const SYNTHETIC = '<synthetic>';
+export const SYNTHETIC = '<synthetic>';
 /** More than any Claude model's output limit, so each gets its own. */
-const MAX_OUTPUT_TOKENS = 1_000_000;
+export const MAX_OUTPUT_TOKENS = 1_000_000;
 /** Claude Code's notice that one reply ran past the model's output token maximum. */
-const OUTPUT_CAP = /exceeded the \d+ output token maximum/i;
+export const OUTPUT_CAP = /exceeded the \d+ output token maximum/i;
 
-const slim = (line) => line.replace(/"data":"[A-Za-z0-9+/=]{200,}"/g, (m) => `"data":"<${m.length - 9} base64 chars>"`);
+export const slim = (line) => line.replace(/"data":"[A-Za-z0-9+/=]{200,}"/g, (m) => `"data":"<${m.length - 9} base64 chars>"`);
 
 /**
  * Plays one session. `s`: { agent ('claude' | 'codex' | 'api'), model, effort,

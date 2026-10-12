@@ -1,12 +1,14 @@
 #!/usr/bin/env node
 // cube-arena-runner: play Cube Arena Index suites with your own model access,
 // locked down to the cube tools, and post them to the Verified board with an
-// invite code. https://cube.krnl.studio/wanted
+// invite code. https://cube.krnl.studio/wanted . Also the coding benchmark:
+// the model writes its own 5x5 solver, graded on hidden cubes (code.mjs).
 //
 //   npm install -g https://cube.krnl.studio/runner/cube-arena-runner-<version>.tgz
 //   cube-arena-runner login AB12-CD34
 //   cube-arena-runner wanted
 //   cube-arena-runner play --model gemini-3-1-pro-preview --effort high
+//   cube-arena-runner code --model claude-opus-5-5 --effort max
 
 import { execFileSync } from 'node:child_process';
 import { chmodSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
@@ -15,10 +17,11 @@ import { join } from 'node:path';
 import { createInterface } from 'node:readline/promises';
 import { parseArgs } from 'node:util';
 import { operator } from './agent.mjs';
+import { claudeSandboxProblem, playCoding, setUpWorkspace, waitForGrade } from './code.mjs';
 import { commandFor } from './command.mjs';
 import { playSuite } from './play-suite.mjs';
 
-const VERSION = '0.2.5';
+const VERSION = '0.3.0';
 const DEFAULT_URL = 'https://cube.krnl.studio/mcp';
 const HOME = process.env.CUBE_ARENA_HOME || join(homedir(), '.cube-arena');
 const CONFIG = join(HOME, 'config.json');
@@ -32,6 +35,7 @@ const HELP = `cube-arena-runner ${VERSION}: run Cube Arena Index suites for the 
   wanted [--suite thorough] [--all]           what still needs running
   models                                      every model the runner knows
   play --model <id> [options]                 play a suite and post the result
+  code --model <id> [options]                 the coding benchmark: the model writes a 5x5 solver
   logout                                      forget your code
 
 play options:
@@ -45,6 +49,11 @@ play options:
   --resume <suite id>      carry on a suite that stopped part way
   --force                  play even if someone else has claimed this one
   --no-transcript          don't upload the session logs (they help us check results)
+
+code options (macOS or Linux; the model codes in a sandbox with no network):
+  --effort, --via claude-code|codex, --codex-home   as for play
+  --resume <submission id> carry on coding after the runner stopped part way
+  --no-wait                don't wait for the grade (it shows on the site)
 
 Your keys stay on your machine: the runner talks to the model provider directly,
 and only sends Cube Arena the moves, token counts and a text log of each session.
@@ -137,6 +146,7 @@ const { values: opt, positionals } = parseArgs({
     resume: { type: 'string' },
     force: { type: 'boolean', default: false },
     'no-transcript': { type: 'boolean', default: false },
+    'no-wait': { type: 'boolean', default: false },
     'show-name': { type: 'boolean' },
     'hide-name': { type: 'boolean' },
     name: { type: 'string' },
@@ -216,14 +226,16 @@ if (!command || command === 'help' || command === '--help' || command === '-h') 
   }
 } else if (command === 'play') {
   await play();
+} else if (command === 'code') {
+  await code();
 } else {
   fail(`Unknown command "${command}".\n\n${HELP}`);
 }
 
-async function play() {
+/** The catalog model and effort asked for, checked. */
+async function modelAndEffort() {
   if (!token) fail('No invite code yet. Run: cube-arena-runner login AB12-CD34');
   if (!opt.model) fail('--model is required. See: cube-arena-runner wanted');
-  if (!['fast', 'thorough'].includes(opt.suite)) fail('--suite must be fast or thorough');
   const { models, runner } = await get(site, '/api/catalog');
   newer(runner);
   const model = models.find((m) => m.id === opt.model);
@@ -231,6 +243,23 @@ async function play() {
   const effort = opt.effort ?? null;
   if (model.efforts.length && !model.efforts.includes(effort)) fail(`${model.name} takes --effort ${model.efforts.join(', ')}`);
   if (!model.efforts.length && effort) fail(`${model.name} has no effort setting; leave out --effort`);
+  return { model, effort };
+}
+
+/** A Codex home of its own, so your config, AGENTS.md, skills and memories don't reach the model. */
+function codexHomeFor() {
+  const codexHome = opt['codex-home'] ?? join(HOME, 'codex');
+  mkdirSync(codexHome, { recursive: true });
+  if (!existsSync(join(codexHome, 'auth.json'))) {
+    const login = process.platform === 'win32' ? `$env:CODEX_HOME="${codexHome}"; codex login; Remove-Item Env:CODEX_HOME` : `CODEX_HOME=${codexHome} codex login`;
+    fail(`Sign Codex in for the runner once (its own home, so nothing else of yours leaks in):\n  ${login}`);
+  }
+  return codexHome;
+}
+
+async function play() {
+  if (!['fast', 'thorough'].includes(opt.suite)) fail('--suite must be fast or thorough');
+  const { model, effort } = await modelAndEffort();
 
   // How to reach the model: what you asked for, else the first that works here.
   const via = opt.via ?? (opt['base-url'] ? 'api' : pickVia(model));
@@ -244,14 +273,7 @@ async function play() {
   } else if (via === 'codex') {
     if (!model.via.codex) fail(`${model.name} doesn't run in Codex.`);
     if (!has('codex')) fail('Codex is not installed: npm i -g @openai/codex');
-    // A Codex home of its own, so your config, AGENTS.md, skills and memories don't reach the model.
-    const codexHome = opt['codex-home'] ?? join(HOME, 'codex');
-    mkdirSync(codexHome, { recursive: true });
-    if (!existsSync(join(codexHome, 'auth.json'))) {
-      const login = process.platform === 'win32' ? `$env:CODEX_HOME="${codexHome}"; codex login; Remove-Item Env:CODEX_HOME` : `CODEX_HOME=${codexHome} codex login`;
-      fail(`Sign Codex in for the runner once (its own home, so nothing else of yours leaks in):\n  ${login}`);
-    }
-    session = { agent: 'codex', model: model.via.codex, effort, codexHome };
+    session = { agent: 'codex', model: model.via.codex, effort, codexHome: codexHomeFor() };
   } else if (via === 'openrouter') {
     if (!model.via.openrouter) fail(`${model.name} isn't on OpenRouter; try --via api with the provider's endpoint.`);
     const apiKey = process.env.OPENROUTER_API_KEY;
@@ -301,6 +323,68 @@ async function play() {
   });
   if (r.result) console.log(`\nThanks! Results: ${site}/suites/${suite.id}`);
   process.exit(r.breach ? 3 : r.result ? 0 : 1);
+}
+
+/** The coding benchmark: the model writes a 5x5 solver here, Cube Arena grades it. */
+async function code() {
+  if (process.platform === 'win32') fail("The coding benchmark needs macOS or Linux (on Windows, use WSL): the agent's sandbox doesn't run on Windows.");
+  const { model, effort } = await modelAndEffort();
+  const via = opt.via ?? (model.via['claude-code'] && has('claude') ? 'claude-code' : model.via.codex && has('codex') ? 'codex' : null);
+  if (!via) fail(`The coding benchmark runs through Claude Code or Codex; ${model.name} runs via ${Object.keys(model.via).join(', ')}.`);
+  if (!['claude-code', 'codex'].includes(via) || !model.via[via]) fail(`--via must be ${['claude-code', 'codex'].filter((h) => model.via[h]).join(' or ')} for ${model.name}.`);
+  let session;
+  if (via === 'claude-code') {
+    if (!has('claude')) fail('Claude Code is not installed: https://claude.com/claude-code');
+    const problem = claudeSandboxProblem();
+    if (problem) fail(problem);
+    session = { agent: 'claude', model: model.via['claude-code'], effort };
+  } else {
+    if (!has('codex')) fail('Codex is not installed: npm i -g @openai/codex');
+    session = { agent: 'codex', model: model.via.codex, effort, codexHome: codexHomeFor() };
+  }
+
+  const call = operator(site, token);
+  let submission;
+  if (opt.resume) {
+    ({ submission } = await call(`/api/code/submissions?id=${opt.resume}`).catch((e) => fail(e.message)));
+    if (submission.model_id !== model.id || (submission.effort ?? null) !== effort) fail(`That submission is for ${submission.model_name}, not ${model.name}${effort ? ` (${effort})` : ''}.`);
+    if (submission.status !== 'coding') {
+      if (opt['no-wait']) fail(`That submission is ${submission.status}; nothing to carry on.`);
+      console.log(`That submission is ${submission.status}; waiting for its grade.`);
+      return report(await waitForGrade(call, submission.id, 180));
+    }
+  } else {
+    ({ submission } = await call('/api/code/submissions', { model_id: model.id, effort, harness: via, credit: !!config.credit }).catch((e) => fail(e.message)));
+  }
+  const dir = join(HOME, 'code', submission.id);
+  const { limits } = await setUpWorkspace(site, dir).catch((e) => fail(e.message));
+  console.log(`${submission.model_name} via ${via}: coding benchmark ${limits.version}, ${limits.devHours} h to write a 5×5 solver → ${site}`);
+  console.log(`submission ${submission.id} (resume with --resume ${submission.id})`);
+  console.log(`workspace ${dir}`);
+  const r = await playCoding({
+    site,
+    token,
+    submission,
+    session,
+    dir,
+    stateFile: join(HOME, 'code', `${submission.id}.json`),
+    logDir: join(HOME, 'logs'),
+    limits,
+    transcript: !opt['no-transcript'],
+    wait: opt['no-wait'] ? 0 : 180,
+  });
+  if (r.breach) process.exit(3);
+  if (r.stopped) process.exit(1);
+  report(r.submission);
+
+  function report(s) {
+    if (s?.status === 'graded') {
+      console.log(`\n${s.solved}/${s.cases} hidden cubes solved, score ${Number(s.score).toFixed(2)}${s.mean_moves ? `, ${Number(s.mean_moves).toFixed(1)} moves per solve` : ''}.`);
+    } else if (s?.status === 'failed') console.log(`\nThe grader could not run it (${s.error}). We'll look into it.`);
+    else console.log('\nStill waiting for the grader; the result will show on the site.');
+    console.log(`${site}/code/${submission.id}`);
+    process.exit(s?.status === 'graded' ? 0 : 1);
+  }
 }
 
 function pickVia(model) {

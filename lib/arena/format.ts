@@ -8,6 +8,8 @@ export function fmtDuration(secs: number) {
   return m < 60 ? `${m} min` : `${Math.floor(m / 60)}h ${String(m % 60).padStart(2, '0')}m`;
 }
 
+export const fmtMs = (ms: number | null) => (ms === null ? '–' : ms < 1000 ? `${Math.round(ms)} ms` : `${(ms / 1000).toFixed(ms < 10_000 ? 1 : 0)} s`);
+
 export const fmtCost = (v: number | null) => (v === null ? '–' : v < 0.01 ? '<$0.01' : v < 10 ? `$${v.toFixed(2)}` : `$${v.toFixed(0)}`);
 
 export const fmtTokens = (v: number | null) => (v === null ? '–' : v >= 1e6 ? `${(v / 1e6).toFixed(1)}M` : v >= 1e3 ? `${Math.round(v / 1e3)}k` : String(v));

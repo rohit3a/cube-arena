@@ -10,6 +10,7 @@ import ThemeToggle from '@/components/ThemeToggle';
 
 const LINKS = [
   { href: '/benchmark', label: 'Index', note: 'Scores, moves, time and cost for every model', also: ['/models', '/suites'] },
+  { href: '/code', label: 'Coding', note: 'Models write their own 5×5 solver, graded on hidden cubes' },
   { href: '/leaderboard', label: 'Boards', note: 'Verified and community leaderboards' },
   { href: '/wanted', label: 'Wanted', note: 'Models and efforts that still need a run' },
   { href: '/contributors', label: 'Contributors', note: 'The people running models for the Index' },

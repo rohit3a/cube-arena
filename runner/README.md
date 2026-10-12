@@ -24,6 +24,23 @@ If you show your name, every finished suite counts towards your place on the
 [contributors board](https://cube.krnl.studio/contributors), ranked by tests played, with your X handle linked if you add one.
 Your own page there has a share button.
 
+## The coding benchmark
+
+```bash
+cube-arena-runner code --model claude-opus-5-5 --effort max
+```
+
+The model gets a workspace with the [spec](https://cube.krnl.studio/code-kit/v1/SPEC.md), a reference cube, 20 practice cubes and
+a checker, and up to 4 hours to write its own 5×5 solver in `solver/`. When it stops, `solver/` is frozen and sent to Cube Arena,
+which runs it on 50 hidden cubes on its own machine and checks every answer. A cube solved in 60 moves (the scramble's length)
+scores 100; fewer moves score more. Results are on [/code](https://cube.krnl.studio/code).
+
+It runs through Claude Code or Codex on macOS or Linux (Windows: use WSL). The model can read and write files and run commands in
+its workspace only, sandboxed by the CLI with no network, so it can't install packages or download a solver. On Linux, Claude
+Code's sandbox needs `bubblewrap` and `socat`. If the session is cut off by something that isn't the model's doing (an API error,
+a usage limit), the runner carries on after a wait; if the runner itself stops, carry on with `--resume <submission id>` within
+30 minutes.
+
 ## Reaching the model
 
 | `--via` | Models | Needs |
@@ -52,13 +69,14 @@ XAI_API_KEY=… cube-arena-runner play --model grok-4-7 --effort high \
   the conversation, to bound cost.
 - **Model check:** the runner checks that the model that answered is the one you asked for. If anything else shows up, the session
   stops and the suite is hidden.
+- **Coding benchmark:** files and a shell in the workspace only, no network for commands, no web tools, MCP or subagents.
 
 ## What it sends
 
 Your API keys stay on your machine.
 
 The runner sends Cube Arena:
-- the moves;
+- the moves (for the coding benchmark, the finished `solver/` folder);
 - token counts and cost;
 - a text log of each session (what the model said and which tools it called, no pictures), so results can be checked.
 
