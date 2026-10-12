@@ -3,7 +3,7 @@ import { fullScramble } from '../lib/cube/random-state';
 import { levelScramble, rng } from '../lib/cube/scramble';
 import { stateToString } from '../lib/cube/engine';
 import { suiteOrder } from '../lib/arena/ranking';
-import { type GradedRun, SUITES, gradeSuite, ladderScore, scrambleScore, suiteSeed, suiteTests } from '../lib/arena/suites';
+import { type GradedRun, SUITES, gradeSuite, ladderScore, scrambleScore, suiteSeed, suiteTests, testWeights } from '../lib/arena/suites';
 
 const ladder = (size: 2 | 3, best: number, moves: number[], extra: GradedRun['attempts'] = []): GradedRun => ({
   size,
@@ -65,11 +65,22 @@ describe('suites', () => {
     expect(suiteOrder(e(100 / 3, 10, null, 1), e((100 + 0 + 0) / 3 + 1e-12, 9, null, 1))).toBeGreaterThan(0);
   });
 
-  it('averages cubes into tests and tests into the suite; unplayed tests count 0 once it is over', () => {
+  it('averages cubes into tests and weighs tests into the suite; unplayed tests count 0 once it is over', () => {
     const runs = new Map<number, GradedRun>([[0, ladder(2, 11, Array.from({ length: 11 }, (_, i) => i + 1))]]);
     expect(gradeSuite(SUITES.fast, runs, false).score).toBeNull();
     const done = gradeSuite(SUITES.fast, runs, true);
-    expect(done.score).toBeCloseTo(100 / 3, 5);
+    expect(done.score).toBeCloseTo(11, 5);
     expect(done.tests.map((t) => t.score)).toEqual([100, 0, 0]);
+    expect(done.tests.map((t) => t.weight)).toEqual([0.11, 0.445, 0.445]);
+    // 2×2 cleared, 3×3 interactive level 4 of 20, one-shot level 14 of 20.
+    runs.set(1, ladder(3, 4, [1, 2, 3, 4]));
+    runs.set(2, ladder(3, 14, Array.from({ length: 14 }, (_, i) => i + 1)));
+    expect(gradeSuite(SUITES.fast, runs, true).score).toBeCloseTo(11 + 0.445 * 20 + 0.445 * 70, 5);
+  });
+
+  it('weighs Thorough tests equally', () => {
+    const w = [...testWeights(SUITES.thorough).values()];
+    expect(new Set(w.map((x) => x.toFixed(9))).size).toBe(1);
+    expect(w.reduce((a, b) => a + b, 0)).toBeCloseTo(1, 9);
   });
 });

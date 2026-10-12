@@ -4,8 +4,9 @@
 // Nothing is timed against the model: a test ends on its own terms (lives,
 // the top level, a solve or a miss). Moves, cost and time only break ties.
 //
-// Changing the tests or the grading means a new version: scores only compare
-// within one version.
+// Changing the tests means a new version: scores only compare within one
+// version. Grading is worked out from the moves each time it is shown, so a
+// change of weights regrades every result of that version alike.
 
 import { createHmac } from 'node:crypto';
 import { type Challenge, LADDER_MAX_LEVEL, type Mode, SIZES, type Size } from './rules';
@@ -27,6 +28,8 @@ export interface SuiteDef {
   name: string;
   blurb: string;
   slots: SuiteSlot[];
+  /** Each test's share of the suite score, by test id; tests not listed weigh equally. */
+  weights?: Record<string, number>;
 }
 
 const testId = (size: Size, challenge: Challenge, mode: Mode) => `${size}x${size}-${challenge}-${mode}`;
@@ -39,6 +42,8 @@ export const SUITES: Record<SuiteKind, SuiteDef> = {
     name: 'Fast',
     blurb: 'Three ladders: 2×2 and 3×3 interactive, and 3×3 one-shot. No time limit; each ends at the top level or on the third miss.',
     slots: [slot(2, 'ladder', 'interactive'), slot(3, 'ladder', 'interactive'), slot(3, 'ladder', 'one_shot')],
+    // The 2×2 sorts weaker models but every strong one clears it, so it counts for less.
+    weights: { '2x2-ladder-interactive': 11, '3x3-ladder-interactive': 44.5, '3x3-ladder-one_shot': 44.5 },
   },
   thorough: {
     kind: 'thorough',
@@ -112,14 +117,23 @@ export const runScore = (run: GradedRun) => (run.challenge === 'ladder' ? ladder
 export interface SuiteGrade {
   /** 0-100, or null while a test has not been played yet (active suites). */
   score: number | null;
-  tests: { test: string; size: Size; challenge: Challenge; mode: Mode; score: number | null; played: number; cubes: number }[];
+  tests: { test: string; size: Size; challenge: Challenge; mode: Mode; score: number | null; played: number; cubes: number; weight: number }[];
+}
+
+/** Each test's share of the suite score, as fractions that add up to 1. */
+export function testWeights(def: SuiteDef): Map<string, number> {
+  const tests = suiteTests(def);
+  const raw = tests.map((t) => def.weights?.[t.test] ?? 1);
+  const total = raw.reduce((a, b) => a + b, 0);
+  return new Map(tests.map((t, i) => [t.test, raw[i] / total]));
 }
 
 /**
- * Each test scores the mean of its cubes; the suite scores the mean of its
- * tests. Once a suite is over, tests never played count as 0.
+ * Each test scores the mean of its cubes; the suite scores the weighted mean
+ * of its tests (equal unless the suite sets weights). Once a suite is over, tests never played count as 0.
  */
 export function gradeSuite(def: SuiteDef, runsBySlot: Map<number, GradedRun>, finished: boolean): SuiteGrade {
+  const weights = testWeights(def);
   const tests = suiteTests(def).map((t) => {
     const played = t.slots.filter((i) => runsBySlot.has(i));
     const complete = played.length === t.slots.length;
@@ -132,13 +146,14 @@ export function gradeSuite(def: SuiteDef, runsBySlot: Map<number, GradedRun>, fi
       score: complete || finished ? mean(scores) : null,
       played: played.length,
       cubes: t.slots.length,
+      weight: weights.get(t.test) as number,
     };
   });
   const all = tests.every((t) => t.score !== null);
-  return { score: all ? mean(tests.map((t) => t.score as number)) : null, tests };
+  return { score: all ? tests.reduce((a, t) => a + (t.score as number) * t.weight, 0) : null, tests };
 }
 
 /** Told to players at the start of every suite test. */
 export const SUITE_SCORING =
-  'Suite scoring: each test scores 0-100. Ladder: the share of the ladder you climb; full scramble: whether you solve it. The suite score is the average of its tests. ' +
+  'Suite scoring: each test scores 0-100. Ladder: the share of the ladder you climb; full scramble: whether you solve it. The suite score is the average of its tests (Fast weighs the 2×2 ladder 11%, each 3×3 ladder 44.5%). ' +
   'Equal scores rank by the fewest moves (failed attempts included), then the lowest cost, then the least time. There is no time limit: take as long as you need.';

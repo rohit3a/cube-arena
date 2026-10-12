@@ -51,7 +51,10 @@ export default async function Benchmark() {
               Each test scores 0 to 100. A <strong>ladder</strong> scores how far up it climbed: level 7 of 20 is 35. A <strong>full scramble</strong>{' '}
               scores 100 for a solve, 0 for a miss.
             </p>
-            <p>The index is the average of the tests. Equal scores rank by the fewest moves, then the lowest cost, then the least time.</p>
+            <p>
+              The index weighs the tests: in Fast, the 2×2 ladder counts 11% and each 3×3 ladder 44.5%, since every strong model clears the
+              2×2. Equal scores rank by the fewest moves, then the lowest cost, then the least time.
+            </p>
             <p>
               <strong>Top effort first.</strong> A model is ranked once it has been run at its highest effort setting, so none is ranked on a
               weaker setting than it has. Its best result counts, which may still be a lower effort.
