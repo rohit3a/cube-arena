@@ -1322,6 +1322,14 @@ a.tick:hover {
   margin-top: 14px;
 }
 
+.board-card-foot {
+  margin: 0 -22px;
+  padding: 12px 22px;
+  border-top: 1.5px solid var(--rule);
+  font-size: 0.88rem;
+  color: var(--text-3);
+}
+
 .podium {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -1539,6 +1547,38 @@ th.num {
   display: none;
   margin-top: 4px;
   font-size: 0.82rem;
+  font-weight: 600;
+}
+
+/* A model's other efforts and runs, folded under its best one. */
+.model-cell .row-more {
+  display: block;
+  margin-top: 6px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--text-2);
+  font: inherit;
+  font-size: 0.8rem;
+  font-weight: 700;
+  cursor: pointer;
+  text-decoration: underline;
+  text-decoration-color: var(--rule);
+  text-decoration-thickness: 2px;
+  text-underline-offset: 3px;
+}
+
+.model-cell .row-more:hover {
+  color: var(--text);
+  text-decoration-color: var(--orange);
+}
+
+tr.sub-row td {
+  background: var(--bg-2);
+  font-size: 0.9rem;
+}
+
+tr.sub-row .model-cell > strong {
   font-weight: 600;
 }
 
@@ -2628,8 +2668,7 @@ th.num {
     grid-template-columns: repeat(2, 1fr);
   }
 
-  /* Board tables drop the columns nobody ranks by before they'd need to scroll. */
-  table .opt-md,
+  /* Tables keep every column and scroll sideways; only the tile bars go. */
   td .tilebar {
     display: none;
   }
@@ -2685,7 +2724,8 @@ th.num {
     width: 44px;
   }
 
-  table .opt,
+  /* The replay link moves into the model cell. */
+  table .replay-col,
   td .tilebar,
   .wide-only {
     display: none;

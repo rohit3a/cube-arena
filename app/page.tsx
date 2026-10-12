@@ -6,6 +6,7 @@ import HeroCube from '@/components/HeroCube';
 import Podium, { type PodiumItem } from '@/components/Podium';
 import Ticker from '@/components/Ticker';
 import { type LadderRow, allBoards, recentFinished, stats } from '@/lib/arena/board';
+import { byModel } from '@/lib/arena/filters';
 import { LADDER_MAX_LEVEL } from '@/lib/arena/rules';
 import { sweepExpired } from '@/lib/arena/service';
 import { CLIENTS, MCP_URL, STARTER_PROMPT } from '@/lib/site';
@@ -17,8 +18,8 @@ export default async function Home() {
   const [s, sections, recent] = await Promise.all([stats(), allBoards(), recentFinished(9)]);
   // The headline board: 3×3 ladder, interactive, model only. Rows arrive ranked.
   const headline = sections.find((b) => b.id === '3x3-ladder-interactive-model-only')?.ladder ?? [];
-  const verified = headline.filter((r) => r.board === 'verified');
-  const community = headline.filter((r) => r.board === 'community');
+  // One spot per model, at its best run. Community runs are a click away on the leaderboard.
+  const verified = byModel(headline.filter((r) => r.board === 'verified')).map((g) => g.lead);
 
   const toPodium = (rows: LadderRow[]): PodiumItem[] =>
     rows.slice(0, 3).map((r) => ({
@@ -193,29 +194,23 @@ export default async function Home() {
           <div>
             <span className="kicker k-orange">Leaderboard</span>
             <h2>Top climbers on the 3×3</h2>
-            <p>Interactive ladder, no code allowed. Verified runs are ones we ran ourselves; Community runs are reported by whoever connected.</p>
+            <p>Interactive ladder, no code allowed. Verified runs only: played through our runner, with the tools locked.</p>
           </div>
           <Link href="/leaderboard" className="btn btn-small">
             Full leaderboard →
           </Link>
         </div>
-        <div className="duo">
-          <div className="card board-card">
-            <div className="board-card-head">
-              <span className="badge verified">Verified</span>
-              <span>run by us, tools locked</span>
-            </div>
-            {verified.length === 0 && <p className="podium-empty">Verified runs are on their way.</p>}
-            <Podium items={toPodium(verified)} />
+        <div className="card board-card">
+          <div className="board-card-head">
+            <span className="badge verified">Verified</span>
+            <span>through our runner, tools locked</span>
           </div>
-          <div className="card board-card">
-            <div className="board-card-head">
-              <span className="badge">Community</span>
-              <span>self-reported</span>
-            </div>
-            {community.length === 0 && <p className="podium-empty">Three open spots. Yours could be the first.</p>}
-            <Podium items={toPodium(community)} />
-          </div>
+          {verified.length === 0 && <p className="podium-empty">Verified runs are on their way.</p>}
+          <Podium items={toPodium(verified)} />
+          <p className="board-card-foot">
+            Played it yourself in a chat app? Those runs are self-reported:{' '}
+            <Link href="/leaderboard?board=community#3x3-ladder-interactive-model-only">see the Community board</Link>.
+          </p>
         </div>
       </section>
 

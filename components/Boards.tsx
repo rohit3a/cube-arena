@@ -5,7 +5,7 @@ import { useState } from 'react';
 import Podium, { type PodiumItem } from '@/components/Podium';
 import { LadderTable, ScrambleTable } from '@/components/Tables';
 import type { BoardSection } from '@/lib/arena/board';
-import { ALL, type Filters, applyFilters, filtersQuery } from '@/lib/arena/filters';
+import { DEFAULT, type Filters, applyFilters, byModel, filtersQuery } from '@/lib/arena/filters';
 import { CHALLENGE_LABEL, LADDER_MAX_LEVEL, MAX_TURN_BATCH, MODE_LABEL, SIZES, TOOL_USE_HELP, type ToolUse } from '@/lib/arena/rules';
 
 // Model-only first (the real test), then own code, then solver.
@@ -15,8 +15,8 @@ const GROUPS: { tool: ToolUse; title: string; blurb: string; kicker: string }[] 
   { tool: 'solver', title: 'With a solver', blurb: TOOL_USE_HELP.solver, kicker: 'k-orange' },
 ];
 
-const TOGGLES: { key: keyof Filters; label: string; options: [string, string][] }[] = [
-  { key: 'board', label: 'Board', options: [['verified', 'Verified'], ['community', 'Community']] },
+const TOGGLES: { key: keyof Filters; label: string; options: [string, string][]; all?: string }[] = [
+  { key: 'board', label: 'Runs', options: [['verified', 'Verified'], ['community', 'Community']], all: 'Verified + Community' },
   { key: 'size', label: 'Cube', options: SIZES.map((s) => [String(s), `${s}×${s}`]) },
   { key: 'challenge', label: 'Challenge', options: [['ladder', 'Ladder'], ['scramble', 'Full scramble']] },
   { key: 'mode', label: 'Mode', options: [['interactive', 'Interactive'], ['one_shot', 'One-shot']] },
@@ -32,11 +32,12 @@ function rule(s: BoardSection) {
     : `One fully mixed cube a run. Solve rate wins; ties go to fewer moves, then less time. ${how}`;
 }
 
+/** The top three models (each at its best run). */
 function podium(s: BoardSection): PodiumItem[] {
   const rows =
     s.challenge === 'ladder'
-      ? s.ladder.map((r) => ({ ...r, score: `level ${r.best}` }))
-      : s.scramble.map((r) => ({ ...r, score: `${Math.round((100 * r.solved) / r.runs)}% solved` }));
+      ? byModel(s.ladder).map(({ lead: r }) => ({ ...r, score: `level ${r.best}` }))
+      : byModel(s.scramble).map(({ lead: r }) => ({ ...r, score: `${Math.round((100 * r.solved) / r.runs)}% solved` }));
   return rows.slice(0, 3).map((r) => ({
     key: `${r.board}|${r.model_name}|${r.display_name}`,
     title: r.model_name,
@@ -64,9 +65,9 @@ export default function Boards({ sections, initial }: { sections: BoardSection[]
         {TOGGLES.map((t) => {
           const value = String(f[t.key]);
           return (
-            <label key={t.key} className={`toggle ${value === 'all' ? '' : 'on'}`}>
+            <label key={t.key} className={`toggle ${value === String(DEFAULT[t.key]) ? '' : 'on'}`}>
               <span className="toggle-key">{t.label}</span>
-              <span className="toggle-value">{t.options.find(([v]) => v === value)?.[1] ?? 'All'}</span>
+              <span className="toggle-value">{t.options.find(([v]) => v === value)?.[1] ?? t.all ?? 'All'}</span>
               <select
                 aria-label={t.label}
                 value={value}
@@ -75,7 +76,7 @@ export default function Boards({ sections, initial }: { sections: BoardSection[]
                   update({ ...f, [t.key]: t.key === 'size' && v !== 'all' ? Number(v) : v });
                 }}
               >
-                <option value="all">All</option>
+                <option value="all">{t.all ?? 'All'}</option>
                 {t.options.map(([v, text]) => (
                   <option key={v} value={v}>
                     {text}
@@ -89,8 +90,8 @@ export default function Boards({ sections, initial }: { sections: BoardSection[]
           {visible.length} board{visible.length === 1 ? '' : 's'}
         </span>
         {filtered && (
-          <button type="button" className="filter-reset" onClick={() => update(ALL)}>
-            Show all
+          <button type="button" className="filter-reset" onClick={() => update(DEFAULT)}>
+            Reset
           </button>
         )}
       </div>
@@ -101,9 +102,14 @@ export default function Boards({ sections, initial }: { sections: BoardSection[]
         </div>
       ) : visible.length === 0 ? (
         <div className="card empty">
-          Nobody has played this combination yet.{' '}
-          <button type="button" className="filter-reset" onClick={() => update(ALL)}>
-            Show all boards
+          {f.board === 'verified' ? 'No Verified runs on this combination yet.' : 'Nobody has played this combination yet.'}{' '}
+          {f.board === 'verified' && (
+            <button type="button" className="filter-reset" onClick={() => update({ ...f, board: 'all' })}>
+              Include Community runs
+            </button>
+          )}{' '}
+          <button type="button" className="filter-reset" onClick={() => update(DEFAULT)}>
+            Reset filters
           </button>
         </div>
       ) : (

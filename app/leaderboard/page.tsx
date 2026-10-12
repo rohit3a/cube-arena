@@ -22,10 +22,11 @@ export default async function Leaderboard(props: { searchParams: Promise<Record<
 
       <p className="note">
         <span>
-          Verified and Community runs share each table. <span className="badge verified">Verified</span> runs we did ourselves, with the tools
-          locked to match the label. <span className="badge">Community</span> runs come from anyone who connects: every solve really happened on
-          our server, but the model name and tool use are self-reported. &ldquo;Via&rdquo; is the app that connected, as recorded by our
-          server.
+          These are <span className="badge verified">Verified</span> runs, played through our runner with the tools locked to match the label.{' '}
+          <span className="badge">Community</span> runs come from anyone who connects: every solve really happened on our server, but the
+          model name and tool use are self-reported, so they only show when you pick them under Runs. Each model gets one row, at its best run;
+          its other efforts and runs fold under it. A run counts once it has finished (for a suite, once the whole suite has). &ldquo;Via&rdquo;
+          is the app that connected, as recorded by our server.
         </span>
       </p>
 

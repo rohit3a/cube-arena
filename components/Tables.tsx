@@ -1,5 +1,9 @@
+'use client';
+
 import Link from 'next/link';
+import { Fragment, type ReactNode, useState } from 'react';
 import type { LadderRow, ScrambleRow } from '@/lib/arena/board';
+import { byModel } from '@/lib/arena/filters';
 import { fmtCost } from '@/lib/arena/format';
 import type { Board } from '@/lib/arena/rules';
 
@@ -37,6 +41,43 @@ const ago = (d: Date) => {
   return `${Math.round(s / 86400)}d ago`;
 };
 
+const rowKey = (r: { board?: Board; model_name: string; display_name: string }) => `${r.board}|${r.model_name}|${r.display_name}`;
+
+/**
+ * One ranked row per model: its best run. Its other efforts and runs fold
+ * under it, a click away, so one model can't fill the board.
+ */
+function Grouped<T extends { board?: Board; model_name: string; display_name: string }>({
+  rows,
+  row,
+}: {
+  rows: T[];
+  row: (r: T, rank: ReactNode, more: ReactNode) => ReactNode;
+}) {
+  const [open, setOpen] = useState<Set<string>>(() => new Set());
+  return byModel(rows).map((g, i) => {
+    const key = rowKey(g.lead);
+    const shown = open.has(key);
+    const toggle = () =>
+      setOpen((o) => {
+        const next = new Set(o);
+        if (!next.delete(key)) next.add(key);
+        return next;
+      });
+    const more = g.more.length > 0 && (
+      <button type="button" className="row-more" aria-expanded={shown} onClick={toggle} title={g.more.map((r) => `${r.model_name} · ${r.display_name}`).join('\n')}>
+        {shown ? 'Hide' : `+${g.more.length} more`}
+      </button>
+    );
+    return (
+      <Fragment key={key}>
+        {row(g.lead, <Rank i={i} />, more)}
+        {shown && g.more.map((r) => <Fragment key={rowKey(r)}>{row(r, null, null)}</Fragment>)}
+      </Fragment>
+    );
+  });
+}
+
 export function LadderTable({ rows, maxLevel, compact = false }: { rows: LadderRow[]; maxLevel: number; compact?: boolean }) {
   return (
     <div className="table-wrap">
@@ -59,43 +100,45 @@ export function LadderTable({ rows, maxLevel, compact = false }: { rows: LadderR
             </th>
             <th className="num opt opt-md">Runs</th>
             {!compact && <th className="opt opt-md">Last played</th>}
-            {!compact && <th className="opt">Replay</th>}
+            {!compact && <th className="opt replay-col">Replay</th>}
           </tr>
         </thead>
         <tbody>
-          {rows.map((r, i) => (
-            <tr key={`${r.board}|${r.model_name}|${r.display_name}`}>
-              <td className="rank">
-                <Rank i={i} />
-              </td>
-              <td className="model-cell">
-                <strong>{r.model_name}</strong>
-                <span>
-                  {r.display_name} · via {r.via} <BoardBadge board={r.board} />
-                </span>
-                {r.best_attempt && (
-                  <Link prefetch={false} href={`/replay/${r.best_attempt}`} className="cell-replay">
-                    Best solve →
-                  </Link>
-                )}
-              </td>
-              <td className="num">
-                <strong>{r.best}</strong>
-                <span className="faint"> / {maxLevel}</span>
-                <TileBar value={r.best} max={maxLevel} />
-              </td>
-              <td className="num">{r.moves ?? '–'}</td>
-              <td className="num opt">{fmtCost(r.cost)}</td>
-              <td className="num opt">{duration(r.secs)}</td>
-              <td className="num opt opt-md">{r.runs}</td>
-              {!compact && (
-                <td className="faint opt opt-md" suppressHydrationWarning>
-                  {ago(r.last)}
+          <Grouped
+            rows={rows}
+            row={(r, rank, more) => (
+              <tr className={rank ? undefined : 'sub-row'}>
+                <td className="rank">{rank}</td>
+                <td className="model-cell">
+                  <strong>{r.model_name}</strong>
+                  <span>
+                    {r.display_name} · via {r.via} <BoardBadge board={r.board} />
+                  </span>
+                  {r.best_attempt && (
+                    <Link prefetch={false} href={`/replay/${r.best_attempt}`} className="cell-replay">
+                      Best solve →
+                    </Link>
+                  )}
+                  {more}
                 </td>
-              )}
-              {!compact && <td className="opt">{r.best_attempt ? <Link prefetch={false} href={`/replay/${r.best_attempt}`}>best solve →</Link> : <span className="faint">–</span>}</td>}
-            </tr>
-          ))}
+                <td className="num">
+                  <strong>{r.best}</strong>
+                  <span className="faint"> / {maxLevel}</span>
+                  <TileBar value={r.best} max={maxLevel} />
+                </td>
+                <td className="num">{r.moves ?? '–'}</td>
+                <td className="num opt">{fmtCost(r.cost)}</td>
+                <td className="num opt">{duration(r.secs)}</td>
+                <td className="num opt opt-md">{r.runs}</td>
+                {!compact && (
+                  <td className="faint opt opt-md" suppressHydrationWarning>
+                    {ago(r.last)}
+                  </td>
+                )}
+                {!compact && <td className="opt replay-col">{r.best_attempt ? <Link prefetch={false} href={`/replay/${r.best_attempt}`}>best solve →</Link> : <span className="faint">–</span>}</td>}
+              </tr>
+            )}
+          />
         </tbody>
       </table>
     </div>
@@ -122,41 +165,43 @@ export function ScrambleTable({ rows }: { rows: ScrambleRow[] }) {
             </th>
             <th className="num opt">Median time</th>
             <th className="opt opt-md">Last played</th>
-            <th className="opt">Replay</th>
+            <th className="opt replay-col">Replay</th>
           </tr>
         </thead>
         <tbody>
-          {rows.map((r, i) => (
-            <tr key={`${r.board}|${r.model_name}|${r.display_name}`}>
-              <td className="rank">
-                <Rank i={i} />
-              </td>
-              <td className="model-cell">
-                <strong>{r.model_name}</strong>
-                <span>
-                  {r.display_name} · via {r.via} <BoardBadge board={r.board} />
-                </span>
-                {r.best_attempt && (
-                  <Link prefetch={false} href={`/replay/${r.best_attempt}`} className="cell-replay">
-                    Best solve →
-                  </Link>
-                )}
-              </td>
-              <td className="num opt opt-md">
-                {r.solved} / {r.runs}
-              </td>
-              <td className="num">
-                <strong>{Math.round((100 * r.solved) / r.runs)}%</strong>
-              </td>
-              <td className="num">{r.median_moves === null ? '–' : Math.round(r.median_moves)}</td>
-              <td className="num opt">{fmtCost(r.median_cost)}</td>
-              <td className="num opt">{duration(r.median_secs)}</td>
-              <td className="faint opt opt-md" suppressHydrationWarning>
-                {ago(r.last)}
-              </td>
-              <td className="opt">{r.best_attempt ? <Link prefetch={false} href={`/replay/${r.best_attempt}`}>best solve →</Link> : <span className="faint">–</span>}</td>
-            </tr>
-          ))}
+          <Grouped
+            rows={rows}
+            row={(r, rank, more) => (
+              <tr className={rank ? undefined : 'sub-row'}>
+                <td className="rank">{rank}</td>
+                <td className="model-cell">
+                  <strong>{r.model_name}</strong>
+                  <span>
+                    {r.display_name} · via {r.via} <BoardBadge board={r.board} />
+                  </span>
+                  {r.best_attempt && (
+                    <Link prefetch={false} href={`/replay/${r.best_attempt}`} className="cell-replay">
+                      Best solve →
+                    </Link>
+                  )}
+                  {more}
+                </td>
+                <td className="num opt opt-md">
+                  {r.solved} / {r.runs}
+                </td>
+                <td className="num">
+                  <strong>{Math.round((100 * r.solved) / r.runs)}%</strong>
+                </td>
+                <td className="num">{r.median_moves === null ? '–' : Math.round(r.median_moves)}</td>
+                <td className="num opt">{fmtCost(r.median_cost)}</td>
+                <td className="num opt">{duration(r.median_secs)}</td>
+                <td className="faint opt opt-md" suppressHydrationWarning>
+                  {ago(r.last)}
+                </td>
+                <td className="opt replay-col">{r.best_attempt ? <Link prefetch={false} href={`/replay/${r.best_attempt}`}>best solve →</Link> : <span className="faint">–</span>}</td>
+              </tr>
+            )}
+          />
         </tbody>
       </table>
     </div>

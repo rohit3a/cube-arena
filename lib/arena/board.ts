@@ -21,6 +21,9 @@ import type { Board, Challenge, Mode, Size, ToolUse } from './rules';
 // A ladder's moves, cost and time are all the whole run's, failed attempts
 // included: moves and time from the first cube to the last, cost where the
 // runner measured it (unknown ranks last). Nothing limits the time.
+//
+// Only runs that are over count, and a suite's runs only once the whole suite
+// is: a run still climbing, or a suite someone walked away from, stays off.
 
 export interface LadderRow {
   model_name: string;
@@ -88,6 +91,11 @@ export const scrambleOrder = (a: ScrambleRow, b: ScrambleRow) =>
   fewer(a.median_secs, b.median_secs) ||
   verifiedFirst(a, b);
 
+/** SQL: run `r` is over, and so is its suite if it has one. */
+const finished = (sql: Tx) => sql`(
+  r.status = 'finished'
+  and (r.suite_id is null or exists (select 1 from cube_arena.suites su where su.id = r.suite_id and su.status = 'finished')))`;
+
 async function allBoardsQuery(): Promise<BoardSection[]> {
   const [ladder, scramble] = await withDb(async (sql) => {
     const l = await sql<Keyed<LadderRow>[]>`
@@ -105,7 +113,7 @@ async function allBoardsQuery(): Promise<BoardSection[]> {
                  extract(epoch from max(coalesce(a.finished_at, now())) - min(a.created_at))::float as secs
           from cube_arena.attempts a where a.run_id = r.id
         ) t on true
-        where r.challenge = 'ladder' and not r.hidden
+        where r.challenge = 'ladder' and not r.hidden and ${finished(sql)}
       )
       select size, mode, tool_use, board, model_name, display_name,
              max(best_level)::int as best, count(*)::int as runs, max(updated_at) as last,
@@ -127,7 +135,7 @@ async function allBoardsQuery(): Promise<BoardSection[]> {
                filter (where a.status = 'solved'))[1] as best_attempt,
              coalesce((array_agg(r.client order by a.move_count) filter (where a.status = 'solved'))[1], max(r.client)) as client
       from cube_arena.runs r join cube_arena.attempts a on a.run_id = r.id
-      where r.challenge = 'scramble' and r.status = 'finished' and not r.hidden
+      where r.challenge = 'scramble' and not r.hidden and ${finished(sql)}
       group by r.size, r.mode, r.tool_use, r.board, r.model_name, r.display_name`;
     return [l, s] as const;
   });
