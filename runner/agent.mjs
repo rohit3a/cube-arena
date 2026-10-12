@@ -24,6 +24,7 @@ import { createWriteStream, mkdirSync, mkdtempSync, readFileSync, realpathSync, 
 import { tmpdir } from 'node:os';
 import { join, resolve, sep } from 'node:path';
 import { gzipSync } from 'node:zlib';
+import { takeCodexSession } from './codex-session.mjs';
 import { commandFor } from './command.mjs';
 import { sameModelName } from './cursor.mjs';
 import { playApiSession } from './harness-api.mjs';
@@ -75,7 +76,7 @@ function claudeCommand(s, work) {
 // code_mode_host off, its JavaScript exec tool only returns an error, and the
 // cube tools are called directly.
 const CODEX_OFF = [
-  'shell_tool', 'unified_exec', 'unified_exec_tty', 'apps', 'browser_use', 'browser_use_external', 'computer_use', 'image_generation',
+  'memories', 'shell_tool', 'unified_exec', 'unified_exec_tty', 'apps', 'browser_use', 'browser_use_external', 'computer_use', 'image_generation',
   'multi_agent', 'plugins', 'code_mode_host', 'in_app_browser', 'hooks', 'view_image', 'tool_suggest', 'skill_search', 'goals', 'sleep_tool',
   'skill_mcp_dependency_install', 'workspace_dependencies',
 ];
@@ -87,7 +88,8 @@ function codexCommand(s, work) {
   const table = `{${Object.entries(s.headers)
     .map(([k, v]) => `${toml(k)}=${toml(String(v))}`)
     .join(',')}}`;
-  const args = ['exec', '--json', '--ephemeral', '--skip-git-repo-check', '--ignore-user-config', '--ignore-rules', '-s', 'read-only'];
+  // Not --ephemeral: the session file has the tokens if the session is stopped (codex-session.mjs).
+  const args = ['exec', '--json', '--skip-git-repo-check', '--ignore-user-config', '--ignore-rules', '-s', 'read-only'];
   args.push('-m', s.model);
   if (s.effort) args.push('-c', `model_reasoning_effort=${toml(s.effort)}`);
   for (const f of CODEX_OFF) args.push('--disable', f);
@@ -226,6 +228,8 @@ function playCli(s) {
   // stopped the session and no result came.
   const claudeUsage = new Map(); // message id → usage (stream-json repeats a message per content block)
   let claudeTotal = null;
+  let codexThread = null;
+  let codexReported = false;
 
   function stop(reason) {
     if (out.stopReason) return;
@@ -320,6 +324,7 @@ function playCli(s) {
   const CODEX_OK = new Set(['agent_message', 'reasoning', 'mcp_tool_call', 'error', 'todo_list']);
   function onCodex(ev) {
     const item = ev.item;
+    if (ev.type === 'thread.started') codexThread = ev.thread_id;
     if (ev.type === 'item.started' || ev.type === 'item.completed') {
       if (!CODEX_OK.has(item.type)) return lockdown(`a ${item.type} item`);
       if (item.type === 'mcp_tool_call' && item.server !== 'cube-arena') return lockdown(`called ${item.server}.${item.tool}`);
@@ -338,6 +343,7 @@ function playCli(s) {
       }
     }
     if (ev.type === 'turn.completed' && ev.usage) {
+      codexReported = true;
       const u = ev.usage;
       const add = (k, v) => {
         if (Number.isFinite(v)) out.usage[k] = (out.usage[k] ?? 0) + v;
@@ -469,6 +475,10 @@ function playCli(s) {
         }
         const thinking = claudeTotal?.output_tokens_details?.thinking_tokens;
         if (Number.isFinite(thinking)) out.usage.reasoning_tokens = thinking;
+      } else if (!cursor) {
+        // Stopped before its turn completed, Codex reported no tokens: its session file has them.
+        const saved = takeCodexSession(s.codexHome, codexThread);
+        if (!codexReported && saved) Object.assign(out.usage, saved);
       }
       resolve(out);
     });

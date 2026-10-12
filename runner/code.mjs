@@ -17,6 +17,7 @@ import { appendFileSync, createWriteStream, existsSync, mkdirSync, readFileSync,
 import { join } from 'node:path';
 import { gunzipSync, gzipSync } from 'node:zlib';
 import { MAX_OUTPUT_TOKENS, OUTPUT_CAP, SYNTHETIC, operator, slim } from './agent.mjs';
+import { takeCodexSession } from './codex-session.mjs';
 import { commandFor } from './command.mjs';
 import { listFiles, tarGz } from './tar.mjs';
 
@@ -30,7 +31,7 @@ const CLAUDE_OK = new Set([...CLAUDE_TOOLS, 'MultiEdit', 'LS', 'BashOutput', 'Ki
 /** Codex items expected in a coding session; a web search or any MCP call means the lockdown failed. */
 const CODEX_OK = new Set(['agent_message', 'reasoning', 'command_execution', 'file_change', 'todo_list', 'error']);
 const CODEX_OFF = [
-  'apps', 'browser_use', 'browser_use_external', 'computer_use', 'image_generation', 'multi_agent', 'plugins',
+  'memories', 'apps', 'browser_use', 'browser_use_external', 'computer_use', 'image_generation', 'multi_agent', 'plugins',
   'in_app_browser', 'hooks', 'view_image', 'tool_suggest', 'skill_search', 'goals', 'skill_mcp_dependency_install', 'workspace_dependencies',
 ];
 
@@ -167,7 +168,8 @@ function claudeCommand(s) {
 
 function codexCommand(s) {
   const toml = JSON.stringify;
-  const args = ['exec', '--json', '--ephemeral', '--skip-git-repo-check', '--ignore-user-config', '--ignore-rules', '-s', 'workspace-write', '-C', s.dir];
+  // Not --ephemeral: the session file has the tokens if the session is stopped (codex-session.mjs).
+  const args = ['exec', '--json', '--skip-git-repo-check', '--ignore-user-config', '--ignore-rules', '-s', 'workspace-write', '-C', s.dir];
   args.push('-m', s.model);
   if (s.effort) args.push('-c', `model_reasoning_effort=${toml(s.effort)}`);
   for (const f of CODEX_OFF) args.push('--disable', f);
@@ -196,6 +198,8 @@ export function codingSession(s) {
   const note = (kind, text, tool) => out.events.push({ t: Math.round((Date.now() - started) / 1000), kind, ...(tool && { tool }), text: String(text ?? '') });
   const claudeUsage = new Map();
   let claudeTotal = null;
+  let codexThread = null;
+  let codexReported = false;
 
   function stop(reason) {
     if (out.stopReason) return;
@@ -275,6 +279,7 @@ export function codingSession(s) {
 
   function onCodex(ev) {
     const item = ev.item;
+    if (ev.type === 'thread.started') codexThread = ev.thread_id;
     if (ev.type === 'item.started' || ev.type === 'item.completed') {
       if (!CODEX_OK.has(item.type)) return lockdown(`a ${item.type} item`);
     }
@@ -294,6 +299,7 @@ export function codingSession(s) {
     }
     if (ev.type === 'turn.completed') {
       out.quit = true;
+      if (ev.usage) codexReported = true;
       const u = ev.usage ?? {};
       const add = (k, v) => {
         if (Number.isFinite(v)) out.usage[k] = (out.usage[k] ?? 0) + v;
@@ -353,6 +359,10 @@ export function codingSession(s) {
         }
         const thinking = claudeTotal?.output_tokens_details?.thinking_tokens;
         if (Number.isFinite(thinking)) out.usage.reasoning_tokens = thinking;
+      } else {
+        // Stopped before its turn completed, Codex reported no tokens: its session file has them.
+        const saved = takeCodexSession(s.codexHome, codexThread);
+        if (!codexReported && saved) Object.assign(out.usage, saved);
       }
       // Killed at the deadline, or ended by the model: either way the coding is over.
       if (out.deadline) out.quit = true;
