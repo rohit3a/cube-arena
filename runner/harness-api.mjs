@@ -153,7 +153,7 @@ function forgetOldPictures(messages) {
  *   url: string, token: string, logPath: string,
  *   api: { baseUrl: string, apiKey: string, provider?: 'openrouter' | 'openai-compatible' } }} s
  * @returns {Promise<{ runId: string | null, runOver: boolean, last: any, calls: number, breach: string | null,
- *   stopReason: string | null, final: string | null, usage: Record<string, number>, code: number | null,
+ *   stopReason: string | null, quit: boolean, final: string | null, usage: Record<string, number>, code: number | null,
  *   minutes: number, events: { t: number, kind: 'say' | 'think' | 'call' | 'result' | 'error', tool?: string, text: string }[] }>}
  */
 export async function playApiSession(s) {
@@ -164,7 +164,7 @@ export async function playApiSession(s) {
   const openrouter = provider === 'openrouter';
 
   /** @type {Awaited<ReturnType<typeof playApiSession>>} */
-  const out = { runId: null, runOver: false, last: null, calls: 0, breach: null, stopReason: null, final: null, usage: {}, code: null, minutes: 0, events: [] };
+  const out = { runId: null, runOver: false, last: null, calls: 0, breach: null, stopReason: null, quit: false, final: null, usage: {}, code: null, minutes: 0, events: [] };
   const log = createWriteStream(s.logPath);
   const write = (type, data) => log.write(`${slim(JSON.stringify({ t: secs(), type, ...data }))}\n`);
   const note = (kind, text, tool) => out.events.push(tool === undefined ? { t: secs(), kind, text } : { t: secs(), kind, tool, text });
@@ -291,6 +291,7 @@ export async function playApiSession(s) {
     for (let turn = 1; ; turn++) {
       if (turn > MAX_TURNS) {
         stop(`the runner's ${MAX_TURNS}-turn limit`);
+        out.quit = true;
         break;
       }
       write('request', { turn, model: s.model, tool_choice: 'auto', ...extra, messages: messages.slice(logged) });
@@ -324,7 +325,9 @@ export async function playApiSession(s) {
         note('say', said);
       }
       if (!calls.length) {
+        // An answer with no tool call: the model chose to stop.
         out.final = said;
+        out.quit = true;
         break;
       }
 

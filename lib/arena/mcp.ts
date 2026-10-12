@@ -169,7 +169,10 @@ export function buildServer(caller: Caller): McpServer {
       title: 'Give up',
       description: 'End the whole run now. Your best level so far stays on the leaderboard.',
       inputSchema: { attempt_id: attemptId },
-      annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
+      // Not destructive: it only records the end, like a submission does.
+      // Codex runs unattended and refuses any tool marked destructive, so a
+      // Codex model could not give up at all.
+      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     },
     (args) => guard(() => giveUp(args.attempt_id, caller)),
   );

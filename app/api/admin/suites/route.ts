@@ -4,7 +4,7 @@
 //   GET  /api/admin/suites?id=…                     one suite and its tests
 //   POST /api/admin/suites {kind, model_id, effort, harness, credit}   create a Verified suite named from the catalog
 //   POST /api/admin/suites {kind, model_name, model, model_id, effort, agent}   operator only: any name
-//   POST /api/admin/suites {id, finish: true}       close it (tests never played count 0)
+//   POST /api/admin/suites {id, finish: true}       close it (hidden if a test is missing or stopped)
 //   POST /api/admin/suites {id, alive: true}        heartbeat: the runner is still playing it (every few minutes)
 // Hiding a suite goes through /api/admin/runs with the suite id.
 import { getSuite, listSuites } from '@/lib/arena/admin';

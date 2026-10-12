@@ -18,7 +18,7 @@ import { operator } from './agent.mjs';
 import { commandFor } from './command.mjs';
 import { playSuite } from './play-suite.mjs';
 
-const VERSION = '0.2.4';
+const VERSION = '0.2.5';
 const DEFAULT_URL = 'https://cube.krnl.studio/mcp';
 const HOME = process.env.CUBE_ARENA_HOME || join(homedir(), '.cube-arena');
 const CONFIG = join(HOME, 'config.json');

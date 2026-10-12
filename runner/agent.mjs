@@ -107,8 +107,13 @@ const slim = (line) => line.replace(/"data":"[A-Za-z0-9+/=]{200,}"/g, (m) => `"d
  * Plays one session. `s`: { agent ('claude' | 'codex' | 'api'), model, effort,
  * prompt, headers, url, token, codexHome, logPath, api? }. Nothing times the
  * model out. Resolves when the agent is done, after any run it left open is
- * stopped, its usage is recorded, a lockdown breach is hidden, and (with
+ * dealt with, its usage is recorded, a lockdown breach is hidden, and (with
  * `s.transcript`) the session's digest is uploaded for audit.
+ *
+ * A run left open ends as given up when the model ended it (`out.quit`: it
+ * stopped playing, or ran past an output or turn limit). Ended any other way
+ * (an API error, a crash), the run stays open and `out.retry` says why, so the
+ * same test can be picked up again: that ending says nothing about the model.
  */
 export async function playSession(s) {
   const out = s.agent === 'api' ? await playApiSession(s) : await playCli(s);
@@ -120,12 +125,16 @@ export async function playSession(s) {
 async function afterSession(s, out) {
   const call = operator(s.url, s.token);
   try {
-    if (out.runId && !out.runOver && out.apiError) {
-      console.log('  left open: the same test picks up again once the API answers');
+    const quit = out.quit && !out.breach && !out.apiError;
+    if (out.runId && !out.runOver && !out.breach && !quit) {
+      out.retry = out.apiError ?? out.stopReason ?? `the session ended unexpectedly (exit ${out.code})`;
+      console.log(`  left open (${out.retry}): the same test can pick up where the cube was left`);
     } else if (out.runId && !out.runOver) {
-      const why = out.stopReason ? `stopped by ${out.stopReason}` : 'the agent stopped before the run was over';
-      await call('/api/admin/runs', { id: out.runId, stop: true, reason: why });
-      console.log(`  run stopped (${why})`);
+      const why = out.breach ? `stopped by ${out.stopReason}` : out.stopReason ? `the model stopped: ${out.stopReason}` : 'the model stopped playing before the test was over';
+      await call('/api/admin/runs', { id: out.runId, stop: true, quit, reason: why });
+      console.log(`  run over (${why})`);
+    } else if (!out.runId && out.apiError) {
+      out.retry = out.apiError;
     }
     if (out.runId) await call('/api/admin/runs', { id: out.runId, usage: out.usage });
     if (out.runId && out.breach) {
@@ -153,7 +162,7 @@ function playCli(s) {
   const run = commandFor(cmd, args);
   const child = spawn(run.file, run.args, { cwd: work, env, stdio: ['ignore', 'pipe', 'pipe'] });
 
-  const out = { runId: null, runOver: false, last: null, calls: 0, breach: null, stopReason: null, apiError: null, final: null, usage: {}, code: null, minutes: 0, events: [] };
+  const out = { runId: null, runOver: false, last: null, calls: 0, breach: null, stopReason: null, apiError: null, quit: false, retry: null, final: null, usage: {}, code: null, minutes: 0, events: [] };
   // The audit digest: what the model said and called, no pictures.
   const note = (kind, text, tool) => out.events.push({ t: Math.round((Date.now() - started) / 1000), kind, ...(tool && { tool }), text: String(text ?? '') });
   // Claude Code's session totals come with its result event. Each assistant
@@ -220,8 +229,10 @@ function playCli(s) {
       note('error', text);
       console.log(`  [${secs()}] Claude Code: ${text.slice(0, 200)}`);
       // A reply past the model's output limit is the model's own doing: the test ends there.
-      if (OUTPUT_CAP.test(text)) out.stopReason ??= "a reply over the model's output token limit";
-      else out.apiError ??= text || 'an API error';
+      if (OUTPUT_CAP.test(text)) {
+        out.stopReason ??= "a reply over the model's output token limit";
+        out.quit = true;
+      } else out.apiError ??= text || 'an API error';
       return;
     }
     if (ev.type === 'assistant') {
@@ -238,6 +249,8 @@ function playCli(s) {
       if (part.type === 'tool_result') seeReply((Array.isArray(part.content) ? part.content : []).find((c) => c.type === 'text')?.text ?? '');
     }
     if (ev.type === 'result') {
+      // The model finished its turn: it chose to stop here.
+      if (ev.subtype === 'success' && !ev.is_error) out.quit = true;
       out.final = String(ev.result ?? '');
       if (Number.isFinite(ev.total_cost_usd)) out.usage.cost_usd = ev.total_cost_usd;
       if (ev.usage) claudeTotal = ev.usage;
@@ -276,6 +289,9 @@ function playCli(s) {
       add('output_tokens', u.output_tokens);
       add('reasoning_tokens', u.reasoning_output_tokens);
     }
+    // Codex runs one turn: completing it means the model chose to stop.
+    if (ev.type === 'turn.completed') out.quit = true;
+    if (ev.type === 'turn.failed') out.quit = false;
     if (ev.type === 'turn.failed' || ev.type === 'error') note('error', JSON.stringify(ev.error ?? ev.message));
     if (ev.type === 'turn.failed' || ev.type === 'error') console.log(`  [${secs()}] ${ev.type}: ${JSON.stringify(ev.error ?? ev.message).slice(0, 200)}`);
   }

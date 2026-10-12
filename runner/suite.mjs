@@ -6,8 +6,8 @@
 //   node --env-file=.env.local runner/suite.mjs --model gpt-6-luna --effort max --suite fast
 //   node --env-file=.env.local runner/suite.mjs --resume <suite id> --model gpt-6-luna --effort max
 //
-// A lockdown breach hides the whole suite and stops. Tests the agent never
-// started count 0. Needs CUBE_OPERATOR_TOKEN.
+// A lockdown breach hides the whole suite and stops. A suite with a test
+// missing closes off the boards. Needs CUBE_OPERATOR_TOKEN.
 
 import { homedir } from 'node:os';
 import { dirname, join } from 'node:path';

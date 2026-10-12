@@ -204,17 +204,44 @@ async function afterSuiteTest(tx: Tx, suiteId: string, slot: number): Promise<st
   return finishSuite(tx, suite);
 }
 
-/** Closes a suite (tests never played count 0) and returns its result line. */
+/**
+ * Closes a suite and returns its result line. A suite shows only if it is
+ * complete: every test played to an end the model made (cleared, out of
+ * lives, gave up, quit). A test never played, or one stopped for a reason
+ * nobody knows (a crash, a killed runner), says nothing about the model, so
+ * that suite is hidden, its runs with it.
+ */
 async function finishSuite(tx: Tx, suite: SuiteRow): Promise<string> {
   if (suite.status !== 'finished') {
     await tx`update cube_arena.suites set status = 'finished', finished_at = now(), updated_at = now() where id = ${suite.id}`;
     // Its claim, if any, is done: the model and effort are free for another run.
     await tx`update cube_arena.claims set released_at = now() where suite_id = ${suite.id} and released_at is null`;
     suite.status = 'finished';
+    const gap = await incomplete(tx, suite);
+    if (gap) {
+      await tx`update cube_arena.suites set hidden = true, hidden_reason = coalesce(hidden_reason, ${`incomplete: ${gap}`}) where id = ${suite.id}`;
+      await tx`update cube_arena.runs set hidden = true, hidden_reason = coalesce(hidden_reason, ${`incomplete suite: ${gap}`}) where suite_id = ${suite.id}`;
+      suite.hidden = true;
+    }
+  }
+  if (suite.hidden) {
+    return `Suite closed: ${SUITES[suite.kind].name} ${suite.version} is incomplete, so it isn't shown on the boards. Start a new one to run it again.`;
   }
   const grade = (await gradeSuites(tx, [suite])).get(suite.id);
   const score = grade?.score ?? 0;
   return `Suite complete: ${SUITES[suite.kind].name} ${suite.version}, score ${score.toFixed(1)} out of 100. Results: ${BASE_URL}/suites/${suite.id}`;
+}
+
+/** Why a suite isn't complete ("test 2 never played"), or null if every test ended the model's way. */
+async function incomplete(tx: Tx, suite: SuiteRow): Promise<string | null> {
+  const runs = await tx<{ suite_slot: number; status: string; end_reason: string | null }[]>`
+    select suite_slot, status, end_reason from cube_arena.runs where suite_id = ${suite.id}`;
+  const gaps = SUITES[suite.kind].slots.flatMap((_, i) => {
+    const r = runs.find((x) => x.suite_slot === i);
+    if (!r || r.status !== 'finished') return [`test ${i + 1} never played`];
+    return r.end_reason === 'stopped' ? [`test ${i + 1} stopped for an unknown reason`] : [];
+  });
+  return gaps.length ? gaps.join(', ') : null;
 }
 
 /** After an attempt ends, move the run on: next level, a retry, or the end. */
@@ -588,13 +615,15 @@ export async function sweepExpired(): Promise<void> {
 }
 
 /**
- * Ends a run now, its open attempt as stopped. The runner calls this when its
- * session ends before the run does (the model quit, the CLI crashed, a
- * lockdown breach), and so does the sweep for abandoned Community cubes. `id`
- * is the run id or any of its attempt ids. Returns false if there was no such
- * run or it had already ended.
+ * Ends a run now. The runner calls this when its session ends before the run
+ * does, and so does the sweep for abandoned Community cubes. With `quit` the
+ * model ended it (it stopped playing, a lockdown breach): that counts as giving
+ * up, a result like any other. Otherwise nobody knows why (the CLI crashed, the
+ * runner was killed), and the open attempt ends as stopped, which keeps its
+ * suite off the boards. `id` is the run id or any of its attempt ids. Returns
+ * false if there was no such run or it had already ended.
  */
-export async function stopRun(id: string, detail: string): Promise<boolean> {
+export async function stopRun(id: string, detail: string, quit = false): Promise<boolean> {
   if (!UUID.test(id)) return false;
   return transaction(async (tx) => {
     const [run] = await tx<RunRow[]>`select * from cube_arena.runs
@@ -602,11 +631,11 @@ export async function stopRun(id: string, detail: string): Promise<boolean> {
     if (!run || run.status !== 'active') return false;
     const [a] = await tx<AttemptRow[]>`select * from cube_arena.attempts where run_id = ${run.id} and status = 'active' order by seq desc limit 1 for update`;
     if (!a) {
-      await finishRun(tx, run, 'stopped');
+      await finishRun(tx, run, quit ? 'gave_up' : 'stopped');
       return true;
     }
-    await endAttempt(tx, a, 'stopped', detail);
-    await tx`insert into cube_arena.events (attempt_id, kind, move_count) values (${a.id}, 'stop', ${a.move_count})`;
+    await endAttempt(tx, a, quit ? 'gave_up' : 'stopped', detail);
+    await tx`insert into cube_arena.events (attempt_id, kind, move_count) values (${a.id}, ${quit ? 'give_up' : 'stop'}, ${a.move_count})`;
     await advance(tx, run, a);
     return true;
   });
@@ -624,7 +653,7 @@ export async function heartbeat(suiteId: string): Promise<boolean> {
   });
 }
 
-/** Operator only: closes a suite now (tests never played count 0). Returns its result line, or null if there is no such suite. */
+/** Operator only: closes a suite now (hidden if a test is missing). Returns its result line, or null if there is no such suite. */
 export async function closeSuite(id: string): Promise<string | null> {
   if (!UUID.test(id)) return null;
   return transaction(async (tx) => {

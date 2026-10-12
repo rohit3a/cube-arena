@@ -1,11 +1,13 @@
 // Plays a suite that already exists on the server, one fresh agent session per
 // test, each allowed to touch only its own test. Shared by suite.mjs (the
 // operator) and cli.mjs (invitees). A lockdown breach hides the whole suite
-// and stops; tests the agent never started count 0. An API error (a usage
-// limit, an outage) leaves the test open and picks it up again after a wait;
-// a reply past the model's output limit ends the test. Nothing is timed: while
-// it plays, the runner sends a heartbeat so the site can tell a model that is
-// still thinking from a runner that died.
+// and stops. A test ends when the run does or the model stops playing (that
+// counts as giving up). A session ended any other way (an API error, a usage
+// limit, a crash) leaves the test open and picks it up again after a wait. A
+// test that never starts stops the suite for --resume: a suite with a test
+// missing is closed off the boards. Nothing is timed: while it plays, the
+// runner sends a heartbeat so the site can tell a model that is still
+// thinking from a runner that died.
 
 import { mkdirSync } from 'node:fs';
 import { join } from 'node:path';
@@ -13,9 +15,9 @@ import { operator, playSession } from './agent.mjs';
 
 /** How often the runner tells the site it's still playing (it gives up on a suite after 30 quiet minutes). */
 const HEARTBEAT_MS = 5 * 60_000;
-/** After an API error (a usage limit, an outage), minutes to wait before picking the test up again; then hourly. */
+/** After an API error, a usage limit or a crash, minutes to wait before picking the test up again; then hourly. */
 const RETRY_MINUTES = [1, 5, 15, 30, 60];
-/** How long to keep waiting out API errors before leaving the suite for --resume. */
+/** How long to keep retrying before leaving the suite for --resume. */
 const RETRY_HOURS = 12;
 
 /**
@@ -64,23 +66,23 @@ async function playTests(p, call, started) {
       const tokens = r.usage.output_tokens !== undefined ? `, ${r.usage.input_tokens ?? 0} in / ${r.usage.output_tokens} out tokens` : '';
       console.log(`  done in ${r.minutes.toFixed(1)} min, ${r.calls} tool calls${tokens}${cost}`);
       if (r.last) console.log(`  best level ${r.last.best_level}, replay ${r.last.replay_url ?? '-'}`);
-      if (!r.runId) console.log('  !! the agent never started this test; it counts 0');
-      if (r.code && !r.runId && r.stopReason?.startsWith('API error')) {
-        console.log(`!!! ${r.stopReason}. Stopping; resume later with --resume ${suite.id}`);
-        return { breach: null, result: null, suite, stopped: r.stopReason };
-      }
       if (r.breach) {
         console.log(`!!! lockdown broken (${r.breach}); the suite is hidden. Stopping.`);
         return { breach: r.breach, result: null, suite };
       }
-      if (!r.apiError || r.runOver) break;
+      if (!r.retry && r.runId) break;
+      if (!r.retry) {
+        const why = r.stopReason ?? (r.quit ? 'the model ended without starting it' : `the agent ended, exit ${r.code}`);
+        console.log(`!!! test ${i + 1} never started (${why}). Stopping; carry on with --resume ${suite.id} within 30 minutes.`);
+        return { breach: null, result: null, suite, stopped: why };
+      }
       // Not the model's doing: the cube waits where it is, and a fresh session picks it up.
       const wait = RETRY_MINUTES[Math.min(tries, RETRY_MINUTES.length - 1)];
       if (waited + wait > RETRY_HOURS * 60) {
-        console.log(`!!! API errors for ${RETRY_HOURS} h (${r.apiError}). Stopping; resume later with --resume ${suite.id}`);
-        return { breach: null, result: null, suite, stopped: r.apiError };
+        console.log(`!!! still failing after ${RETRY_HOURS} h (${r.retry}). Stopping; carry on with --resume ${suite.id} within 30 minutes.`);
+        return { breach: null, result: null, suite, stopped: r.retry };
       }
-      console.log(`  API error, not the model's doing. Trying this test again in ${wait} min; the cube waits where it is.`);
+      console.log(`  not the model's doing (${r.retry}). Trying this test again in ${wait} min; the cube waits where it is.`);
       await new Promise((res) => setTimeout(res, wait * 60_000));
       waited += wait;
     }

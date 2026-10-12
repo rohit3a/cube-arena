@@ -13,8 +13,8 @@
 // ("Claude Opus 5.5 (high)", "GPT-6-Astra (xhigh)"), so it cannot be mistyped,
 // and aliases like "opus" are refused, as are efforts a model does not have.
 //
-// Needs CUBE_OPERATOR_TOKEN. Nothing times the model out. If the agent stops
-// before the run is over (a crash, or it just quits), the run is stopped.
+// Needs CUBE_OPERATOR_TOKEN. Nothing times the model out. If the model quits
+// before the run is over, that counts as giving up; a crash stops the run.
 // Transcripts go to runner/out/ (gitignored), with image data left out.
 
 import { mkdirSync } from 'node:fs';
@@ -22,7 +22,7 @@ import { homedir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseArgs } from 'node:util';
-import { playSession } from './agent.mjs';
+import { operator, playSession } from './agent.mjs';
 import { resolveModel } from './models.mjs';
 
 const { values: opt } = parseArgs({
@@ -77,6 +77,9 @@ const r = await playSession({
   codexHome: opt['codex-home'],
   logPath,
 });
+
+// One run, no retries: a session that ended some other way stops it.
+if (r.retry && r.runId) await operator(opt.url, token)('/api/admin/runs', { id: r.runId, stop: true, reason: `stopped by ${r.retry}` }).catch((e) => console.log(`(could not stop the run: ${e.message})`));
 
 console.log(`\nexit ${r.code} after ${r.minutes.toFixed(1)} min, ${r.calls} tool calls`);
 if (r.final) console.log(`final: ${r.final.slice(0, 400)}`);

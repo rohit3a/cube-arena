@@ -106,7 +106,7 @@ export default async function SuitePage(props: { params: Promise<{ id: string }>
                         Test {i + 1} of {total}
                       </span>
                       {!r ? (
-                        <span className="muted">{e.status === 'active' ? 'not started yet' : 'not played (counts 0)'}</span>
+                        <span className="muted">{e.status === 'active' ? 'not started yet' : 'not played'}</span>
                       ) : (
                         <span>
                           {s.challenge === 'ladder' ? (

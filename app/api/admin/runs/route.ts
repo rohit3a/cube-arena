@@ -1,7 +1,7 @@
 // Run API (Authorization: Bearer <operator token or invite code>).
 //   GET  /api/admin/runs?limit=50&hidden=1      recent runs (or only hidden ones)            operator
 //   POST /api/admin/runs {id, hidden, reason}   hide or unhide a run (run id or attempt id)   operator; an invitee may hide its own
-//   POST /api/admin/runs {id, stop: true, reason} end an active run now, as a timeout        operator, or the invitee whose suite it is
+//   POST /api/admin/runs {id, stop: true, quit?, reason} end an active run now            operator, or the invitee whose suite it is
 //   POST /api/admin/runs {id, model_name}        fix a run's model name                       operator
 //   POST /api/admin/runs {id, usage}             record the tokens and cost the runner measured   operator, or its invitee
 // Hiding a run that belongs to a suite (or passing a suite id) hides the whole suite.
@@ -23,7 +23,7 @@ export async function GET(req: Request) {
 export async function POST(req: Request) {
   const { auth, bad } = await authFrom(req);
   if (!auth) return deny(bad);
-  const body = (await req.json().catch(() => null)) as { id?: unknown; hidden?: unknown; stop?: unknown; reason?: unknown; model_name?: unknown; usage?: unknown } | null;
+  const body = (await req.json().catch(() => null)) as { id?: unknown; hidden?: unknown; stop?: unknown; quit?: unknown; reason?: unknown; model_name?: unknown; usage?: unknown } | null;
   const id = typeof body?.id === 'string' ? body.id.trim() : '';
   const reason = typeof body?.reason === 'string' ? body.reason.slice(0, 200) : null;
   // An invitee's runner may end, annotate or hide (never unhide or rename) runs in its own suites.
@@ -32,7 +32,7 @@ export async function POST(req: Request) {
     const allowed = owner?.inviteId === auth.invite.id && (body?.stop === true || !!body?.usage || body?.hidden === true);
     if (!allowed) return Response.json({ error: 'not allowed' }, { status: 403 });
   }
-  if (body?.stop === true) return Response.json({ stopped: await stopRun(id, reason ?? 'stopped by the operator') });
+  if (body?.stop === true) return Response.json({ stopped: await stopRun(id, reason ?? 'stopped by the operator', body.quit === true) });
   if (body?.usage && typeof body.usage === 'object') {
     const u = body.usage as Record<string, unknown>;
     const usage = Object.fromEntries(
