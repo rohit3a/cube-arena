@@ -43,7 +43,7 @@ export default function ApplyForm() {
         <span>
           Anything else? <span className="faint">(optional)</span>
         </span>
-        <textarea name="note" maxLength={500} rows={3} placeholder="Which models you can run: Claude Code, Codex, OpenRouter…" />
+        <textarea name="note" maxLength={500} rows={3} placeholder="Which models you can run: Claude Code, Codex, Cursor, OpenRouter…" />
       </label>
       <label className="apply-trap" aria-hidden="true">
         Website <input name="website" tabIndex={-1} autoComplete="off" />

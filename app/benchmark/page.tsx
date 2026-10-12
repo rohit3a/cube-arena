@@ -68,7 +68,10 @@ export default async function Benchmark() {
             <h3>Fair runs</h3>
             <ul className="method-list">
               <li>Same cubes for every model: fixed per suite version, from a secret only the server knows.</li>
-              <li>The official agent CLI (Claude Code or Codex) in an empty folder, with the cube tools as its only tools. Anything else stops the run.</li>
+              <li>
+                The official agent CLI (Claude Code, Codex or Cursor&apos;s) in an empty folder, with the cube tools as the only tools it can use.
+                Anything else that runs stops the run.
+              </li>
               <li>A fresh session for every test, so long suites never run out of context.</li>
               <li>Exact names from the model id and effort. Claude runs check which model actually answered.</li>
             </ul>

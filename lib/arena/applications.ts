@@ -152,7 +152,7 @@ function inviteEmail(app: Application, code: string): { text: string; html: stri
     [`Pick a model and effort that still needs a run at ${SITE_URL}/wanted, claim it, and play it, for example:`, 'cube-arena-runner play --model claude-sonnet-5-5 --effort max'],
   ];
   const intro = `Hi ${app.name}, you're in. Your invite code is ${code}. Keep it to yourself: anything run with it goes on the Verified board.`;
-  const outro = `You need your own access to the model: Claude Code, Codex, or an OpenRouter key. There's no time limit. Finished suites put you on ${SITE_URL}/contributors, linked to @${app.x_handle}.`;
+  const outro = `You need your own access to the model: Claude Code, Codex, Cursor, or an OpenRouter key. There's no time limit. Finished suites put you on ${SITE_URL}/contributors, linked to @${app.x_handle}.`;
   return {
     text: [intro, '', ...steps.flatMap(([say, cmd], i) => [`${i + 1}. ${say}`, `   ${cmd}`, '']), outro, ''].join('\n'),
     html:

@@ -5,8 +5,8 @@
 
 import data from '../../data/catalog.json';
 
-export type Harness = 'claude-code' | 'codex' | 'openrouter';
-export const HARNESSES: Harness[] = ['claude-code', 'codex', 'openrouter'];
+export type Harness = 'claude-code' | 'codex' | 'cursor' | 'openrouter';
+export const HARNESSES: Harness[] = ['claude-code', 'codex', 'cursor', 'openrouter'];
 
 export interface CatalogModel {
   id: string;
@@ -17,7 +17,7 @@ export interface CatalogModel {
   wanted: boolean;
   /** Effort levels, low to max; empty when the model has no effort setting. */
   efforts: string[];
-  /** The model's id in each harness that can run it. */
+  /** The model's id in each harness that can run it (for Cursor, without the effort: the runner adds it). */
   via: Partial<Record<Harness, string>>;
   /** USD per million tokens on OpenRouter. */
   price: { input: number | null; output: number | null; cached?: number | null } | null;
@@ -50,6 +50,7 @@ export function harnessLabel(harness: string | null): string | null {
   if (!harness) return null;
   if (harness === 'claude' || harness === 'claude-code') return 'Claude Code';
   if (harness === 'codex') return 'Codex';
+  if (harness === 'cursor') return 'Cursor';
   if (harness === 'openrouter') return 'OpenRouter';
   return harness.replace(/^api:/, '');
 }

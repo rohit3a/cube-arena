@@ -1,6 +1,6 @@
-// One agent session against Cube Arena: Claude Code, Codex or a model called
-// directly over an API (harness-api.mjs), locked down to the cube tools and
-// watched as it plays. Used by run.mjs (one run) and play-suite.mjs (one fresh
+// One agent session against Cube Arena: Claude Code, Codex, Cursor's CLI or a
+// model called directly over an API (harness-api.mjs), locked down to the cube
+// tools and watched as it plays. Used by run.mjs (one run) and play-suite.mjs (one fresh
 // session per suite test).
 //
 // Lockdown: the agent gets the cube tools and nothing else (no shell, files,
@@ -11,13 +11,21 @@
 // Codex runs use their own CODEX_HOME (default ~/.codex-bench, signed in once
 // with `CODEX_HOME=~/.codex-bench codex login --device-auth`), so no
 // AGENTS.md, config, skills or memories from this machine reach the model.
+//
+// Cursor can't take its own tools away, so its sessions get permissions that
+// block them (shell, files, web, other servers) and allow only the cube
+// server. A blocked attempt is noted in the log; one that went through (a
+// shell command, a web search, a file read outside the empty session folder)
+// breaks the lockdown. Its config and data live in the runner's own folder
+// (cursor.mjs), and its background worker is stopped with the session.
 
 import { spawn } from 'node:child_process';
-import { createWriteStream, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { createWriteStream, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { join, resolve, sep } from 'node:path';
 import { gzipSync } from 'node:zlib';
 import { commandFor } from './command.mjs';
+import { sameModelName } from './cursor.mjs';
 import { playApiSession } from './harness-api.mjs';
 import { SYSTEM } from './system.mjs';
 
@@ -93,6 +101,42 @@ function codexCommand(s, work) {
   return { cmd: 'codex', args, env: { ...process.env, CUBE_OPERATOR_TOKEN: s.token, CODEX_HOME: s.codexHome } };
 }
 
+// What a Cursor session may do: the cube server's tools, nothing else.
+export const CURSOR_PERMISSIONS = {
+  allow: ['Mcp(cube-arena:*)'],
+  deny: ['Shell(*)', 'Read(**)', 'Read(/**)', 'Write(**)', 'Write(/**)', 'WebFetch(*)'],
+};
+
+function cursorCommand(s, work) {
+  // The session folder is the project: its .cursor/ holds the permissions and
+  // the cube server. The invite code stays out of the file (${env:...}).
+  mkdirSync(join(work, '.cursor'));
+  writeFileSync(join(work, '.cursor', 'cli.json'), JSON.stringify({ permissions: CURSOR_PERMISSIONS }));
+  const headers = { Authorization: 'Bearer ${env:CUBE_ARENA_TOKEN}', ...s.headers };
+  writeFileSync(join(work, '.cursor', 'mcp.json'), JSON.stringify({ mcpServers: { 'cube-arena': { url: s.url, headers } } }));
+  // Cursor's global config, in the runner's folder: the same permissions, and
+  // whatever Cursor keeps there itself (it remembers the last model).
+  const config = join(s.cursorHome, 'config');
+  const data = join(s.cursorHome, 'data');
+  mkdirSync(config, { recursive: true });
+  mkdirSync(data, { recursive: true });
+  let kept = {};
+  try {
+    kept = JSON.parse(readFileSync(join(config, 'cli-config.json'), 'utf8'));
+  } catch {
+    // first session
+  }
+  writeFileSync(join(config, 'cli-config.json'), JSON.stringify({ version: 1, ...kept, permissions: CURSOR_PERMISSIONS }), { mode: 0o600 });
+  // No system prompt option: the rules lead the prompt.
+  const args = ['-p', `${SYSTEM}\n\n${s.prompt}`, '--output-format', 'stream-json', '--model', s.model, '--trust', '--approve-mcps'];
+  return { cmd: s.cursorBin, args, env: { ...process.env, CURSOR_CONFIG_DIR: config, CURSOR_DATA_DIR: data, CUBE_ARENA_TOKEN: s.token } };
+}
+
+/** Cursor's bookkeeping tools: they read or write nothing outside the session. */
+const CURSOR_HARMLESS = new Set(['getMcpToolsToolCall', 'updateTodosToolCall', 'readTodosToolCall', 'partialToolCall', 'truncatedToolCall']);
+/** Cursor's tools that look at files, and the argument naming where. */
+const CURSOR_LOOKS = { grepToolCall: 'path', globToolCall: 'targetDirectory', lsToolCall: 'path', readToolCall: 'path', semSearchToolCall: 'path' };
+
 // Transcripts keep everything but the pictures, which the site can redraw.
 /** The model name on messages Claude Code writes itself: API errors, usage limits. */
 export const SYNTHETIC = '<synthetic>';
@@ -154,13 +198,24 @@ async function afterSession(s, out) {
 }
 
 function playCli(s) {
-  const work = mkdtempSync(join(tmpdir(), 'cube-runner-'));
-  const { cmd, args, env } = s.agent === 'claude' ? claudeCommand(s, work) : codexCommand(s, work);
+  const work = realpathSync(mkdtempSync(join(tmpdir(), 'cube-runner-')));
+  const cursor = s.agent === 'cursor';
+  const { cmd, args, env } = s.agent === 'claude' ? claudeCommand(s, work) : cursor ? cursorCommand(s, work) : codexCommand(s, work);
   const log = createWriteStream(s.logPath);
   const started = Date.now();
   const secs = () => `${Math.round((Date.now() - started) / 1000)}s`;
   const run = commandFor(cmd, args);
-  const child = spawn(run.file, run.args, { cwd: work, env, stdio: ['ignore', 'pipe', 'pipe'] });
+  // Cursor leaves a worker running after it exits: its own process group lets
+  // the runner stop the lot.
+  const group = cursor && process.platform !== 'win32';
+  const child = spawn(run.file, run.args, { cwd: work, env, stdio: ['ignore', 'pipe', 'pipe'], detached: group });
+  const killGroup = (signal) => {
+    try {
+      process.kill(-child.pid, signal);
+    } catch {
+      // already gone
+    }
+  };
 
   const out = { runId: null, runOver: false, last: null, calls: 0, breach: null, stopReason: null, apiError: null, quit: false, retry: null, final: null, usage: {}, code: null, minutes: 0, events: [] };
   // The audit digest: what the model said and called, no pictures.
@@ -179,6 +234,9 @@ function playCli(s) {
     if (process.platform === 'win32') {
       // No signals on Windows: end the whole tree (Codex runs a native binary under Node).
       spawn('taskkill', ['/pid', String(child.pid), '/T', '/F'], { stdio: 'ignore' }).on('error', () => child.kill());
+    } else if (group) {
+      killGroup('SIGTERM');
+      setTimeout(() => killGroup('SIGKILL'), 10_000).unref();
     } else {
       child.kill('SIGTERM');
       setTimeout(() => child.kill('SIGKILL'), 10_000).unref();
@@ -296,6 +354,66 @@ function playCli(s) {
     if (ev.type === 'turn.failed' || ev.type === 'error') console.log(`  [${secs()}] ${ev.type}: ${JSON.stringify(ev.error ?? ev.message).slice(0, 200)}`);
   }
 
+  // Cursor stream-json. Its tools come in pairs of tool_call events, started
+  // and completed; the completed one says whether it went through.
+  let thought = '';
+  const inWork = (kind, args) => {
+    const key = CURSOR_LOOKS[kind];
+    if (!key) return false;
+    const p = resolve(work, String(args?.[key] ?? '.'));
+    return p === work || p.startsWith(work + sep);
+  };
+  function onCursor(ev) {
+    if (ev.type === 'system' && ev.subtype === 'init' && s.modelName && !sameModelName(ev.model, s.modelName)) {
+      lockdown(`asked for ${s.modelName}, Cursor started ${ev.model}`);
+    }
+    if (ev.type === 'thinking' && ev.subtype === 'delta' && ev.text) thought += ev.text;
+    if (ev.type === 'thinking' && ev.subtype === 'completed' && thought) {
+      note('think', thought.slice(0, 2000));
+      thought = '';
+    }
+    if (ev.type === 'assistant') {
+      const text = (ev.message?.content ?? []).map((p) => p.text ?? '').join('').trim();
+      if (text) {
+        note('say', text);
+        out.final = text;
+        console.log(`  [${secs()}] says: ${text.replace(/\s+/g, ' ').slice(0, 160)}`);
+      }
+    }
+    if (ev.type === 'tool_call') {
+      const [kind, call] = Object.entries(ev.tool_call ?? {})[0] ?? [];
+      if (!kind || CURSOR_HARMLESS.has(kind)) return;
+      const cube = kind === 'mcpToolCall' && call?.args?.providerIdentifier === 'cube-arena';
+      if (ev.subtype === 'started') {
+        if (cube) seeCall(call.args.toolName, call.args.args);
+        return;
+      }
+      if (ev.subtype !== 'completed') return;
+      const r = call?.result ?? {};
+      if (cube) {
+        if (r.success) seeReply((r.success.content ?? []).map((c) => c.text?.text ?? '').find(Boolean) ?? '', call.args.toolName);
+        else console.log(`      → ${JSON.stringify(r).slice(0, 160)}`);
+        return;
+      }
+      const what = `${kind.replace(/ToolCall$/, '')} ${JSON.stringify(call?.args ?? {}).slice(0, 120)}`;
+      if (r.success && !inWork(kind, call?.args)) return lockdown(`Cursor ran ${what}`);
+      note(r.success ? 'call' : 'blocked', what);
+      console.log(`  [${secs()}] ${r.success ? 'looked in its empty folder' : 'blocked'}: ${what}`);
+    }
+    if (ev.type === 'result') {
+      // The model finished its turn: it chose to stop here.
+      if (ev.subtype === 'success' && !ev.is_error) out.quit = true;
+      out.final = String(ev.result ?? out.final ?? '');
+      const u = ev.usage;
+      if (u) {
+        // Input counted the way OpenAI does: everything read, cached reads included.
+        out.usage.input_tokens = (u.inputTokens ?? 0) + (u.cacheReadTokens ?? 0) + (u.cacheWriteTokens ?? 0);
+        out.usage.cached_input_tokens = u.cacheReadTokens ?? 0;
+        out.usage.output_tokens = u.outputTokens ?? 0;
+      }
+    }
+  }
+
   let buf = '';
   child.stdout.on('data', (chunk) => {
     buf += chunk;
@@ -311,9 +429,11 @@ function playCli(s) {
         continue;
       }
       if (s.agent === 'claude') onClaude(ev);
+      else if (cursor) onCursor(ev);
       else onCodex(ev);
     }
   });
+  let errText = '';
   child.stderr.on('data', (chunk) => {
     // Codex logs its disabled code-mode host on every start; that is expected.
     const text = String(chunk)
@@ -321,6 +441,7 @@ function playCli(s) {
       .filter((l) => l && !/code-mode host is disabled|Reading additional input from stdin/.test(l))
       .join('\n');
     if (text) process.stderr.write(`${text}\n`);
+    if (text && errText.length < 2000) errText += `${text}\n`;
   });
 
   return new Promise((resolve) => {
@@ -328,6 +449,15 @@ function playCli(s) {
       log.end();
       rmSync(work, { recursive: true, force: true, maxRetries: 5 });
       out.code = code;
+      if (cursor) {
+        if (group) killGroup('SIGTERM');
+        // Cursor's chats and per-folder state for this session: the log has it all.
+        for (const d of [join(s.cursorHome, 'config', 'chats'), join(s.cursorHome, 'data', 'projects')]) rmSync(d, { recursive: true, force: true, maxRetries: 5 });
+        // No result means Cursor gave up, not the model: a usage limit, a network error.
+        if (!out.quit && !out.stopReason && !out.breach) {
+          out.apiError ??= errText.trim().split('\n').find((l) => /error|limit|usage|denied|failed/i.test(l))?.slice(0, 300) ?? (errText.trim().split('\n')[0]?.slice(0, 300) || null);
+        }
+      }
       out.minutes = (Date.now() - started) / 60_000;
       if (s.agent === 'claude') {
         // Input counted the way OpenAI does: everything read, cached reads included.

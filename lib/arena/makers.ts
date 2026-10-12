@@ -16,6 +16,7 @@ const MAKERS: [RegExp, Maker][] = [
   [/^qwen/i, { name: 'Alibaba', color: 'var(--pink)' }],
   [/^(mistral|magistral|codestral)/i, { name: 'Mistral', color: 'var(--yellow)' }],
   [/^kimi/i, { name: 'Moonshot', color: 'var(--slate)' }],
+  [/^(composer|cursor)/i, { name: 'Cursor', color: 'var(--text)' }],
 ];
 
 export function makerOf(model: string): Maker {

@@ -19,13 +19,14 @@ import { parseArgs } from 'node:util';
 import { operator } from './agent.mjs';
 import { claudeSandboxProblem, playCoding, setUpWorkspace, waitForGrade } from './code.mjs';
 import { commandFor } from './command.mjs';
+import { cursorBin, cursorModels, cursorSignedIn, cursorSlug } from './cursor.mjs';
 import { playSuite } from './play-suite.mjs';
 
-const VERSION = '0.3.1';
+const VERSION = '0.4.0';
 const DEFAULT_URL = 'https://cube.krnl.studio/mcp';
 const HOME = process.env.CUBE_ARENA_HOME || join(homedir(), '.cube-arena');
 const CONFIG = join(HOME, 'config.json');
-const VIA = ['claude-code', 'codex', 'openrouter', 'api'];
+const VIA = ['claude-code', 'codex', 'cursor', 'openrouter', 'api'];
 
 const HELP = `cube-arena-runner ${VERSION}: run Cube Arena Index suites for the Verified board.
 
@@ -41,11 +42,12 @@ const HELP = `cube-arena-runner ${VERSION}: run Cube Arena Index suites for the 
 play options:
   --effort <level>         low, medium, high, xhigh or max (what the model takes; see wanted)
   --suite fast|thorough    default fast (three ladders); thorough is every test (many hours)
-  --via <how>              claude-code, codex, openrouter or api (default: the first you have)
+  --via <how>              claude-code, codex, cursor, openrouter or api (default: the first you have)
   --base-url <url>         with --via api: an OpenAI-compatible endpoint, e.g. https://api.x.ai/v1
   --api-key-env <NAME>     with --via api: the environment variable holding its key
   --api-model <id>         with --via api: the model's id on that endpoint
   --codex-home <dir>       a Codex home just for this (default ~/.cube-arena/codex)
+  --cursor-home <dir>      Cursor's config and data for the runner (default ~/.cube-arena/cursor)
   --resume <suite id>      carry on a suite that stopped part way
   --force                  play even if someone else has claimed this one
   --no-transcript          don't upload the session logs (they help us check results)
@@ -143,6 +145,7 @@ const { values: opt, positionals } = parseArgs({
     'api-key-env': { type: 'string' },
     'api-model': { type: 'string' },
     'codex-home': { type: 'string' },
+    'cursor-home': { type: 'string' },
     resume: { type: 'string' },
     force: { type: 'boolean', default: false },
     'no-transcript': { type: 'boolean', default: false },
@@ -274,6 +277,8 @@ async function play() {
     if (!model.via.codex) fail(`${model.name} doesn't run in Codex.`);
     if (!has('codex')) fail('Codex is not installed: npm i -g @openai/codex');
     session = { agent: 'codex', model: model.via.codex, effort, codexHome: codexHomeFor() };
+  } else if (via === 'cursor') {
+    session = cursorSession(model, effort);
   } else if (via === 'openrouter') {
     if (!model.via.openrouter) fail(`${model.name} isn't on OpenRouter; try --via api with the provider's endpoint.`);
     const apiKey = process.env.OPENROUTER_API_KEY;
@@ -325,12 +330,40 @@ async function play() {
   process.exit(r.breach ? 3 : r.result ? 0 : 1);
 }
 
+/**
+ * A Cursor session for this model and effort: the full Cursor id from your
+ * account's model list, checked before anything starts.
+ */
+function cursorSession(model, effort) {
+  if (!model.via.cursor) fail(`${model.name} isn't in Cursor.`);
+  if (process.platform === 'win32') fail('--via cursor needs macOS or Linux (on Windows, use WSL).');
+  const bin = cursorBin();
+  if (!bin) fail("Cursor's CLI is not installed: curl https://cursor.com/install -fsS | bash");
+  const cursorHome = opt['cursor-home'] ?? join(HOME, 'cursor');
+  mkdirSync(cursorHome, { recursive: true });
+  const env = { ...process.env, CURSOR_CONFIG_DIR: join(cursorHome, 'config'), CURSOR_DATA_DIR: join(cursorHome, 'data') };
+  if (!cursorSignedIn(bin, env)) fail(`Sign Cursor's CLI in first: ${bin} login`);
+  let list;
+  try {
+    list = cursorModels(bin, env);
+  } catch (e) {
+    fail(`Couldn't list your Cursor models: ${String(e.stderr || e.message).trim().slice(0, 300)}`);
+  }
+  const found = cursorSlug(model.via.cursor, effort, list);
+  if (!found.slug) {
+    if (!found.efforts.length) fail(`Your Cursor plan doesn't list ${model.name} (${model.via.cursor}). See: ${bin} models`);
+    fail(`Cursor has ${model.name} at ${found.efforts.join(', ')}, not ${effort ?? 'its default'}.`);
+  }
+  console.log(`Cursor model ${found.slug} (${found.name}). It runs on your Cursor plan's usage.`);
+  return { agent: 'cursor', model: found.slug, modelName: found.name, effort, cursorBin: bin, cursorHome };
+}
+
 /** The coding benchmark: the model writes a 5x5 solver here, Cube Arena grades it. */
 async function code() {
   if (process.platform === 'win32') fail("The coding benchmark needs macOS or Linux (on Windows, use WSL): the agent's sandbox doesn't run on Windows.");
   const { model, effort } = await modelAndEffort();
   const via = opt.via ?? (model.via['claude-code'] && has('claude') ? 'claude-code' : model.via.codex && has('codex') ? 'codex' : null);
-  if (!via) fail(`The coding benchmark runs through Claude Code or Codex; ${model.name} runs via ${Object.keys(model.via).join(', ')}.`);
+  if (!via) fail(`The coding benchmark runs through Claude Code or Codex for now; ${model.name} runs via ${Object.keys(model.via).join(', ')}.`);
   if (!['claude-code', 'codex'].includes(via) || !model.via[via]) fail(`--via must be ${['claude-code', 'codex'].filter((h) => model.via[h]).join(' or ')} for ${model.name}.`);
   let session;
   if (via === 'claude-code') {
@@ -390,6 +423,7 @@ async function code() {
 function pickVia(model) {
   if (model.via['claude-code'] && has('claude')) return 'claude-code';
   if (model.via.codex && has('codex')) return 'codex';
+  if (model.via.cursor && process.platform !== 'win32' && cursorBin()) return 'cursor';
   if (model.via.openrouter && process.env.OPENROUTER_API_KEY) return 'openrouter';
   const ways = Object.keys(model.via).join(', ');
   return fail(`No way to reach ${model.name} here. It runs via ${ways}: install that CLI, or set OPENROUTER_API_KEY, or use --via api.`);

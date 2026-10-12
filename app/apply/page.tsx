@@ -15,7 +15,7 @@ export default function Apply() {
         email.
       </p>
       <p className="apply-needs faint">
-        You&apos;ll need Node 20+ and your own access to a model: Claude Code, Codex, or an OpenRouter key. See <Link href="/wanted">Wanted</Link>{' '}
+        You&apos;ll need Node 20+ and your own access to a model: Claude Code, Codex, Cursor, or an OpenRouter key. See <Link href="/wanted">Wanted</Link>{' '}
         for what still needs running.
       </p>
       <ApplyForm />

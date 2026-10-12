@@ -16,7 +16,8 @@
    ],
    "via": {
     "claude-code": "claude-haiku-5-5",
-    "openrouter": "anthropic/claude-haiku-5.5"
+    "openrouter": "anthropic/claude-haiku-5.5",
+    "cursor": "claude-haiku-5-5"
    },
    "price": {
     "input": 0.1,
@@ -83,7 +84,8 @@
    ],
    "via": {
     "claude-code": "claude-sonnet-5-5",
-    "openrouter": "anthropic/claude-sonnet-5.5"
+    "openrouter": "anthropic/claude-sonnet-5.5",
+    "cursor": "claude-sonnet-5-5"
    },
    "price": {
     "input": 2,
@@ -107,7 +109,8 @@
    ],
    "via": {
     "claude-code": "claude-opus-5-5",
-    "openrouter": "anthropic/claude-opus-5.5"
+    "openrouter": "anthropic/claude-opus-5.5",
+    "cursor": "claude-opus-5-5"
    },
    "price": {
     "input": 4,
@@ -177,7 +180,8 @@
     "xhigh"
    ],
    "via": {
-    "openrouter": "x-ai/grok-4.7"
+    "openrouter": "x-ai/grok-4.7",
+    "cursor": "grok-4.7"
    },
    "price": {
     "input": 2,
@@ -315,7 +319,8 @@
     "high"
    ],
    "via": {
-    "openrouter": "google/gemini-3.8-flash"
+    "openrouter": "google/gemini-3.8-flash",
+    "cursor": "gemini-3.8-flash"
    },
    "price": {
     "input": 0.75,
@@ -338,7 +343,8 @@
     "max"
    ],
    "via": {
-    "openrouter": "meta/muse-spark-1.3"
+    "openrouter": "meta/muse-spark-1.3",
+    "cursor": "muse-spark-1.3"
    },
    "price": {
     "input": 1.25,
@@ -384,7 +390,8 @@
    ],
    "via": {
     "claude-code": "claude-fable-5-1",
-    "openrouter": "anthropic/claude-fable-5.1"
+    "openrouter": "anthropic/claude-fable-5.1",
+    "cursor": "claude-fable-5-1"
    },
    "price": {
     "input": 10,
@@ -533,7 +540,8 @@
     "max"
    ],
    "via": {
-    "openrouter": "moonshotai/kimi-k3"
+    "openrouter": "moonshotai/kimi-k3",
+    "cursor": "kimi-k3"
    },
    "price": {
     "input": 0.8,
@@ -579,7 +587,8 @@
    ],
    "via": {
     "codex": "gpt-5.6-terra",
-    "openrouter": "openai/gpt-5.6-terra"
+    "openrouter": "openai/gpt-5.6-terra",
+    "cursor": "gpt-5.6-terra"
    },
    "price": {
     "input": 2,
@@ -596,7 +605,8 @@
    "wanted": true,
    "efforts": [],
    "via": {
-    "openrouter": "moonshotai/kimi-k2.7-code"
+    "openrouter": "moonshotai/kimi-k2.7-code",
+    "cursor": "kimi-k2.7-code"
    },
    "price": {
     "input": 0.671,
@@ -851,7 +861,8 @@
     "xhigh"
    ],
    "via": {
-    "openrouter": "openai/gpt-5.3-codex"
+    "openrouter": "openai/gpt-5.3-codex",
+    "cursor": "gpt-5.3-codex"
    },
    "price": {
     "input": 1.75,
@@ -997,6 +1008,19 @@
    "aa": "https://artificialanalysis.ai/models/undefined"
   },
   {
+   "id": "composer-2-5",
+   "name": "Composer 2.5",
+   "maker": "Cursor",
+   "released": null,
+   "wanted": true,
+   "efforts": [],
+   "via": {
+    "cursor": "composer-2.5"
+   },
+   "price": null,
+   "aa": null
+  },
+  {
    "id": "gemini-3-7-flash",
    "name": "Gemini 3.7 Flash",
    "maker": "Google",
@@ -1008,7 +1032,8 @@
     "high"
    ],
    "via": {
-    "openrouter": "google/gemini-3.7-flash"
+    "openrouter": "google/gemini-3.7-flash",
+    "cursor": "gemini-3.7-flash"
    },
    "price": {
     "input": 0.75,
@@ -1030,7 +1055,8 @@
     "xhigh"
    ],
    "via": {
-    "openrouter": "x-ai/grok-4.6"
+    "openrouter": "x-ai/grok-4.6",
+    "cursor": "cursor-grok-4.6"
    },
    "price": {
     "input": 2,
@@ -1098,7 +1124,8 @@
    ],
    "via": {
     "claude-code": "claude-opus-5",
-    "openrouter": "anthropic/claude-opus-5"
+    "openrouter": "anthropic/claude-opus-5",
+    "cursor": "claude-opus-5"
    },
    "price": {
     "input": 5,
@@ -1119,7 +1146,8 @@
     "high"
    ],
    "via": {
-    "openrouter": "google/gemini-3.6-flash"
+    "openrouter": "google/gemini-3.6-flash",
+    "cursor": "gemini-3.6-flash"
    },
    "price": {
     "input": 0.75,
@@ -1143,7 +1171,8 @@
    ],
    "via": {
     "codex": "gpt-5.6-luna",
-    "openrouter": "openai/gpt-5.6-luna"
+    "openrouter": "openai/gpt-5.6-luna",
+    "cursor": "gpt-5.6-luna"
    },
    "price": {
     "input": 0.2,
@@ -1167,7 +1196,8 @@
    ],
    "via": {
     "codex": "gpt-5.6-sol",
-    "openrouter": "openai/gpt-5.6-sol"
+    "openrouter": "openai/gpt-5.6-sol",
+    "cursor": "gpt-5.6-sol"
    },
    "price": {
     "input": 2,
@@ -1210,7 +1240,8 @@
     "high"
    ],
    "via": {
-    "openrouter": "x-ai/grok-4.5"
+    "openrouter": "x-ai/grok-4.5",
+    "cursor": "cursor-grok-4.5"
    },
    "price": {
     "input": 2,
@@ -1234,7 +1265,8 @@
    ],
    "via": {
     "claude-code": "claude-sonnet-5",
-    "openrouter": "anthropic/claude-sonnet-5"
+    "openrouter": "anthropic/claude-sonnet-5",
+    "cursor": "claude-sonnet-5"
    },
    "price": {
     "input": 2,
@@ -1258,7 +1290,8 @@
    ],
    "via": {
     "claude-code": "claude-fable-5",
-    "openrouter": "anthropic/claude-fable-5"
+    "openrouter": "anthropic/claude-fable-5",
+    "cursor": "claude-fable-5"
    },
    "price": {
     "input": 10,
@@ -1303,7 +1336,8 @@
    ],
    "via": {
     "claude-code": "claude-opus-4-8",
-    "openrouter": "anthropic/claude-opus-4.8"
+    "openrouter": "anthropic/claude-opus-4.8",
+    "cursor": "claude-opus-4-8"
    },
    "price": {
     "input": 5,
@@ -1324,7 +1358,8 @@
     "high"
    ],
    "via": {
-    "openrouter": "google/gemini-3.5-flash"
+    "openrouter": "google/gemini-3.5-flash",
+    "cursor": "gemini-3.5-flash"
    },
    "price": {
     "input": 1.5,
@@ -1368,7 +1403,8 @@
    ],
    "via": {
     "codex": "gpt-5.5",
-    "openrouter": "openai/gpt-5.5"
+    "openrouter": "openai/gpt-5.5",
+    "cursor": "gpt-5.5"
    },
    "price": {
     "input": 5,
@@ -1443,7 +1479,8 @@
    ],
    "via": {
     "claude-code": "claude-opus-4-7",
-    "openrouter": "anthropic/claude-opus-4.7"
+    "openrouter": "anthropic/claude-opus-4.7",
+    "cursor": "claude-opus-4-7"
    },
    "price": {
     "input": 5,
@@ -1499,7 +1536,8 @@
     "xhigh"
    ],
    "via": {
-    "openrouter": "openai/gpt-5.4-mini"
+    "openrouter": "openai/gpt-5.4-mini",
+    "cursor": "gpt-5.4-mini"
    },
    "price": {
     "input": 0.75,
@@ -1521,7 +1559,8 @@
     "xhigh"
    ],
    "via": {
-    "openrouter": "openai/gpt-5.4-nano"
+    "openrouter": "openai/gpt-5.4-nano",
+    "cursor": "gpt-5.4-nano"
    },
    "price": {
     "input": 0.2,
@@ -1543,7 +1582,8 @@
     "xhigh"
    ],
    "via": {
-    "openrouter": "openai/gpt-5.4"
+    "openrouter": "openai/gpt-5.4",
+    "cursor": "gpt-5.4"
    },
    "price": {
     "input": 2.5,
@@ -1642,7 +1682,8 @@
    ],
    "via": {
     "claude-code": "claude-sonnet-4-6",
-    "openrouter": "anthropic/claude-sonnet-4.6"
+    "openrouter": "anthropic/claude-sonnet-4.6",
+    "cursor": "claude-4.6-sonnet"
    },
    "price": {
     "input": 3,
@@ -1665,7 +1706,8 @@
    ],
    "via": {
     "claude-code": "claude-opus-4-6",
-    "openrouter": "anthropic/claude-opus-4.6"
+    "openrouter": "anthropic/claude-opus-4.6",
+    "cursor": "claude-4.6-opus"
    },
    "price": {
     "input": 5,
@@ -1725,7 +1767,8 @@
     "xhigh"
    ],
    "via": {
-    "openrouter": "openai/gpt-5.2"
+    "openrouter": "openai/gpt-5.2",
+    "cursor": "gpt-5.2"
    },
    "price": {
     "input": 1.75,
@@ -1786,7 +1829,8 @@
    ],
    "via": {
     "claude-code": "claude-opus-4-5",
-    "openrouter": "anthropic/claude-opus-4.5"
+    "openrouter": "anthropic/claude-opus-4.5",
+    "cursor": "claude-4.5-opus"
    },
    "price": {
     "input": 5,
@@ -1807,7 +1851,8 @@
     "high"
    ],
    "via": {
-    "openrouter": "openai/gpt-5.1"
+    "openrouter": "openai/gpt-5.1",
+    "cursor": "gpt-5.1"
    },
    "price": {
     "input": 1.25,
@@ -1976,7 +2021,8 @@
     "high"
    ],
    "via": {
-    "openrouter": "openai/gpt-5-mini"
+    "openrouter": "openai/gpt-5-mini",
+    "cursor": "gpt-5-mini"
    },
    "price": {
     "input": 0.25,
@@ -2248,7 +2294,8 @@
    "wanted": false,
    "efforts": [],
    "via": {
-    "claude-code": "claude-sonnet-4-5"
+    "claude-code": "claude-sonnet-4-5",
+    "cursor": "claude-4.5-sonnet"
    },
    "price": null,
    "aa": null

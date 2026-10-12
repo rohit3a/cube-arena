@@ -5,8 +5,11 @@
 //   node scripts/build-catalog.mjs
 //
 // Sources: data/aa-models.json (Artificial Analysis's model list, refreshed by
-// hand), OpenRouter's public model list (fetched), and the Claude Code and
-// Codex model ids in runner/models.mjs. A model is in the catalog when it can
+// hand), OpenRouter's public model list (fetched), the Claude Code and Codex
+// model ids in runner/models.mjs, and Cursor's model list in
+// data/cursor-models.txt (refreshed by hand: cursor-agent models > data/cursor-models.txt).
+//
+//   node scripts/build-catalog.mjs --cursor-only   just redo the Cursor ids in the current catalog A model is in the catalog when it can
 // read images and call tools somewhere we can run it. "wanted" marks the ones
 // Artificial Analysis lists as current: those are what we ask people to run.
 
@@ -14,9 +17,48 @@ import { readFileSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { parseModels, parseSlug } from '../runner/cursor.mjs';
 import { CLAUDE_EFFORT_LIMITS, EFFORTS, SWEEP_MODELS, claudeName, codexModels, codexName, effortsOf } from '../runner/models.mjs';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
+const CATALOG = join(root, 'data/catalog.json');
+const order = (a, b) => Number(b.wanted) - Number(a.wanted) || (b.released ?? '').localeCompare(a.released ?? '') || a.name.localeCompare(b.name);
+
+// Models only Cursor has, by their Cursor id.
+const CURSOR_ONLY = { 'composer-2.5': { id: 'composer-2-5', name: 'Composer 2.5', maker: 'Cursor' } };
+
+/**
+ * Adds via.cursor: a model's Cursor id without its effort ("gpt-5.6-terra"),
+ * matched on the catalog id. The runner finds the full id for an effort from
+ * the user's own list. Cursor writes older Claude ids family-last
+ * ("claude-4.6-opus") and some Grok ones with a "cursor-" prefix.
+ */
+function withCursor(models) {
+  const key = (base) => base.replace(/^cursor-/, '').replace(/^claude-(\d+(?:\.\d+)?)-(opus|sonnet|haiku|fable)\b/, 'claude-$2-$1').replace(/\./g, '-');
+  const bases = new Map();
+  for (const { slug } of parseModels(readFileSync(join(root, 'data/cursor-models.txt'), 'utf8'))) {
+    const { base } = parseSlug(slug);
+    if (base !== 'auto' && !bases.has(key(base))) bases.set(key(base), base);
+  }
+  for (const m of models) {
+    delete m.via.cursor;
+    const base = bases.get(m.id.replace(/\./g, '-'));
+    if (base) m.via.cursor = base;
+  }
+  for (const [base, extra] of Object.entries(CURSOR_ONLY)) {
+    if (bases.has(key(base)) && !models.some((m) => m.id === extra.id)) models.push({ ...extra, released: null, wanted: true, efforts: [], via: { cursor: base }, price: null, aa: null });
+  }
+  return models.sort(order);
+}
+
+if (process.argv.includes('--cursor-only')) {
+  const catalog = JSON.parse(readFileSync(CATALOG, 'utf8'));
+  const models = withCursor(catalog.models);
+  writeFileSync(CATALOG, `${JSON.stringify({ ...catalog, models }, null, 1)}\n`);
+  console.log(`${models.filter((m) => m.via.cursor).length} of ${models.length} models reachable in Cursor`);
+  for (const m of models.filter((x) => x.wanted && x.via.cursor)) console.log(`  ${m.id.padEnd(28)} ${m.via.cursor}`);
+  process.exit(0);
+}
 const aa = JSON.parse(readFileSync(join(root, 'data/aa-models.json'), 'utf8')).models;
 const res = await fetch('https://openrouter.ai/api/v1/models');
 if (!res.ok) throw new Error(`OpenRouter: ${res.status}`);
@@ -107,9 +149,9 @@ for (const id of SWEEP_MODELS) {
   });
 }
 
-const models = [...entries.values()].sort((a, b) => Number(b.wanted) - Number(a.wanted) || (b.released ?? '').localeCompare(a.released ?? '') || a.name.localeCompare(b.name));
+const models = withCursor([...entries.values()]);
 writeFileSync(
-  join(root, 'data/catalog.json'),
+  CATALOG,
   `${JSON.stringify({ built: new Date().toISOString().slice(0, 10), models }, null, 1)}\n`,
 );
 const wanted = models.filter((m) => m.wanted);

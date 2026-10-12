@@ -85,7 +85,7 @@ export async function POST(req: Request) {
   }
   const credit = auth.role === 'invite' && body.credit === true;
   const display = auth.role === 'operator' ? 'Cube Arena' : credit ? auth.invite.name.slice(0, 32).padEnd(2, '.') : 'Invited tester';
-  const agent = harness === 'claude-code' ? 'claude' : harness === 'codex' ? 'codex' : 'api';
+  const agent = harness === 'claude-code' ? 'claude' : harness === 'codex' ? 'codex' : harness === 'cursor' ? 'cursor' : 'api';
   const suite = await createSuite(kind, { display, model: labelOf(model, effort) }, caller, {
     model: model.name,
     model_id: model.id,

@@ -49,10 +49,14 @@ a usage limit), the runner carries on after a wait; if the runner itself stops, 
 | --- | --- | --- |
 | `claude-code` | Claude | [Claude Code](https://claude.com/claude-code), signed in |
 | `codex` | GPT | [Codex](https://github.com/openai/codex), signed in once with `CODEX_HOME=~/.cube-arena/codex codex login` |
+| `cursor` | what your Cursor plan has: Claude, GPT, Gemini, Grok, Kimi, Composer… | [Cursor's CLI](https://cursor.com/cli), signed in with `cursor-agent login` (macOS or Linux) |
 | `openrouter` | almost everything | `OPENROUTER_API_KEY` |
 | `api` | anything with an OpenAI-compatible API | `--base-url`, `--api-key-env`, `--api-model` |
 
 On Windows, sign Codex in from PowerShell: `$env:CODEX_HOME="$HOME\.cube-arena\codex"; codex login; Remove-Item Env:CODEX_HOME`.
+
+With `--via cursor`, the run uses your Cursor plan's usage; the runner finds the model's Cursor id for the effort you ask for
+(`cursor-agent models` lists what your plan has).
 
 Without `--via` it picks the first that works on your machine. For example, Grok through xAI's own API:
 
@@ -67,6 +71,10 @@ XAI_API_KEY=… cube-arena-runner play --model grok-4-7 --effort high \
   - run in an empty folder;
   - the cube server is their only tool;
   - your settings, CLAUDE.md, AGENTS.md, plugins, hooks, skills and memories are not loaded (Codex gets a home of its own).
+- **Cursor:** its own tools can't be switched off, so the session's permissions block them all (shell, file reads and writes, web,
+  other MCP servers) and allow only the cube server. A blocked attempt is noted in the log; one that gets through stops the session
+  and hides the suite. Cursor's config, chats and default model live in `~/.cube-arena/cursor`, so yours are left alone. Your
+  Cursor user rules and plugins still load; keep them about code, not cubes.
 - **API mode:** the runner holds the conversation, so the model can only call the cube tools. Only the three latest pictures stay in
   the conversation, to bound cost.
 - **Model check:** the runner checks that the model that answered is the one you asked for. If anything else shows up, the session
