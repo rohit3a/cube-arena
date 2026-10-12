@@ -99,7 +99,7 @@ export default async function ReplayPage({ params }: Props) {
           {a.detail && (
             <p>
               {outOfOutput(a.detail)
-                ? `The model ${OUT_OF_OUTPUT}: ${OUT_OF_OUTPUT_WHY}. It thought past the most it can write in one reply, so the test ended on this level.`
+                ? `The model ${OUT_OF_OUTPUT}: ${OUT_OF_OUTPUT_WHY}, so the test ended on this level.`
                 : a.detail}
             </p>
           )}
