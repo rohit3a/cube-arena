@@ -52,7 +52,7 @@ export default async function Benchmark() {
               scores 100 for a solve, 0 for a miss.
             </p>
             <p>
-              The index weighs the tests: in Fast, the 2×2 ladder counts 11% and each 3×3 ladder 44.5%, since every strong model clears the
+              The index weighs the tests: in Fast, the 2×2 ladder counts 20% and each 3×3 ladder 40%, since every strong model clears the
               2×2. Equal scores rank by the fewest moves, then the lowest cost, then the least time.
             </p>
             <p>

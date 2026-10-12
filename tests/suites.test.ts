@@ -69,13 +69,13 @@ describe('suites', () => {
     const runs = new Map<number, GradedRun>([[0, ladder(2, 11, Array.from({ length: 11 }, (_, i) => i + 1))]]);
     expect(gradeSuite(SUITES.fast, runs, false).score).toBeNull();
     const done = gradeSuite(SUITES.fast, runs, true);
-    expect(done.score).toBeCloseTo(11, 5);
+    expect(done.score).toBeCloseTo(20, 5);
     expect(done.tests.map((t) => t.score)).toEqual([100, 0, 0]);
-    expect(done.tests.map((t) => t.weight)).toEqual([0.11, 0.445, 0.445]);
+    expect(done.tests.map((t) => t.weight)).toEqual([0.2, 0.4, 0.4]);
     // 2×2 cleared, 3×3 interactive level 4 of 20, one-shot level 14 of 20.
     runs.set(1, ladder(3, 4, [1, 2, 3, 4]));
     runs.set(2, ladder(3, 14, Array.from({ length: 14 }, (_, i) => i + 1)));
-    expect(gradeSuite(SUITES.fast, runs, true).score).toBeCloseTo(11 + 0.445 * 20 + 0.445 * 70, 5);
+    expect(gradeSuite(SUITES.fast, runs, true).score).toBeCloseTo(20 + 0.4 * 20 + 0.4 * 70, 5);
   });
 
   it('weighs Thorough tests equally', () => {

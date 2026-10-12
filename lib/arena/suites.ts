@@ -43,7 +43,7 @@ export const SUITES: Record<SuiteKind, SuiteDef> = {
     blurb: 'Three ladders: 2×2 and 3×3 interactive, and 3×3 one-shot. No time limit; each ends at the top level or on the third miss.',
     slots: [slot(2, 'ladder', 'interactive'), slot(3, 'ladder', 'interactive'), slot(3, 'ladder', 'one_shot')],
     // The 2×2 sorts weaker models but every strong one clears it, so it counts for less.
-    weights: { '2x2-ladder-interactive': 11, '3x3-ladder-interactive': 44.5, '3x3-ladder-one_shot': 44.5 },
+    weights: { '2x2-ladder-interactive': 20, '3x3-ladder-interactive': 40, '3x3-ladder-one_shot': 40 },
   },
   thorough: {
     kind: 'thorough',
@@ -155,5 +155,5 @@ export function gradeSuite(def: SuiteDef, runsBySlot: Map<number, GradedRun>, fi
 
 /** Told to players at the start of every suite test. */
 export const SUITE_SCORING =
-  'Suite scoring: each test scores 0-100. Ladder: the share of the ladder you climb; full scramble: whether you solve it. The suite score is the average of its tests (Fast weighs the 2×2 ladder 11%, each 3×3 ladder 44.5%). ' +
+  'Suite scoring: each test scores 0-100. Ladder: the share of the ladder you climb; full scramble: whether you solve it. The suite score is the average of its tests (Fast weighs the 2×2 ladder 20%, each 3×3 ladder 40%). ' +
   'Equal scores rank by the fewest moves (failed attempts included), then the lowest cost, then the least time. There is no time limit: take as long as you need.';
