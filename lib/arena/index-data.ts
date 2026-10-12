@@ -3,7 +3,7 @@
 // boards (board.ts): dates arrive as strings after the round trip.
 
 import { unstable_cache } from 'next/cache';
-import { catalogCost, harnessLabel } from './catalog';
+import { catalogCost, harnessLabel, topEffort } from './catalog';
 import { clientLabel } from './clients';
 import { type SuiteRow, type Usage, UUID, withDb } from './db';
 import { contributorSlug } from './invites';
@@ -40,6 +40,8 @@ export interface SuiteEntry {
   /** For model pages: the CLI id on Verified ("gpt-6-luna"), else built from the name. */
   slug: string;
   effort: string | null;
+  /** The model's top effort (catalog.ts topEffort): rankings wait for a result at it. */
+  top_effort: string | null;
   maker: string;
   color: string;
   display_name: string;
@@ -141,6 +143,7 @@ async function suiteEntriesQuery(): Promise<SuiteEntry[]> {
         model,
         slug: s.model_id ?? slugOf(model),
         effort,
+        top_effort: topEffort(s.model_id ?? slugOf(model), model),
         maker: maker.name,
         color: maker.color,
         display_name: s.display_name,

@@ -2,10 +2,12 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { BarChart } from '@/components/charts';
 import CopyButton from '@/components/CopyButton';
+import WaitingNote from '@/components/WaitingNote';
 import { PersonName } from '@/components/People';
 import { type CodeEntry, codeBoard, sweepCode } from '@/lib/arena/code';
 import { CODE } from '@/lib/arena/code-rules';
 import { fmtCost, fmtDuration, fmtMs, fmtScore } from '@/lib/arena/format';
+import { fullEffort } from '@/lib/arena/ranking';
 import { RUNNER_INSTALL } from '@/lib/site';
 
 export const dynamic = 'force-dynamic';
@@ -22,7 +24,10 @@ function RunBy({ e }: { e: CodeEntry }) {
 
 export default async function CodeBoardPage() {
   await sweepCode().catch(() => {});
-  const { graded, pending } = await codeBoard();
+  const board = await codeBoard();
+  // A model counts once it has a solver from its top effort.
+  const { ranked: graded, waiting } = fullEffort(board.graded);
+  const { pending } = board;
   const best = graded[0] ?? null;
   const max = Math.max(125, Math.ceil((Math.max(0, ...graded.map((e) => e.score ?? 0)) * 1.1) / 25) * 25);
   const command = `${RUNNER_INSTALL}\ncube-arena-runner login AB12-CD34\ncube-arena-runner code --model claude-opus-5-5 --effort max`;
@@ -74,6 +79,7 @@ export default async function CodeBoardPage() {
           reference={{ value: 100, label: `100 = ${CODE.reference} moves, the scramble's length` }}
           empty="No solver has been graded yet."
         />
+        <WaitingNote waiting={waiting} />
       </section>
 
       {graded.length > 0 && (

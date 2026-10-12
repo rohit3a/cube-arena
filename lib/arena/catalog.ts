@@ -30,6 +30,11 @@ export const CATALOG_BUILT = data.built;
 const byId = new Map(CATALOG.map((m) => [m.id, m]));
 export const catalogModel = (id: string) => byId.get(id) ?? null;
 
+const byName = new Map(CATALOG.map((m) => [m.name.toLowerCase(), m]));
+
+/** A model's top effort, found by id or else by name; null when it has no effort setting or isn't in the catalog. */
+export const topEffort = (id: string, name: string): string | null => (byId.get(id) ?? byName.get(name.toLowerCase()))?.efforts.at(-1) ?? null;
+
 /**
  * What tokens cost at the model's list price, for harnesses that count tokens
  * but not dollars (Codex). input_tokens includes the cached ones, as Codex

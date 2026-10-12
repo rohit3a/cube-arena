@@ -19,6 +19,7 @@ const entry = (o: Partial<SuiteEntry> & { at: string }): SuiteEntry => {
     model: 'M',
     slug: 'gpt-6-luna',
     effort: 'max',
+    top_effort: 'max',
     maker: 'OpenAI',
     color: '#000',
     display_name: 'x',

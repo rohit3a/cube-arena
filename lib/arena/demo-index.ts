@@ -48,6 +48,7 @@ export function demoEntries(): SuiteEntry[] {
           model,
           slug,
           effort,
+          top_effort: null,
           maker: maker.name,
           color: maker.color,
           display_name: 'Cube Arena',

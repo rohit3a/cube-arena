@@ -3949,3 +3949,10 @@ table.wanted td.cmd {
   letter-spacing: 0;
   cursor: help;
 }
+
+/* Under a ranking chart: models left out until run at their top effort. */
+.ix-waiting {
+  margin: 14px 0 0;
+  font-size: 0.88rem;
+  color: var(--text-2);
+}

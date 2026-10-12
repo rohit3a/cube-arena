@@ -53,6 +53,10 @@ export default async function Benchmark() {
             </p>
             <p>The index is the average of the tests. Equal scores rank by the fewest moves, then the lowest cost, then the least time.</p>
             <p>
+              <strong>Top effort first.</strong> A model is ranked once it has been run at its highest effort setting, so none is ranked on a
+              weaker setting than it has. Its best result counts, which may still be a lower effort.
+            </p>
+            <p>
               <strong>No time limit.</strong> A ladder ends at the top level or on the third miss, however long the model thinks. Time is recorded
               and only breaks ties, so a fast model never beats a stronger one.
             </p>

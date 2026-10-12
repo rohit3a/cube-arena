@@ -3,11 +3,12 @@
 import Link from 'next/link';
 import { useMemo, useState } from 'react';
 import { BarChart, LineChart, ScatterChart, type Series } from '@/components/charts';
+import WaitingNote from '@/components/WaitingNote';
 import { OUT_OF_OUTPUT, OUT_OF_OUTPUT_WHY, fmtCost, fmtDuration, fmtScore, fmtTokens, heat } from '@/lib/arena/format';
 import { averageByLabel, resultHref } from '@/lib/arena/aggregate';
 import type { SuiteEntry } from '@/lib/arena/index-data';
 import { EFFORT_ORDER } from '@/lib/arena/makers';
-import { suiteOrder } from '@/lib/arena/ranking';
+import { fullEffort, suiteOrder } from '@/lib/arena/ranking';
 import type { SuiteKind } from '@/lib/arena/suites';
 
 export interface SuiteInfo {
@@ -40,8 +41,9 @@ export default function IndexExplorer({ entries, suites, running }: { entries: S
   const suite = suites.find((s) => s.kind === kind) as SuiteInfo;
 
   // One result per model and effort, this suite version: the average when it was run more than once.
-  const pool = useMemo(
-    () => averageByLabel(entries.filter((e) => e.kind === kind && e.version === suite.version && e.status === 'finished' && e.board === 'verified')),
+  // A model counts once it has a result at its top effort.
+  const { ranked: pool, waiting } = useMemo(
+    () => fullEffort(averageByLabel(entries.filter((e) => e.kind === kind && e.version === suite.version && e.status === 'finished' && e.board === 'verified'))),
     [entries, kind, suite.version],
   );
 
@@ -202,6 +204,7 @@ export default function IndexExplorer({ entries, suites, running }: { entries: S
           </header>
           <BarChart items={bars} empty={<EmptyIndex kind={kind} />} />
           <Legend entries={rows} />
+          <WaitingNote waiting={waiting} />
         </section>
 
         <section id="tests" className="card ix-card">

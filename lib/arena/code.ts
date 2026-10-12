@@ -11,7 +11,7 @@ import { createHash } from 'node:crypto';
 import { gunzipSync } from 'node:zlib';
 import { unstable_cache } from 'next/cache';
 import type { Auth } from './auth';
-import { type Harness, HARNESSES, catalogCost, catalogModel, harnessLabel, labelOf, listCost } from './catalog';
+import { type Harness, HARNESSES, catalogCost, catalogModel, harnessLabel, labelOf, listCost, topEffort } from './catalog';
 import { type Usage, UUID, transaction, withDb } from './db';
 import { contributorSlug } from './invites';
 import { estimateCost, makerOf, slugOf } from './makers';
@@ -283,6 +283,8 @@ export interface CodeEntry {
   model: string;
   slug: string;
   effort: string | null;
+  /** The model's top effort (catalog.ts topEffort): the ranking waits for a result at it. */
+  top_effort: string | null;
   maker: string;
   color: string;
   status: CodeStatus;
@@ -324,6 +326,7 @@ async function codeEntriesQuery(): Promise<CodeEntry[]> {
       model,
       slug: s.model_id ?? slugOf(model),
       effort: s.effort,
+      top_effort: topEffort(s.model_id ?? slugOf(model), model),
       maker: maker.name,
       color: maker.color,
       status: s.status,
