@@ -101,3 +101,17 @@ export function cursorSlug(base, effort, list) {
 
 /** Model names compared loosely: Cursor pads some with double spaces. */
 export const sameModelName = (a, b) => String(a ?? '').toLowerCase().replace(/[^a-z0-9.]+/g, ' ').trim() === String(b ?? '').toLowerCase().replace(/[^a-z0-9.]+/g, ' ').trim();
+
+const EFFORT_NAMES = { none: 'None', minimal: 'Minimal', low: 'Low', medium: 'Medium', high: 'High', xhigh: 'Extra High', max: 'Max' };
+
+/**
+ * Is the model a Cursor session started the one from the list? The list leaves
+ * the effort off a model's default ("cursor-grok-4.5-high - Grok 4.5") while the
+ * session names it ("Grok 4.5 High"), so the effort asked for may be on either
+ * side. Any other difference is another model.
+ */
+export function sameCursorModel(started, listed, effort) {
+  if (sameModelName(started, listed)) return true;
+  const word = EFFORT_NAMES[effort];
+  return !!word && (sameModelName(started, `${listed} ${word}`) || sameModelName(`${started} ${word}`, listed));
+}

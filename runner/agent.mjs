@@ -26,7 +26,7 @@ import { join, resolve, sep } from 'node:path';
 import { gzipSync } from 'node:zlib';
 import { takeCodexSession } from './codex-session.mjs';
 import { commandFor } from './command.mjs';
-import { sameModelName } from './cursor.mjs';
+import { sameCursorModel } from './cursor.mjs';
 import { playApiSession } from './harness-api.mjs';
 import { SYSTEM } from './system.mjs';
 
@@ -370,7 +370,7 @@ function playCli(s) {
     return p === work || p.startsWith(work + sep);
   };
   function onCursor(ev) {
-    if (ev.type === 'system' && ev.subtype === 'init' && s.modelName && !sameModelName(ev.model, s.modelName)) {
+    if (ev.type === 'system' && ev.subtype === 'init' && s.modelName && !sameCursorModel(ev.model, s.modelName, s.effort)) {
       lockdown(`asked for ${s.modelName}, Cursor started ${ev.model}`);
     }
     if (ev.type === 'thinking' && ev.subtype === 'delta' && ev.text) thought += ev.text;

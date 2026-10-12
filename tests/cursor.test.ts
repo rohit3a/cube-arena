@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { cursorSlug, parseModels, parseSlug, sameModelName } from '../runner/cursor.mjs';
+import { cursorSlug, parseModels, parseSlug, sameCursorModel, sameModelName } from '../runner/cursor.mjs';
 
 // Lines as `cursor-agent models` prints them (2026.08 CLI).
 const LISTING = `Available models
@@ -56,5 +56,14 @@ describe('Cursor model ids', () => {
   it('compares model names loosely', () => {
     expect(sameModelName('Claude Haiku 5.5  High', 'Claude Haiku 5.5 High')).toBe(true);
     expect(sameModelName('Composer 2.5', 'Gemini 3.8 Flash Low')).toBe(false);
+  });
+
+  it('accepts a session that names the effort the list left off, and nothing else', () => {
+    expect(sameCursorModel('Grok 4.5 High', 'Grok 4.5', 'high')).toBe(true);
+    expect(sameCursorModel('Grok 4.6', 'Grok 4.6 Extra High', 'xhigh')).toBe(true);
+    expect(sameCursorModel('Grok 4.5 Low', 'Grok 4.5', 'high')).toBe(false);
+    expect(sameCursorModel('Grok 4.7 High', 'Grok 4.5', 'high')).toBe(false);
+    expect(sameCursorModel('Composer 2.5', 'Composer 2.5', null)).toBe(true);
+    expect(sameCursorModel('Composer 2.5 High', 'Composer 2.5', null)).toBe(false);
   });
 });
