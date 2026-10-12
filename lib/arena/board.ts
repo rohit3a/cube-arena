@@ -231,7 +231,7 @@ export interface Replay {
   run: RunRow;
   events: Pick<EventRow, 'kind' | 'move_count' | 'solved' | 'at' | 'error' | 'moves'>[];
   /** Other attempts in the same run, for navigation. */
-  siblings: Pick<AttemptRow, 'id' | 'seq' | 'level' | 'status'>[];
+  siblings: Pick<AttemptRow, 'id' | 'seq' | 'level' | 'status' | 'detail'>[];
 }
 
 async function replayQuery(id: string): Promise<Replay | null> {
@@ -245,7 +245,7 @@ async function replayQuery(id: string): Promise<Replay | null> {
       select kind, move_count, solved, at, error, moves from cube_arena.events
       where attempt_id = ${id} and kind <> 'look' order by id`;
     const siblings = await sql<Replay['siblings']>`
-      select id, seq, level, status from cube_arena.attempts where run_id = ${run.id} order by seq`;
+      select id, seq, level, status, detail from cube_arena.attempts where run_id = ${run.id} order by seq`;
     return { attempt, run, events, siblings };
   });
 }

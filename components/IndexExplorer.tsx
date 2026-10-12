@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useMemo, useState } from 'react';
 import { BarChart, LineChart, ScatterChart, type Series } from '@/components/charts';
-import { fmtCost, fmtDuration, fmtScore, fmtTokens, heat } from '@/lib/arena/format';
+import { OUT_OF_OUTPUT, OUT_OF_OUTPUT_WHY, fmtCost, fmtDuration, fmtScore, fmtTokens, heat } from '@/lib/arena/format';
 import { averageByLabel, resultHref } from '@/lib/arena/aggregate';
 import type { SuiteEntry } from '@/lib/arena/index-data';
 import { EFFORT_ORDER } from '@/lib/arena/makers';
@@ -239,10 +239,16 @@ export default function IndexExplorer({ entries, suites, running }: { entries: S
                       </td>
                       <td className="num strong">{fmtScore(e.score)}</td>
                       {suite.tests.map((t) => {
-                        const s = e.tests.find((x) => x.test === t.test)?.score ?? null;
+                        const g = e.tests.find((x) => x.test === t.test);
+                        const s = g?.score ?? null;
                         return (
                           <td key={t.test} className={`num heat-cell ${heat(s)}`}>
                             {fmtScore(s)}
+                            {g?.out_of_output && (
+                              <sup className="oo-mark" title={`${OUT_OF_OUTPUT}: ${OUT_OF_OUTPUT_WHY}`}>
+                                †
+                              </sup>
+                            )}
                           </td>
                         );
                       })}
@@ -251,6 +257,12 @@ export default function IndexExplorer({ entries, suites, running }: { entries: S
                 </tbody>
               </table>
             </div>
+          )}
+          {rows.some((e) => e.out_of_output > 0) && (
+            <p className="ix-foot">
+              † Ran out of output: {OUT_OF_OUTPUT_WHY}, so the test ended on that level. It keeps the levels it had cleared.{' '}
+              <Link href="/benchmark#method">Why</Link>
+            </p>
           )}
         </section>
 
@@ -284,7 +296,10 @@ export default function IndexExplorer({ entries, suites, running }: { entries: S
         <section id="effort" className="card ix-card">
           <header className="ix-head">
             <h2>Does more effort help?</h2>
-            <p>The same model at each reasoning effort, low to max. A flat line means thinking longer doesn&apos;t help it see the cube.</p>
+            <p>
+              The same model at each reasoning effort, low to max. A flat line means thinking longer doesn&apos;t help it see the cube; a drop at the
+              top often means the model thought past its output limit and never answered († in Score by test).
+            </p>
           </header>
           <LineChart series={series} xs={EFFORT_ORDER} empty="Effort curves appear once a model has been run at two or more efforts." />
         </section>
@@ -326,6 +341,14 @@ export default function IndexExplorer({ entries, suites, running }: { entries: S
                           <i className="swatch" style={{ background: e.color }} />
                           {e.label}
                         </Link>
+                        {e.out_of_output > 0 && (
+                          <span
+                            className="tag tag-oo"
+                            title={`${e.out_of_output} test${e.out_of_output > 1 ? 's' : ''} ended because ${OUT_OF_OUTPUT_WHY}`}
+                          >
+                            {OUT_OF_OUTPUT}
+                          </span>
+                        )}
                       </td>
                       <td className="muted">{e.maker}</td>
                       <td className="num strong">

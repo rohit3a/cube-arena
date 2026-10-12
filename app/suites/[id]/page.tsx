@@ -2,7 +2,7 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { PersonName } from '@/components/People';
-import { fmtCost, fmtDuration, fmtScore, fmtTokens, heat } from '@/lib/arena/format';
+import { OUT_OF_OUTPUT, OUT_OF_OUTPUT_WHY, fmtCost, fmtDuration, fmtScore, fmtTokens, heat } from '@/lib/arena/format';
 import { suiteEntry, testNames } from '@/lib/arena/index-data';
 import { CHALLENGE_LABEL, LADDER_MAX_LEVEL, MODE_LABEL } from '@/lib/arena/rules';
 import { SUITES } from '@/lib/arena/suites';
@@ -120,7 +120,20 @@ export default async function SuitePage(props: { params: Promise<{ id: string }>
                           )}
                           {' · '}
                           {r.moves} moves · {fmtDuration(r.secs)}
-                          {r.status === 'active' ? ' · playing now' : r.end_reason ? ` · ${END[r.end_reason] ?? r.end_reason}` : ''}
+                          {r.status === 'active' ? (
+                            ' · playing now'
+                          ) : r.out_of_output !== null ? (
+                            <>
+                              {' · '}
+                              <span className="tag tag-oo" title={`The test ended because ${OUT_OF_OUTPUT_WHY}. It keeps the levels it had cleared.`}>
+                                {OUT_OF_OUTPUT} on level {r.out_of_output}
+                              </span>
+                            </>
+                          ) : r.end_reason ? (
+                            ` · ${END[r.end_reason] ?? r.end_reason}`
+                          ) : (
+                            ''
+                          )}
                           {r.replay && (
                             <>
                               {' · '}

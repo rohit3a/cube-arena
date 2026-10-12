@@ -24,3 +24,12 @@ export function heat(v: number | null): string {
   if (v > 0) return 'heat-1';
   return 'heat-0';
 }
+
+/**
+ * The runner's reason when one reply ran past the model's output limit (it
+ * thought past the most it can write at once and never answered). That ends
+ * the test as given up; the pages say what actually happened.
+ */
+export const outOfOutput = (detail: string | null | undefined) => !!detail && /output token limit/i.test(detail);
+export const OUT_OF_OUTPUT = 'ran out of output';
+export const OUT_OF_OUTPUT_WHY = "one reply hit the model's output limit before it answered";

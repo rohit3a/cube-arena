@@ -24,6 +24,8 @@ export interface SuiteRunInfo {
   /** The attempt to show for this run: its best solve, else its last try. */
   replay: string | null;
   via: string;
+  /** The level it ran out of output on (format.ts outOfOutput), when that's how it ended. */
+  out_of_output: number | null;
 }
 
 export interface SuiteEntry {
@@ -46,7 +48,10 @@ export interface SuiteEntry {
   finished_at: string | null;
   /** 0-100; null while unfinished. */
   score: number | null;
-  tests: { test: string; score: number | null; played: number; cubes: number }[];
+  /** out_of_output: a reply hit the model's output limit before it answered, which ended this test. */
+  tests: { test: string; score: number | null; played: number; cubes: number; out_of_output: boolean }[];
+  /** Tests that ended because a reply hit the model's output limit. */
+  out_of_output: number;
   moves: number;
   /** Cubes solved, and moves per solved cube (null with none). */
   solved: number;
@@ -85,13 +90,15 @@ async function suiteEntriesQuery(): Promise<SuiteEntry[]> {
           select json_agg(json_build_object(
             'slot', r.suite_slot, 'run_id', r.id, 'status', r.status, 'end_reason', r.end_reason,
             'best_level', r.best_level, 'solves', r.solves, 'usage', r.usage, 'client', r.client,
-            'moves', coalesce(a.moves, 0), 'secs', coalesce(a.secs, 0), 'replay', a.replay
+            'moves', coalesce(a.moves, 0), 'secs', coalesce(a.secs, 0), 'replay', a.replay, 'out_of_output', a.out_of_output
           ) order by r.suite_slot)
           from cube_arena.runs r
           left join lateral (
             select sum(x.move_count)::int as moves,
                    extract(epoch from (max(coalesce(x.finished_at, now())) - min(x.created_at)))::int as secs,
-                   (array_agg(x.id order by (x.status = 'solved') desc, x.level desc nulls last, x.seq desc))[1] as replay
+                   (array_agg(x.id order by (x.status = 'solved') desc, x.level desc nulls last, x.seq desc))[1] as replay,
+                   -- the runner's reason for a reply over the output limit (format.ts outOfOutput)
+                   max(x.level) filter (where x.status = 'gave_up' and x.detail ilike '%output token limit%') as out_of_output
             from cube_arena.attempts x where x.run_id = r.id
           ) a on true
           where r.suite_id = s.id
@@ -124,6 +131,7 @@ async function suiteEntriesQuery(): Promise<SuiteEntry[]> {
       }
       const solved = s.runs.reduce((a, r) => a + r.solves, 0);
       const moves = s.runs.reduce((a, r) => a + r.moves, 0);
+      const ranOut = new Set(s.runs.filter((r) => r.out_of_output !== null).map((r) => SUITES[s.kind].slots[r.slot]?.test));
       return {
         id: s.id,
         kind: s.kind,
@@ -140,7 +148,8 @@ async function suiteEntriesQuery(): Promise<SuiteEntry[]> {
         created_at: new Date(s.created_at).toISOString(),
         finished_at: s.finished_at ? new Date(s.finished_at).toISOString() : null,
         score: s.status === 'finished' ? (grade?.score ?? 0) : null,
-        tests: (grade?.tests ?? []).map((t) => ({ test: t.test, score: t.score, played: t.played, cubes: t.cubes })),
+        tests: (grade?.tests ?? []).map((t) => ({ test: t.test, score: t.score, played: t.played, cubes: t.cubes, out_of_output: ranOut.has(t.test) })),
+        out_of_output: s.runs.filter((r) => r.out_of_output !== null).length,
         moves,
         solved,
         moves_per_solve: solved > 0 ? moves / solved : null,

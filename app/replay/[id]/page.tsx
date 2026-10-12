@@ -6,6 +6,7 @@ import ReplayPlayer, { type Checkpoint } from '@/components/ReplayPlayer';
 import { replay } from '@/lib/arena/board';
 import { clientLabel } from '@/lib/arena/clients';
 import { CHALLENGE_LABEL, MODE_LABEL, TOOL_USE_LABEL } from '@/lib/arena/rules';
+import { OUT_OF_OUTPUT, OUT_OF_OUTPUT_WHY, outOfOutput } from '@/lib/arena/format';
 
 export const dynamic = 'force-dynamic';
 
@@ -92,10 +93,16 @@ export default async function ReplayPage({ params }: Props) {
         <div className={`result ${a.status === 'solved' ? 'solved' : active ? '' : 'failed'}`}>
           <span className="result-word">
             <MiniFace n={a.size} solved={a.status === 'solved'} seed={a.id} />
-            {RESULT[a.status] ?? a.status}
+            {outOfOutput(a.detail) ? 'Out of output' : (RESULT[a.status] ?? a.status)}
           </span>
           <h2>{headline(r)}</h2>
-          {a.detail && <p>{a.detail}</p>}
+          {a.detail && (
+            <p>
+              {outOfOutput(a.detail)
+                ? `The model ${OUT_OF_OUTPUT}: ${OUT_OF_OUTPUT_WHY}. It thought past the most it can write in one reply, so the test ended on this level.`
+                : a.detail}
+            </p>
+          )}
         </div>
 
         <dl className="facts">
@@ -169,7 +176,9 @@ export default async function ReplayPage({ params }: Props) {
           <div style={{ marginTop: 20 }}>
             <h3>This run</h3>
             <p className="faint" style={{ fontSize: '0.88rem' }}>
-              {run.challenge === 'ladder' ? `Best level ${run.best_level}` : ''} {run.status === 'finished' ? `· ended: ${run.end_reason?.replace(/_/g, ' ')}` : '· still going'}
+              {run.challenge === 'ladder' ? `Best level ${run.best_level}` : ''} {run.status === 'finished'
+                ? `· ended: ${siblings.some((x) => outOfOutput(x.detail)) ? OUT_OF_OUTPUT : run.end_reason?.replace(/_/g, ' ')}`
+                : '· still going'}
             </p>
             <div className="sibs">
               {siblings.map((s) => (

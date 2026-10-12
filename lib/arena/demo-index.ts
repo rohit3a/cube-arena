@@ -35,7 +35,7 @@ export function demoEntries(): SuiteEntry[] {
         if (kind === 'thorough' && effort !== 'max') continue;
         n += 1;
         const score = Math.max(0, top * (kind === 'thorough' ? 0.55 : 1) * (0.55 + 0.45 * (i / 4)) + ((n * 7) % 5) - 2);
-        const tests = suiteTests(SUITES[kind]).map((t, j) => ({ test: t.test, score: Math.max(0, Math.min(100, score * (1.6 - j * 0.35))), played: t.slots.length, cubes: t.slots.length }));
+        const tests = suiteTests(SUITES[kind]).map((t, j) => ({ test: t.test, score: Math.max(0, Math.min(100, score * (1.6 - j * 0.35))), played: t.slots.length, cubes: t.slots.length, out_of_output: false }));
         const maker = makerOf(model);
         const solved = Math.round(score / 4);
         const moves = solved * (8 + ((n * 13) % 9));
@@ -65,6 +65,7 @@ export function demoEntries(): SuiteEntry[] {
           cost_usd: (slug.includes('opus') || slug.includes('astra') ? 0.9 : slug.includes('luna') || slug.includes('haiku') ? 0.03 : 0.25) * (i + 1),
           cost_estimated: slug.startsWith('gpt'),
           runs: [],
+          out_of_output: 0,
           progress: { started: tests.length, of: tests.length },
           n: 1,
           ids: [`00000000-0000-4000-8000-${String(n).padStart(12, '0')}`],

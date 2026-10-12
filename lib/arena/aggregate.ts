@@ -22,8 +22,9 @@ export function averageByLabel(entries: SuiteEntry[]): SuiteEntry[] {
       score: mean(es.map((e) => e.score ?? 0)),
       tests: latest.tests.map((t) => {
         const scores = es.map((e) => e.tests.find((x) => x.test === t.test)?.score ?? null).filter((s): s is number => s !== null);
-        return { ...t, score: scores.length ? mean(scores) : null };
+        return { ...t, score: scores.length ? mean(scores) : null, out_of_output: es.some((e) => e.tests.find((x) => x.test === t.test)?.out_of_output) };
       }),
+      out_of_output: es.reduce((a, e) => a + e.out_of_output, 0),
       moves: Math.round(moves / es.length),
       solved: Math.round((solved / es.length) * 10) / 10,
       moves_per_solve: solved > 0 ? moves / solved : null,

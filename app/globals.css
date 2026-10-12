@@ -3893,3 +3893,19 @@ table.wanted td.cmd {
   margin-top: 12px;
   font-size: 0.88rem;
 }
+
+/* A test that ended because one reply hit the model's output limit. */
+.oo-mark {
+  margin-left: 2px;
+  font-weight: 800;
+  cursor: help;
+}
+
+.tag-oo {
+  margin-left: 8px;
+  vertical-align: middle;
+  background: var(--orange-t);
+  text-transform: none;
+  letter-spacing: 0;
+  cursor: help;
+}

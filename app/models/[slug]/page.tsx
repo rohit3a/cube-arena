@@ -2,7 +2,7 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { BarChart } from '@/components/charts';
-import { fmtCost, fmtDuration, fmtScore, fmtTokens, heat } from '@/lib/arena/format';
+import { OUT_OF_OUTPUT, OUT_OF_OUTPUT_WHY, fmtCost, fmtDuration, fmtScore, fmtTokens, heat } from '@/lib/arena/format';
 import { averageByLabel, resultHref } from '@/lib/arena/aggregate';
 import { type CatalogModel, catalogModel, harnessLabel } from '@/lib/arena/catalog';
 import { type SuiteEntry, suiteEntries, testNames } from '@/lib/arena/index-data';
@@ -115,10 +115,16 @@ export default async function ModelPage(props: { params: Promise<{ slug: string 
                       </td>
                       <td className="num strong">{fmtScore(e.score)}</td>
                       {tests.map((t) => {
-                        const s = e.tests.find((x) => x.test === t.test)?.score ?? null;
+                        const g = e.tests.find((x) => x.test === t.test);
+                        const s = g?.score ?? null;
                         return (
                           <td key={t.test} className={`num heat-cell ${heat(s)}`}>
                             {fmtScore(s)}
+                            {g?.out_of_output && (
+                              <sup className="oo-mark" title={`${OUT_OF_OUTPUT}: ${OUT_OF_OUTPUT_WHY}`}>
+                                †
+                              </sup>
+                            )}
                           </td>
                         );
                       })}
@@ -132,6 +138,12 @@ export default async function ModelPage(props: { params: Promise<{ slug: string 
                 </tbody>
               </table>
             </div>
+            {rows.some((e) => e.out_of_output > 0) && (
+              <p className="ix-foot">
+                † Ran out of output: {OUT_OF_OUTPUT_WHY}, so the test ended on that level. It keeps the levels it had cleared.{' '}
+                <Link href="/benchmark#method">Why</Link>
+              </p>
+            )}
             <details id={`${k}-runs`} className="runs-list" open={all.length > rows.length}>
               <summary>
                 Every run ({all.length})

@@ -56,6 +56,13 @@ export default async function Benchmark() {
               <strong>No time limit.</strong> A ladder ends at the top level or on the third miss, however long the model thinks. Time is recorded
               and only breaks ties, so a fast model never beats a stronger one.
             </p>
+            <p>
+              <strong>Thinking too long still counts.</strong> Each reply has the model&apos;s own output limit (128,000 tokens for Claude
+              Opus 5.5), and nothing we set changes it. A model that spends a whole reply thinking and never answers ends that test where it
+              stood, marked <em>ran out of output</em> (†): it keeps the levels it cleared and gets nothing for the one it never answered. This
+              hits the highest effort settings hardest, so a lower effort can score higher. We never retry it: that would be an extra attempt
+              no other model gets.
+            </p>
           </div>
           <div className="card">
             <h3>Fair runs</h3>
