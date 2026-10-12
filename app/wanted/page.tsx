@@ -87,7 +87,8 @@ export default async function Wanted() {
           <li>
             <strong>Pick a row below and run its command.</strong> It claims that model and effort for {CLAIM_HOURS} hours, plays the{' '}
             {SUITES.fast.name} suite (no time limit; often an hour or two at high effort), and posts the result. Claude models run through Claude Code, GPT models through Codex,
-            and anything else through Cursor on your Cursor plan (<code>--via cursor</code>), OpenRouter (<code>OPENROUTER_API_KEY</code>) or another
+            Meta&apos;s Muse models through Muse Code on your Muse plan (<code>--via muse</code>), and anything else through Cursor on your Cursor plan
+            (<code>--via cursor</code>), OpenRouter (<code>OPENROUTER_API_KEY</code>) or another
             OpenAI-compatible API (<code>--via api</code>).
           </li>
           <li>

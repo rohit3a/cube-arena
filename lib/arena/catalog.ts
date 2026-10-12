@@ -5,8 +5,8 @@
 
 import data from '../../data/catalog.json';
 
-export type Harness = 'claude-code' | 'codex' | 'cursor' | 'openrouter';
-export const HARNESSES: Harness[] = ['claude-code', 'codex', 'cursor', 'openrouter'];
+export type Harness = 'claude-code' | 'codex' | 'cursor' | 'muse' | 'openrouter';
+export const HARNESSES: Harness[] = ['claude-code', 'codex', 'cursor', 'muse', 'openrouter'];
 
 export interface CatalogModel {
   id: string;
@@ -19,7 +19,7 @@ export interface CatalogModel {
   efforts: string[];
   /** The model's id in each harness that can run it (for Cursor, without the effort: the runner adds it). */
   via: Partial<Record<Harness, string>>;
-  /** USD per million tokens on OpenRouter. */
+  /** USD per million tokens on OpenRouter (Meta's API price for a model only Muse Code has). */
   price: { input: number | null; output: number | null; cached?: number | null } | null;
   aa: string | null;
 }
@@ -56,6 +56,7 @@ export function harnessLabel(harness: string | null): string | null {
   if (harness === 'claude' || harness === 'claude-code') return 'Claude Code';
   if (harness === 'codex') return 'Codex';
   if (harness === 'cursor') return 'Cursor';
+  if (harness === 'muse') return 'Muse Code';
   if (harness === 'openrouter') return 'OpenRouter';
   return harness.replace(/^api:/, '');
 }

@@ -22,11 +22,11 @@ import { commandFor } from './command.mjs';
 import { cursorBin, cursorModels, cursorSignedIn, cursorSlug } from './cursor.mjs';
 import { playSuite } from './play-suite.mjs';
 
-const VERSION = '0.4.3';
+const VERSION = '0.4.4';
 const DEFAULT_URL = 'https://cube.krnl.studio/mcp';
 const HOME = process.env.CUBE_ARENA_HOME || join(homedir(), '.cube-arena');
 const CONFIG = join(HOME, 'config.json');
-const VIA = ['claude-code', 'codex', 'cursor', 'openrouter', 'api'];
+const VIA = ['claude-code', 'codex', 'cursor', 'muse', 'openrouter', 'api'];
 
 const HELP = `cube-arena-runner ${VERSION}: run Cube Arena Index suites for the Verified board.
 
@@ -42,7 +42,7 @@ const HELP = `cube-arena-runner ${VERSION}: run Cube Arena Index suites for the 
 play options:
   --effort <level>         low, medium, high, xhigh or max (what the model takes; see wanted)
   --suite fast|thorough    default fast (three ladders); thorough is every test (many hours)
-  --via <how>              claude-code, codex, cursor, openrouter or api (default: the first you have)
+  --via <how>              claude-code, codex, cursor, muse, openrouter or api (default: the first you have)
   --base-url <url>         with --via api: an OpenAI-compatible endpoint, e.g. https://api.x.ai/v1
   --api-key-env <NAME>     with --via api: the environment variable holding its key
   --api-model <id>         with --via api: the model's id on that endpoint
@@ -279,6 +279,12 @@ async function play() {
     session = { agent: 'codex', model: model.via.codex, effort, codexHome: codexHomeFor() };
   } else if (via === 'cursor') {
     session = cursorSession(model, effort);
+  } else if (via === 'muse') {
+    if (!model.via.muse) fail(`${model.name} isn't in Muse Code.`);
+    if (!has('muse')) fail("Muse Code (Meta's CLI) is not installed.");
+    const billed = process.env.META_API_KEY ? 'META_API_KEY, billed per token' : 'your Muse Code plan (muse login)';
+    console.log(`Muse Code model ${model.via.muse}, contributor mode off. It runs on ${billed}.`);
+    session = { agent: 'muse', model: model.via.muse, effort };
   } else if (via === 'openrouter') {
     if (!model.via.openrouter) fail(`${model.name} isn't on OpenRouter; try --via api with the provider's endpoint.`);
     const apiKey = process.env.OPENROUTER_API_KEY;
@@ -424,6 +430,7 @@ function pickVia(model) {
   if (model.via['claude-code'] && has('claude')) return 'claude-code';
   if (model.via.codex && has('codex')) return 'codex';
   if (model.via.cursor && process.platform !== 'win32' && cursorBin()) return 'cursor';
+  if (model.via.muse && has('muse')) return 'muse';
   if (model.via.openrouter && process.env.OPENROUTER_API_KEY) return 'openrouter';
   const ways = Object.keys(model.via).join(', ');
   return fail(`No way to reach ${model.name} here. It runs via ${ways}: install that CLI, or set OPENROUTER_API_KEY, or use --via api.`);

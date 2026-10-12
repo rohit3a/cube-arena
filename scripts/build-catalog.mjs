@@ -6,10 +6,13 @@
 //
 // Sources: data/aa-models.json (Artificial Analysis's model list, refreshed by
 // hand), OpenRouter's public model list (fetched), the Claude Code and Codex
-// model ids in runner/models.mjs, and Cursor's model list in
-// data/cursor-models.txt (refreshed by hand: cursor-agent models > data/cursor-models.txt).
+// model ids in runner/models.mjs, Cursor's model list in
+// data/cursor-models.txt (refreshed by hand: cursor-agent models > data/cursor-models.txt),
+// and the Muse Code ids below (checked by hand against Muse Code's model list).
 //
-//   node scripts/build-catalog.mjs --cursor-only   just redo the Cursor ids in the current catalog A model is in the catalog when it can
+//   node scripts/build-catalog.mjs --cursor-only   just redo the Cursor and Muse Code ids in the current catalog
+//
+// A model is in the catalog when it can
 // read images and call tools somewhere we can run it. "wanted" marks the ones
 // Artificial Analysis lists as current: those are what we ask people to run.
 
@@ -26,6 +29,27 @@ const order = (a, b) => Number(b.wanted) - Number(a.wanted) || (b.released ?? ''
 
 // Models only Cursor has, by their Cursor id.
 const CURSOR_ONLY = { 'composer-2.5': { id: 'composer-2-5', name: 'Composer 2.5', maker: 'Cursor' } };
+
+// Meta's models in Muse Code: its id for each catalog model, and the models
+// only Muse Code has so far (priced at Meta's API list price).
+const MUSE = { 'muse-spark-1-3': 'muse-spark-1.3', 'muse-spark-1-2': 'muse-spark-1.2' };
+const MUSE_ONLY = {
+  'muse-wonder-1.0': { id: 'muse-wonder', name: 'Muse Wonder', maker: 'Meta', released: '2026-10-12', efforts: ['low', 'medium', 'high', 'xhigh', 'max'], price: { input: 4, output: 20, cached: 0.2 } },
+};
+
+/** Adds via.muse: a model's Muse Code id. */
+function withMuse(models) {
+  for (const m of models) {
+    delete m.via.muse;
+    if (MUSE[m.id]) m.via.muse = MUSE[m.id];
+  }
+  for (const [museId, extra] of Object.entries(MUSE_ONLY)) {
+    const known = models.find((m) => m.id === extra.id);
+    if (known) known.via.muse = museId;
+    else models.push({ id: extra.id, name: extra.name, maker: extra.maker, released: extra.released, wanted: true, efforts: extra.efforts, via: { muse: museId }, price: extra.price, aa: null });
+  }
+  return models.sort(order);
+}
 
 /**
  * Adds via.cursor: a model's Cursor id without its effort ("gpt-5.6-terra"),
@@ -53,7 +77,7 @@ function withCursor(models) {
 
 if (process.argv.includes('--cursor-only')) {
   const catalog = JSON.parse(readFileSync(CATALOG, 'utf8'));
-  const models = withCursor(catalog.models);
+  const models = withMuse(withCursor(catalog.models));
   writeFileSync(CATALOG, `${JSON.stringify({ ...catalog, models }, null, 1)}\n`);
   console.log(`${models.filter((m) => m.via.cursor).length} of ${models.length} models reachable in Cursor`);
   for (const m of models.filter((x) => x.wanted && x.via.cursor)) console.log(`  ${m.id.padEnd(28)} ${m.via.cursor}`);
@@ -149,7 +173,7 @@ for (const id of SWEEP_MODELS) {
   });
 }
 
-const models = withCursor([...entries.values()]);
+const models = withMuse(withCursor([...entries.values()]));
 writeFileSync(
   CATALOG,
   `${JSON.stringify({ built: new Date().toISOString().slice(0, 10), models }, null, 1)}\n`,

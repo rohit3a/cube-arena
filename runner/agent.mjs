@@ -1,5 +1,5 @@
-// One agent session against Cube Arena: Claude Code, Codex, Cursor's CLI or a
-// model called directly over an API (harness-api.mjs), locked down to the cube
+// One agent session against Cube Arena: Claude Code, Codex, Cursor's CLI, Muse
+// Code or a model called directly over an API (harness-api.mjs), locked down to the cube
 // tools and watched as it plays. Used by run.mjs (one run) and play-suite.mjs (one fresh
 // session per suite test).
 //
@@ -18,8 +18,14 @@
 // shell command, a web search, a file read outside the empty session folder)
 // breaks the lockdown. Its config and data live in the runner's own folder
 // (cursor.mjs), and its background worker is stopped with the session.
+//
+// Muse Code sessions get the cube tools by name and contributor mode off
+// (muse.mjs). Its stream names each tool call and the model behind each reply;
+// the session's export, read once it ends, has the arguments, the tokens and
+// the toolset every request offered, which is checked again.
 
 import { spawn } from 'node:child_process';
+import { randomUUID } from 'node:crypto';
 import { createWriteStream, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve, sep } from 'node:path';
@@ -28,6 +34,7 @@ import { takeCodexSession } from './codex-session.mjs';
 import { commandFor } from './command.mjs';
 import { sameCursorModel } from './cursor.mjs';
 import { playApiSession } from './harness-api.mjs';
+import { MUSE_CUBE, MUSE_FATAL, exportMuseSession, forgetMuseSession, museCommand, sameMuseModel } from './muse.mjs';
 import { SYSTEM } from './system.mjs';
 
 export { SYSTEM } from './system.mjs';
@@ -134,6 +141,11 @@ function cursorCommand(s, work) {
   return { cmd: s.cursorBin, args, env: { ...process.env, CURSOR_CONFIG_DIR: config, CURSOR_DATA_DIR: data, CUBE_ARENA_TOKEN: s.token } };
 }
 
+function museCommandFor(s, sessionId) {
+  const { args, env } = museCommand(s, sessionId, SYSTEM);
+  return { cmd: 'muse', args, env: { ...process.env, ...env } };
+}
+
 /** Cursor's bookkeeping tools: they read or write nothing outside the session. */
 const CURSOR_HARMLESS = new Set(['getMcpToolsToolCall', 'updateTodosToolCall', 'readTodosToolCall', 'partialToolCall', 'truncatedToolCall']);
 /** Cursor's tools that look at files, and the argument naming where. */
@@ -150,7 +162,7 @@ export const OUTPUT_CAP = /exceeded the \d+ output token maximum/i;
 export const slim = (line) => line.replace(/"data":"[A-Za-z0-9+/=]{200,}"/g, (m) => `"data":"<${m.length - 9} base64 chars>"`);
 
 /**
- * Plays one session. `s`: { agent ('claude' | 'codex' | 'api'), model, effort,
+ * Plays one session. `s`: { agent ('claude' | 'codex' | 'cursor' | 'muse' | 'api'), model, effort,
  * prompt, headers, url, token, codexHome, logPath, api? }. Nothing times the
  * model out. Resolves when the agent is done, after any run it left open is
  * dealt with, its usage is recorded, a lockdown breach is hidden, and (with
@@ -202,7 +214,9 @@ async function afterSession(s, out) {
 function playCli(s) {
   const work = realpathSync(mkdtempSync(join(tmpdir(), 'cube-runner-')));
   const cursor = s.agent === 'cursor';
-  const { cmd, args, env } = s.agent === 'claude' ? claudeCommand(s, work) : cursor ? cursorCommand(s, work) : codexCommand(s, work);
+  const muse = s.agent === 'muse';
+  const museId = muse ? randomUUID() : null;
+  const { cmd, args, env } = s.agent === 'claude' ? claudeCommand(s, work) : cursor ? cursorCommand(s, work) : muse ? museCommandFor(s, museId) : codexCommand(s, work);
   const log = createWriteStream(s.logPath);
   const started = Date.now();
   const secs = () => `${Math.round((Date.now() - started) / 1000)}s`;
@@ -275,7 +289,8 @@ function playCli(s) {
   function seeCall(tool, input) {
     note('call', JSON.stringify(input ?? {}), tool);
     out.calls += 1;
-    console.log(`  [${secs()}] ${tool} ${JSON.stringify(input ?? {}).slice(0, 120)}`);
+    // Muse's stream names the tool but not its arguments (the reply shows the moves).
+    console.log(`  [${secs()}] ${tool}${muse ? '' : ` ${JSON.stringify(input ?? {}).slice(0, 120)}`}`);
   }
 
   // Claude Code stream-json.
@@ -420,6 +435,51 @@ function playCli(s) {
     }
   }
 
+  // Muse Code exec --json. Each model reply and each tool call is a task; a
+  // tool call that isn't a cube tool, or a reply from another model, breaks
+  // the lockdown. Only the final reply streams; the export has the rest.
+  const museTasks = new Map(); // task id → task kind
+  let museSay = '';
+  function onMuse(ev) {
+    const p = ev.payload ?? {};
+    const e = p.event ?? {};
+    if (ev.payload_type !== 'run.output.delta' && museSay) {
+      console.log(`  [${secs()}] says: ${museSay.replace(/\s+/g, ' ').slice(0, 160)}`);
+      museSay = '';
+    }
+    if (ev.payload_type === 'run.model.configured' && p.model_id && !sameMuseModel(p.model_id, s.model)) lockdown(`asked for ${s.model}, Muse started ${p.model_id}`);
+    if (ev.payload_type === 'task.lifecycle.proposed') {
+      museTasks.set(e.task_id, e.task_kind);
+      if (e.task_kind?.startsWith('tool.') && !e.task_kind.startsWith(`tool.${MUSE_CUBE}`)) lockdown(`called ${e.task_kind.slice(5)}`);
+      else if (e.task_kind?.startsWith('tool.')) seeCall(e.task_kind.slice(5 + MUSE_CUBE.length));
+    }
+    if (ev.payload_type === 'task.lifecycle.status') {
+      const facets = e.details?.facets ?? [];
+      const answered = facets.find((f) => f.detail?.kind === 'provider')?.detail?.model;
+      if (answered && museTasks.get(e.task_id) === 'model.meta.response' && !sameMuseModel(answered, s.model)) lockdown(`${answered} answered, not ${s.model}`);
+      // A failed attempt at the model (a usage limit, an overloaded server): Muse retries it.
+      const failed = facets.find((f) => f.kind === 'external_attempt' && f.error_kind && f.error_kind !== 'stream_succeeded');
+      if (failed) {
+        const why = `${e.message ?? 'model attempt failed'} (${failed.error_kind}${failed.http_status ? ` ${failed.http_status}` : ''})`;
+        note('error', why);
+        console.log(`  [${secs()}] Muse: ${why.slice(0, 200)}`);
+      }
+    }
+    if (ev.payload_type === 'tool.result') seeReply(String(p.text ?? ''), String(p.correlation_facts?.tool_name ?? '').replace(MUSE_CUBE, ''));
+    if (ev.payload_type === 'run.output.delta') museSay += p.text ?? '';
+    if (ev.payload_type === 'run.terminal.completed') {
+      // The model finished its turn: it chose to stop here.
+      out.quit = true;
+      out.final = String(p.text ?? '');
+    } else if (ev.payload_type?.startsWith('run.terminal.')) {
+      const why = String(p.reason ?? p.text ?? ev.payload_type).slice(0, 300);
+      note('error', why);
+      console.log(`  [${secs()}] Muse: ${why}`);
+      if (MUSE_FATAL.test(why)) out.stopReason ??= why;
+      else out.apiError ??= why;
+    }
+  }
+
   let buf = '';
   child.stdout.on('data', (chunk) => {
     buf += chunk;
@@ -436,6 +496,7 @@ function playCli(s) {
       }
       if (s.agent === 'claude') onClaude(ev);
       else if (cursor) onCursor(ev);
+      else if (muse) onMuse(ev);
       else onCodex(ev);
     }
   });
@@ -444,17 +505,41 @@ function playCli(s) {
     // Codex logs its disabled code-mode host on every start; that is expected.
     const text = String(chunk)
       .split('\n')
-      .filter((l) => l && !/code-mode host is disabled|Reading additional input from stdin/.test(l))
+      .filter((l) => l && !/code-mode host is disabled|Reading additional input from stdin|^muse: (workspace root|Agent delegation: off|Git sandbox relaxation)/.test(l))
       .join('\n');
     if (text) process.stderr.write(`${text}\n`);
     if (text && errText.length < 2000) errText += `${text}\n`;
   });
 
+  /** Muse's export: the digest with arguments and reasoning, the tokens, and the lockdown checked again. */
+  function afterMuse(code) {
+    if (museSay) console.log(`  [${secs()}] says: ${museSay.replace(/\s+/g, ' ').slice(0, 160)}`);
+    const fatal = errText.split('\n').find((l) => MUSE_FATAL.test(l));
+    if (fatal) out.stopReason ??= fatal.replace(/^muse: /, '').slice(0, 300);
+    const x = exportMuseSession(museId, join(work, 'export.json'), started);
+    if (!x) {
+      console.log('  (could not read the Muse session export: no token counts for this session)');
+    } else {
+      Object.assign(out.usage, x.usage);
+      if (x.events.length) out.events = [...x.events, ...out.events.filter((e) => e.kind === 'error')].sort((a, b) => a.t - b.t);
+      const extra = x.tools.filter((t) => !t.startsWith(MUSE_CUBE));
+      if (extra.length) lockdown(`tools besides the cube: ${extra.join(', ')}`);
+      const other = x.models.filter((m) => !sameMuseModel(m, s.model));
+      if (other.length) lockdown(`${other.join(', ')} answered, not ${s.model}`);
+      forgetMuseSession(museId, x.sessionLog);
+    }
+    // Ended without a final reply and nothing said why: Muse's doing, not the model's.
+    if (!out.quit && !out.stopReason && !out.breach && !out.apiError) {
+      out.apiError = errText.trim().split('\n').find((l) => /error|limit|usage|denied|failed/i.test(l))?.slice(0, 300) ?? `Muse Code exited ${code}`;
+    }
+  }
+
   return new Promise((resolve) => {
     child.on('close', (code) => {
       log.end();
-      rmSync(work, { recursive: true, force: true, maxRetries: 5 });
       out.code = code;
+      if (muse) afterMuse(code);
+      rmSync(work, { recursive: true, force: true, maxRetries: 5 });
       if (cursor) {
         if (group) killGroup('SIGTERM');
         // Cursor's chats and per-folder state for this session: the log has it all.

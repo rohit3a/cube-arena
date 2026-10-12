@@ -50,13 +50,15 @@ a usage limit), the runner carries on after a wait; if the runner itself stops, 
 | `claude-code` | Claude | [Claude Code](https://claude.com/claude-code), signed in |
 | `codex` | GPT | [Codex](https://github.com/openai/codex), signed in once with `CODEX_HOME=~/.cube-arena/codex codex login` |
 | `cursor` | what your Cursor plan has: Claude, GPT, Gemini, Grok, Kimi, Composer… | [Cursor's CLI](https://cursor.com/cli), signed in with `cursor-agent login` (macOS or Linux) |
+| `muse` | Meta's Muse models | [Muse Code](https://dev.meta.ai), signed in with `muse login` |
 | `openrouter` | almost everything | `OPENROUTER_API_KEY` |
 | `api` | anything with an OpenAI-compatible API | `--base-url`, `--api-key-env`, `--api-model` |
 
 On Windows, sign Codex in from PowerShell: `$env:CODEX_HOME="$HOME\.cube-arena\codex"; codex login; Remove-Item Env:CODEX_HOME`.
 
 With `--via cursor`, the run uses your Cursor plan's usage; the runner finds the model's Cursor id for the effort you ask for
-(`cursor-agent models` lists what your plan has).
+(`cursor-agent models` lists what your plan has). With `--via muse`, it uses your Muse Code plan (or `META_API_KEY`, if set,
+billed per token), with contributor mode off for every session so Meta doesn't train on the cubes.
 
 Without `--via` it picks the first that works on your machine. For example, Grok through xAI's own API:
 
@@ -75,6 +77,10 @@ XAI_API_KEY=… cube-arena-runner play --model grok-4-7 --effort high \
   other MCP servers) and allow only the cube server. A blocked attempt is noted in the log; one that gets through stops the session
   and hides the suite. Cursor's config, chats and default model live in `~/.cube-arena/cursor`, so yours are left alone. Your
   Cursor user rules and plugins still load; keep them about code, not cubes.
+- **Muse Code:** runs in an empty folder with the cube tools as its whole toolset: no shell, file writes, web, subagents or reminder
+  agents, and no Claude Code or Codex rules or skills. The runner checks the session's record afterwards too (every tool offered,
+  every model that answered), then deletes the session from Muse's folder. Your own Muse rules still load; keep them about code,
+  not cubes.
 - **API mode:** the runner holds the conversation, so the model can only call the cube tools. Only the three latest pictures stay in
   the conversation, to bound cost.
 - **Model check:** the runner checks that the model that answered is the one you asked for. If anything else shows up, the session
