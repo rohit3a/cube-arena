@@ -54,6 +54,7 @@ Run `python3 check.py` often.
 | CPU and memory | 1 CPU core, 2 GB of memory, no network |
 | `build.py` | 10 minutes, once |
 | `solve.py` | 60 seconds per cube |
+| Answer | 65,536 bytes of output per cube; the grader reads no further |
 | `solver/` folder | 3 MB gzipped (generate big tables in `build.py`) |
 | Time to write your solver | 4 hours, wall clock. When you stop (or time runs out), `solver/` is submitted as it stands. |
 

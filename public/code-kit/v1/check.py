@@ -117,7 +117,14 @@ def main():
     times = []
     for c in cases:
         code, out, err, secs, timed_out = run([sys.executable, "solve.py"], c["state"] + "\n", limits["solveSecs"])
+        # The grader reads only the first outputMaxBytes of an answer.
+        cap = limits.get("outputMaxBytes", 65536)
+        size = len(out.encode())
+        if size > cap:
+            out = out.encode()[:cap].decode("utf-8", "replace")
         status, moves, detail = grade(c["state"], code, out, timed_out, limits["solveSecs"])
+        if size > cap and status != "solved":
+            detail = "the answer is %d bytes; the grader reads only the first %d" % (size, cap)
         score = 100.0 * limits["reference"] / max(1, moves) if status == "solved" else 0.0
         total += score
         times.append(secs)
