@@ -4,7 +4,7 @@ import { notFound } from 'next/navigation';
 import { BarChart } from '@/components/charts';
 import Exportable from '@/components/Exportable';
 import { OUT_OF_OUTPUT, OUT_OF_OUTPUT_WHY, fmtCost, fmtDuration, fmtScore, fmtTokens, heat } from '@/lib/arena/format';
-import { averageByLabel, resultHref } from '@/lib/arena/aggregate';
+import { averageByLabel, provisional } from '@/lib/arena/aggregate';
 import { type CatalogModel, catalogModel, harnessLabel } from '@/lib/arena/catalog';
 import { type SuiteEntry, suiteEntries, testNames } from '@/lib/arena/index-data';
 import { effortRank } from '@/lib/arena/makers';
@@ -86,6 +86,18 @@ export default async function ModelPage(props: { params: Promise<{ slug: string 
         const rows = averageByLabel(all).sort((a, b) => effortRank(a.effort) - effortRank(b.effort));
         if (rows.length === 0) return null;
         const tests = testNames(k);
+        // An averaged row points at its runs in the list below, which lights up; a single run at its suite.
+        const runsId = (e: SuiteEntry) => `${k}-runs-${e.effort ?? 'all'}`;
+        const href = (e: SuiteEntry) => (e.n > 1 ? `#${runsId(e)}` : `/suites/${e.id}`);
+        const sorted = [...all].sort((a, b) => effortRank(a.effort) - effortRank(b.effort) || (b.finished_at ?? '').localeCompare(a.finished_at ?? ''));
+        const groups = sorted.reduce<SuiteEntry[][]>((gs, e) => {
+          const last = gs[gs.length - 1];
+          if (last && last[0].effort === e.effort) last.push(e);
+          else gs.push([e]);
+          return gs;
+        }, []);
+        // Left out of the average until its Gauntlet is played (aggregate.ts).
+        const waiting = (e: SuiteEntry): e is SuiteEntry & { gauntlet: 'pending' | 'playing' } => provisional(e) && all.some((x) => x.label === e.label && !provisional(x));
         return (
           <Exportable key={k} id={k} name={`${model} ${SUITES[k].name} ${SUITES[k].version}`} className="card ix-card">
             <header className="ix-head">
@@ -103,7 +115,7 @@ export default async function ModelPage(props: { params: Promise<{ slug: string 
                 sub: e.gauntlet === 'pending' || e.gauntlet === 'playing' ? GAUNTLET_TAG[e.gauntlet] : null,
                 value: e.score,
                 color,
-                href: resultHref(e),
+                href: href(e),
               }))}
             />
             <div className="table-wrap flat">
@@ -128,7 +140,7 @@ export default async function ModelPage(props: { params: Promise<{ slug: string 
                   {rows.map((e) => (
                     <tr key={e.id}>
                       <td>
-                        <Link href={e.n > 1 ? `#${k}-runs` : `/suites/${e.id}`}>{e.effort ?? model}</Link>
+                        {e.n > 1 ? <a href={href(e)}>{e.effort ?? model}</a> : <Link href={href(e)}>{e.effort ?? model}</Link>}
                       </td>
                       <td className="num strong">{fmtScore(e.score)}</td>
                       {tests.map((t) => {
@@ -172,23 +184,24 @@ export default async function ModelPage(props: { params: Promise<{ slug: string 
               <summary>
                 Every run ({all.length})
               </summary>
-              <ul>
-                {all
-                  .sort((a, b) => effortRank(a.effort) - effortRank(b.effort) || (b.finished_at ?? '').localeCompare(a.finished_at ?? ''))
-                  .map((e) => (
+              {groups.map((g) => (
+                <ul key={runsId(g[0])} id={runsId(g[0])}>
+                  {g.map((e) => (
                     <li key={e.id}>
                       <Link href={`/suites/${e.id}`}>
                         <strong>{fmtScore(e.score)}</strong>
                         {e.effort && ` at ${e.effort}`}
                       </Link>{' '}
                       <span className="muted">
+                        {waiting(e) && `· ${GAUNTLET_TAG[e.gauntlet]}, not in the average until it's played `}
                         · run by {e.contributor ? <Link href={`/contributors/${e.contributor.slug}`}>{e.contributor.name}</Link> : e.run_by.join(', ')}
                         {e.harness ? ` via ${e.harness}` : ''} ·{' '}
                         <span suppressHydrationWarning>{e.finished_at ? new Date(e.finished_at).toLocaleDateString(undefined, { day: 'numeric', month: 'short' }) : ''}</span>
                       </span>
                     </li>
                   ))}
-              </ul>
+                </ul>
+              ))}
             </details>
           </Exportable>
         );

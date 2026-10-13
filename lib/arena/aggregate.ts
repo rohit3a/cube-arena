@@ -8,12 +8,19 @@ const mean = (xs: number[]) => xs.reduce((a, b) => a + b, 0) / xs.length;
 /** Averaged suites show the Gauntlet as the least far along of those that unlocked it: a play still to come wins. */
 const GAUNTLET_ORDER = ['playing', 'pending', 'done', 'locked'] as const;
 const meanOrNull = (xs: (number | null)[]) => (xs.every((x) => x !== null) && xs.length ? mean(xs as number[]) : null);
+/** A suite whose 4×4 Gauntlet is still to be played: its score isn't final yet. */
+export const provisional = (e: SuiteEntry) => e.gauntlet === 'pending' || e.gauntlet === 'playing';
 
-/** One entry per label (model and effort): the mean of its finished suites. Entries newest first. */
+/**
+ * One entry per label (model and effort): the mean of its finished suites. Entries newest first.
+ * A suite still waiting on its Gauntlet joins the mean once it's played, unless every suite of
+ * that label is waiting.
+ */
 export function averageByLabel(entries: SuiteEntry[]): SuiteEntry[] {
   const groups = new Map<string, SuiteEntry[]>();
   for (const e of entries) groups.set(e.label, [...(groups.get(e.label) ?? []), e]);
-  return [...groups.values()].map((es) => {
+  return [...groups.values()].map((group) => {
+    const es = group.some((e) => !provisional(e)) ? group.filter((e) => !provisional(e)) : group;
     if (es.length === 1) return es[0];
     const [latest] = es;
     const solved = es.reduce((a, e) => a + e.solved, 0);

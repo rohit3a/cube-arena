@@ -1482,7 +1482,8 @@ tr:last-child td {
   border-bottom: 0;
 }
 
-tbody tr:hover td {
+/* Heat cells keep their colour on a hovered row: their text colour is set for it. */
+tbody tr:hover td:where(:not(.heat-cell)) {
   background: var(--hover);
 }
 
@@ -3355,6 +3356,10 @@ table.heat thead th:first-child {
   background: var(--bg-2);
 }
 
+table.heat tbody tr:hover td:first-child {
+  background: var(--hover);
+}
+
 table.heat th.num {
   min-width: 96px;
   white-space: normal;
@@ -3664,6 +3669,18 @@ table.wanted td.cmd {
   padding-left: 1.2rem;
   display: grid;
   gap: 6px;
+}
+
+/* One list per effort, read as one; an effort link from the table above lights its runs up. */
+.runs-list ul + ul {
+  margin-top: 6px;
+}
+
+.runs-list ul:target {
+  scroll-margin-top: 140px;
+  background: var(--hover);
+  outline: 6px solid var(--hover);
+  border-radius: 4px;
 }
 
 .via-note {

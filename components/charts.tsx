@@ -7,6 +7,11 @@
 import Link from 'next/link';
 import { type ReactNode, useLayoutEffect, useRef, useState } from 'react';
 
+/** An in-page link (#…) is left to the browser, so its target lights up (:target); the rest go through Next. */
+function Go({ href, children }: { href: string; children: ReactNode }) {
+  return href.startsWith('#') ? <a href={href}>{children}</a> : <Link href={href}>{children}</Link>;
+}
+
 function useWidth<T extends HTMLElement>(): [React.RefObject<T | null>, number] {
   const ref = useRef<T>(null);
   const [w, setW] = useState(0);
@@ -141,9 +146,9 @@ function VBars({
               </g>
             );
             return it.href ? (
-              <Link key={it.key} href={it.href}>
+              <Go key={it.key} href={it.href}>
                 {body}
-              </Link>
+              </Go>
             ) : (
               <g key={it.key}>{body}</g>
             );
@@ -183,7 +188,7 @@ function HBars({ items, max, format, reference }: { items: BarItem[]; max: numbe
         );
         return (
           <li key={it.key}>
-            <span className="hbar-label">{it.href ? <Link href={it.href}>{name}</Link> : name}</span>
+            <span className="hbar-label">{it.href ? <Go href={it.href}>{name}</Go> : name}</span>
             <span className="hbar-track">
               <span className={`hbar-fill${it.hatch ? ' hatch' : ''}`} style={{ width: `${Math.max(pct, 1.5)}%`, background: it.color }} />
               {refPct !== null && <i className="hbar-ref" style={{ left: `${refPct}%` }} />}
@@ -313,9 +318,9 @@ function Scatter({ points: usable, xLabel, yLabel, xFormat, log, width }: { poin
               </g>
             );
             return p.href ? (
-              <Link key={p.key} href={p.href}>
+              <Go key={p.key} href={p.href}>
                 {dot}
-              </Link>
+              </Go>
             ) : (
               <g key={p.key}>{dot}</g>
             );
