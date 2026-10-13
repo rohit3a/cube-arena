@@ -66,4 +66,12 @@ describe('Cursor model ids', () => {
     expect(sameCursorModel('Composer 2.5', 'Composer 2.5', null)).toBe(true);
     expect(sameCursorModel('Composer 2.5 High', 'Composer 2.5', null)).toBe(false);
   });
+
+  it('ignores a context window size Cursor adds to the session name', () => {
+    expect(sameCursorModel('Grok 4.7 256K Extra High', 'Grok 4.7 Extra High', 'xhigh')).toBe(true);
+    expect(sameCursorModel('Grok 4.7 256K High', 'Grok 4.7', 'high')).toBe(true);
+    expect(sameCursorModel('Gemini 3.8 1M', 'Gemini 3.8', null)).toBe(true);
+    expect(sameCursorModel('Grok 4.5 256K Extra High', 'Grok 4.7 Extra High', 'xhigh')).toBe(false);
+    expect(sameCursorModel('Grok 4.7 256K Low', 'Grok 4.7 Extra High', 'xhigh')).toBe(false);
+  });
 });

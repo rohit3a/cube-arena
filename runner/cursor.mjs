@@ -100,7 +100,10 @@ export function cursorSlug(base, effort, list) {
 }
 
 /** Model names compared loosely: Cursor pads some with double spaces. */
-export const sameModelName = (a, b) => String(a ?? '').toLowerCase().replace(/[^a-z0-9.]+/g, ' ').trim() === String(b ?? '').toLowerCase().replace(/[^a-z0-9.]+/g, ' ').trim();
+// Cursor's session may name the context window the model list leaves off
+// ("Grok 4.7 256K Extra High" for "Grok 4.7 Extra High"), so a size like 256K or 1M is dropped.
+const looseName = (s) => String(s ?? '').toLowerCase().replace(/[^a-z0-9.]+/g, ' ').replace(/\b\d+(?:\.\d+)?[km]\b/g, ' ').replace(/\s+/g, ' ').trim();
+export const sameModelName = (a, b) => looseName(a) === looseName(b);
 
 const EFFORT_NAMES = { none: 'None', minimal: 'Minimal', low: 'Low', medium: 'Medium', high: 'High', xhigh: 'Extra High', max: 'Max' };
 
