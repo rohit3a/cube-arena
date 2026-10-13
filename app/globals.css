@@ -4240,10 +4240,6 @@ table.wanted td.cmd {
   background: var(--bg);
 }
 
-.cmp-slot {
-  box-shadow: inset 4px 0 0 var(--side);
-}
-
 .cmp-slot select,
 .cmp-add select {
   min-width: 0;
