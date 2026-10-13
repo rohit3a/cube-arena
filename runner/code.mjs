@@ -103,11 +103,16 @@ const hm = (ms) => {
 function promptFor(first, remainingMs, limits) {
   const deadline = new Date(Date.now() + remainingMs).toISOString().slice(0, 16).replace('T', ' ');
   const time = `You have ${hm(remainingMs)} left (until ${deadline} UTC; \`date -u\` tells the time).`;
+  // Models that ended a message with a question for us took it as a pause, not the end (Haiku 5.5, 2026-10-13).
+  const alone =
+    'Nobody will reply during the run: ending your turn ends it and submits solver/. ' +
+    'A cube solved in any number of moves beats an unsolved one (the board ranks by cubes solved first).';
   if (!first) {
     return (
       'Your last session was cut off by an error that was not your doing. Your files are exactly as you left them. ' +
       `Carry on with the Cube Arena coding benchmark (SPEC.md) where you were. ${time} ` +
-      'When you are done, make sure `python3 check.py` passes, then stop: solver/ is submitted as it stands.'
+      'When you are done, make sure `python3 check.py` passes, then stop: solver/ is submitted as it stands. ' +
+      alone
     );
   }
   return (
@@ -115,7 +120,8 @@ function promptFor(first, remainingMs, limits) {
     'Write a 5x5 cube solver in solver/ that solves cubes it has never seen in as few moves as you can: ' +
     `it is graded on ${limits.cases} hidden cubes, and every move counts. Work on your own, with no internet access; ` +
     `test with \`python3 check.py\` and keep improving the move count while you have time. ${time} ` +
-    'When you stop, solver/ is frozen and submitted as it stands.'
+    'When you stop, solver/ is frozen and submitted as it stands. ' +
+    alone
   );
 }
 
