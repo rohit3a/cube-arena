@@ -141,12 +141,20 @@ function buildFrame(node: HTMLElement, title: string, f: Format) {
     return /auto|scroll/.test(c.overflowX) || c.textOverflow === 'ellipsis';
   });
 
+  // Short labels (names, headings, numbers) that sit on one line at the
+  // card's own width must stay that way; paragraphs may wrap.
+  copy.style.width = `${own}px`;
+  const labels = [...copy.querySelectorAll<HTMLElement>('*')]
+    .filter((n) => !n.firstElementChild && (n.textContent ?? '').trim().length > 0 && (n.textContent ?? '').trim().length <= 40)
+    .map((n) => [n, n.offsetHeight] as const);
+
   const fit = (width: number, strict = true) => {
     copy.style.width = `${width}px`;
     const w = copy.offsetWidth;
     const h = copy.offsetHeight;
     // Something that scrolls or spills sideways at this width can't shrink that far.
     if (strict && (copy.scrollWidth > w + 2 || scrollers.some((n) => n.scrollWidth > n.clientWidth + 2))) return null;
+    if (strict && labels.some(([n, at]) => n.offsetHeight > at * 1.3 + 2)) return null;
     const scale = f.w ? Math.min(stage.clientWidth / w, stage.clientHeight / h, MAX_SCALE) : 1;
     return { width, w, h, scale };
   };
