@@ -10,6 +10,7 @@ import { averageByLabel, resultHref } from '@/lib/arena/aggregate';
 import type { SuiteEntry } from '@/lib/arena/index-data';
 import { EFFORT_ORDER } from '@/lib/arena/makers';
 import { fullEffort, suiteOrder } from '@/lib/arena/ranking';
+import { runningLabel } from '@/lib/arena/running';
 import { FAST_WEIGHTING, GAUNTLET, GAUNTLET_TAG } from '@/lib/arena/rules';
 import type { SuiteKind } from '@/lib/arena/suites';
 
@@ -212,7 +213,7 @@ export default function IndexExplorer({ entries, suites, running }: { entries: S
               <span key={r.id}>
                 {i > 0 && ', '}
                 <Link href={`/suites/${r.id}`}>
-                  {r.label} · {r.kind === 'fast' ? 'Fast' : 'Thorough'}, test {Math.max(1, r.progress.started)} of {r.progress.of}
+                  {r.label} · {runningLabel(r)}
                 </Link>
               </span>
             ))}

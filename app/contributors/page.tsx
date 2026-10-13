@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { Handle, PersonName, fmtDate } from '@/components/People';
 import { contributorBoard } from '@/lib/arena/contributors';
 import { fmtDuration, fmtTokens } from '@/lib/arena/format';
+import { testLabel } from '@/lib/arena/running';
 
 export const dynamic = 'force-dynamic';
 export const metadata: Metadata = {
@@ -61,7 +62,7 @@ export default async function Contributors() {
                 <span key={e.id}>
                   {j > 0 && (j === suites.length - 1 ? ' and ' : ', ')}
                   <Link href={`/suites/${e.id}`}>
-                    {e.label}, test {Math.max(1, e.progress.started)} of {e.progress.of}
+                    {e.label}, {testLabel(e)}
                   </Link>
                 </span>
               ))}

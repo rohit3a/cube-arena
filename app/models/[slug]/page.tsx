@@ -9,6 +9,7 @@ import { type CatalogModel, catalogModel, harnessLabel } from '@/lib/arena/catal
 import { type SuiteEntry, suiteEntries, testNames } from '@/lib/arena/index-data';
 import { effortRank } from '@/lib/arena/makers';
 import { suiteOrder } from '@/lib/arena/ranking';
+import { isRunning, runningLabel } from '@/lib/arena/running';
 import { GAUNTLET_TAG } from '@/lib/arena/rules';
 import { SUITES, SUITE_KINDS } from '@/lib/arena/suites';
 import { commandFor } from '@/lib/arena/wanted';
@@ -193,14 +194,14 @@ export default async function ModelPage(props: { params: Promise<{ slug: string 
         );
       })}
 
-      {es.some((e) => e.status === 'active') && (
+      {es.some(isRunning) && (
         <p className="ix-running model-running">
           <span className="live-dot" aria-hidden /> Running now:{' '}
           {es
-            .filter((e) => e.status === 'active')
+            .filter(isRunning)
             .map((e) => (
               <Link key={e.id} href={`/suites/${e.id}`}>
-                {e.label} · {SUITES[e.kind].name}, test {Math.max(1, e.progress.started)} of {e.progress.of}
+                {e.label} · {runningLabel(e)}
               </Link>
             ))}
         </p>

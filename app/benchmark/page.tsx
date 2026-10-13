@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import IndexExplorer, { type SuiteInfo } from '@/components/IndexExplorer';
 import { suiteEntries, testNames } from '@/lib/arena/index-data';
+import { isRunning } from '@/lib/arena/running';
 import { sweepExpired } from '@/lib/arena/service';
 import { GAUNTLET, SUITES, SUITE_KINDS, suiteTests } from '@/lib/arena/suites';
 
@@ -15,7 +16,7 @@ export default async function Benchmark() {
   await sweepExpired().catch(() => {});
   const entries = (await suiteEntries()).filter((e) => e.board === 'verified');
   const suites: SuiteInfo[] = SUITE_KINDS.map((k) => ({ kind: k, name: SUITES[k].name, version: SUITES[k].version, blurb: SUITES[k].blurb, tests: testNames(k) }));
-  const running = entries.filter((e) => e.status === 'active');
+  const running = entries.filter(isRunning);
   const thorough = SUITES.thorough;
   const g = `${GAUNTLET.size}×${GAUNTLET.size}`;
 

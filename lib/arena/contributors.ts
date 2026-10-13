@@ -3,6 +3,7 @@
 // cached the same way and always agrees with the Index.
 
 import { type SuiteEntry, suiteEntries } from './index-data';
+import { isRunning } from './running';
 
 export interface Contributor {
   rank: number;
@@ -97,7 +98,7 @@ export function buildBoard(entries: SuiteEntry[]): ContributorBoard {
     people: ranked,
     anonymous: done.filter((e) => !e.contributor && !e.run_by.includes('Cube Arena')).length,
     ours: done.filter((e) => e.run_by.includes('Cube Arena')).length,
-    running: entries.filter((e) => e.board === 'verified' && e.status === 'active' && e.contributor),
+    running: entries.filter((e) => e.board === 'verified' && isRunning(e) && e.contributor),
   };
 }
 
