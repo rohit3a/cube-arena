@@ -224,12 +224,14 @@ async function finishSuite(tx: Tx, suite: SuiteRow): Promise<string> {
       suite.hidden = true;
     }
   }
-  if (suite.hidden) {
+  if (suite.hidden && (suite.hidden_reason ?? 'incomplete').startsWith('incomplete')) {
     return `Suite closed: ${SUITES[suite.kind].name} ${suite.version} is incomplete, so it isn't shown on the boards. Start a new one to run it again.`;
   }
   const grade = (await gradeSuites(tx, [suite])).get(suite.id);
   const score = grade?.score ?? 0;
-  return `Suite complete: ${SUITES[suite.kind].name} ${suite.version}, score ${score.toFixed(1)} out of 100. Results: ${BASE_URL}/suites/${suite.id}`;
+  // Hidden by the operator (an unreleased model, say): the player still gets the score, but there's no public page.
+  const where = suite.hidden ? '' : ` Results: ${BASE_URL}/suites/${suite.id}`;
+  return `Suite complete: ${SUITES[suite.kind].name} ${suite.version}, score ${score.toFixed(1)} out of 100.${where}`;
 }
 
 /** Why a suite isn't complete ("test 2 never played"), or null if every test ended the model's way. */
@@ -426,9 +428,9 @@ async function startSlot(tx: Tx, suite: SuiteRow, slot: number, caller: Caller):
   const level = t.challenge === 'ladder' ? 1 : 0;
   const [run] = await tx<RunRow[]>`
     insert into cube_arena.runs (board, display_name, model_name, tool_use, client, size, mode, challenge, lives, level, ip_hash,
-                                 suite_id, suite_slot)
+                                 suite_id, suite_slot, hidden, hidden_reason)
     values (${suite.board}, ${suite.display_name}, ${suite.model_name}, 'model_only', ${caller.client}, ${t.size}, ${t.mode}, ${t.challenge},
-            ${lives}, ${level}, ${caller.ipHash}, ${suite.id}, ${slot})
+            ${lives}, ${level}, ${caller.ipHash}, ${suite.id}, ${slot}, ${suite.hidden}, ${suite.hidden_reason})
     returning *`;
   await tx`update cube_arena.suites set updated_at = now() where id = ${suite.id}`;
   const a = await newAttempt(tx, run);
