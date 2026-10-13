@@ -96,6 +96,8 @@ function VBars({
   const longest = Math.max(0, ...items.map(len));
   const slot = Math.max(38, Math.min(76, (width - 60) / items.length));
   const left = Math.max(40, first - slot / 2 + 8);
+  // A few bars on a wide chart sit in the middle, not bunched at the axis.
+  const x0 = Math.max(left, (width - slot * items.length) / 2);
   const bar = Math.min(44, slot * 0.68);
   const labelH = Math.min(130, longest * Math.sin(rad) + 28);
   const top = 18;
@@ -120,7 +122,7 @@ function VBars({
             </g>
           ))}
           {items.map((it, i) => {
-            const cx = left + slot * i + slot / 2;
+            const cx = x0 + slot * i + slot / 2;
             const v = it.value ?? 0;
             const yTop = y(v);
             const h = Math.max(top + height - yTop, 2);

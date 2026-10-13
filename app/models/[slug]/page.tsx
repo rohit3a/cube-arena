@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { BarChart } from '@/components/charts';
+import Exportable from '@/components/Exportable';
 import { OUT_OF_OUTPUT, OUT_OF_OUTPUT_WHY, fmtCost, fmtDuration, fmtScore, fmtTokens, heat } from '@/lib/arena/format';
 import { averageByLabel, resultHref } from '@/lib/arena/aggregate';
 import { type CatalogModel, catalogModel, harnessLabel } from '@/lib/arena/catalog';
@@ -81,7 +82,7 @@ export default async function ModelPage(props: { params: Promise<{ slug: string 
         if (rows.length === 0) return null;
         const tests = testNames(k);
         return (
-          <section key={k} id={k} className="card ix-card">
+          <Exportable key={k} id={k} name={`${model} ${SUITES[k].name} ${SUITES[k].version}`} className="card ix-card">
             <header className="ix-head">
               <h2>
                 {SUITES[k].name} {SUITES[k].version}
@@ -170,7 +171,7 @@ export default async function ModelPage(props: { params: Promise<{ slug: string 
                   ))}
               </ul>
             </details>
-          </section>
+          </Exportable>
         );
       })}
 
@@ -188,7 +189,7 @@ export default async function ModelPage(props: { params: Promise<{ slug: string 
       )}
 
       <p className="board-foot">
-        <Link href="/benchmark">Compare with every model</Link> · <Link href="/leaderboard">All boards</Link>
+        <Link href={`/compare?m=${slug}`}>Compare with other models</Link> · <Link href="/benchmark">The Index</Link> · <Link href="/leaderboard">All boards</Link>
       </p>
     </div>
   );

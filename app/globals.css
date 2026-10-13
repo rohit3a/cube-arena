@@ -3956,3 +3956,671 @@ table.wanted td.cmd {
   font-size: 0.88rem;
   color: var(--text-2);
 }
+
+/* ---------- Saving a card as an image (Exportable) ---------- */
+
+.exportable {
+  position: relative;
+}
+
+.export-menu {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  z-index: 5;
+}
+
+.export-btn {
+  padding: 3px 9px;
+  border: 1.5px solid var(--line);
+  border-radius: 8px;
+  background: var(--card);
+  color: var(--text-2);
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  cursor: pointer;
+  opacity: 0.75;
+  transition: opacity 0.15s, transform 0.15s;
+}
+
+.export-btn::before {
+  content: '⤓ ';
+}
+
+.exportable:hover > .export-menu .export-btn,
+.export-btn:focus-visible,
+.export-btn[aria-expanded='true'] {
+  opacity: 1;
+}
+
+.export-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-sm);
+}
+
+.export-btn:disabled {
+  cursor: progress;
+}
+
+.export-pop {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  display: flex;
+  flex-direction: column;
+  min-width: 236px;
+  padding: 6px;
+  border: var(--bw) solid var(--line);
+  border-radius: 12px;
+  background: var(--card);
+  box-shadow: var(--shadow);
+}
+
+.export-pop button {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 10px;
+  border: 0;
+  border-radius: 8px;
+  background: none;
+  color: var(--text);
+  text-align: left;
+  cursor: pointer;
+}
+
+.export-pop button:hover,
+.export-pop button:focus-visible {
+  background: var(--yellow-t);
+}
+
+.export-pop strong {
+  display: block;
+  font-size: 0.88rem;
+}
+
+.export-pop small {
+  display: block;
+  color: var(--text-3);
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+}
+
+/* A little outline of each image's shape. */
+.export-shape {
+  flex: none;
+  width: 22px;
+  height: 22px;
+  display: grid;
+  place-items: center;
+}
+
+.export-shape::before {
+  content: '';
+  border: 2px solid currentColor;
+  border-radius: 3px;
+}
+
+.export-shape-x::before { width: 22px; height: 13px; }
+.export-shape-square::before { width: 17px; height: 17px; }
+.export-shape-portrait::before { width: 15px; height: 19px; }
+.export-shape-story::before { width: 12px; height: 21px; }
+.export-shape-full::before { width: 19px; height: 15px; border-style: dashed; }
+.export-shape-best::before { width: 18px; height: 18px; border-radius: 50%; }
+
+/* The share image: built off screen, rendered, removed. */
+.share-holder {
+  position: fixed;
+  top: 0;
+  left: -100000px;
+  pointer-events: none;
+}
+
+.share-frame {
+  /* Soft hairlines instead of the site's hard outlines and offset shadows. */
+  --line: color-mix(in srgb, var(--text) 14%, transparent);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 26px 32px 30px;
+  color: var(--text);
+  background-color: var(--bg);
+  background-image:
+    radial-gradient(120% 80% at 100% 0%, color-mix(in srgb, var(--yellow) 10%, transparent), transparent 60%),
+    radial-gradient(circle, var(--rule) 1.2px, transparent 1.4px);
+  background-size: 100% 100%, 22px 22px;
+  box-sizing: border-box;
+  overflow: hidden;
+}
+
+.share-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex: none;
+}
+
+.share-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  font-family: var(--font-display);
+  font-size: 1.1rem;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+
+.share-brand .brand-mark {
+  width: 28px;
+  height: 28px;
+}
+
+.share-meta {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  font-family: var(--font-mono);
+  font-size: 0.74rem;
+  color: var(--text-3);
+}
+
+.share-url {
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: var(--yellow);
+  color: #18181d;
+  font-weight: 700;
+}
+
+.share-title {
+  flex: none;
+  font-family: var(--font-display);
+  font-size: 1.35rem;
+  font-weight: 800;
+  line-height: 1.15;
+  letter-spacing: -0.02em;
+}
+
+.share-title {
+  text-wrap: balance;
+}
+
+.share-nowrap {
+  white-space: nowrap;
+}
+
+.share-scaler * {
+  scrollbar-width: none;
+}
+
+.share-stage {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.share-full .share-stage {
+  display: block;
+}
+
+.share-sizer {
+  flex: none;
+}
+
+.share-scaler {
+  transform-origin: 0 0;
+}
+
+/* Inside the frame: no hard shadows; the card floats on a soft one. */
+.share-scaler * {
+  box-shadow: none !important;
+}
+
+.share-scaler .exportable[data-exporting].card,
+.share-scaler .exportable[data-exporting].share-boxed,
+.share-scaler .exportable[data-exporting] .card {
+  border-width: 1px;
+  border-radius: 18px;
+  box-shadow: 0 24px 60px -18px rgba(0, 0, 0, 0.5) !important;
+}
+
+.share-scaler .exportable[data-exporting].share-boxed {
+  padding: 20px;
+  border: 1px solid var(--line);
+  background: var(--card);
+}
+
+/* ---------- Compare ---------- */
+
+.cmp {
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+  margin-top: 22px;
+  transition: opacity 0.2s;
+}
+
+.cmp-pending {
+  opacity: 0.55;
+  pointer-events: none;
+}
+
+.cmp-dot {
+  display: inline-block;
+  flex: none;
+  width: 12px;
+  height: 12px;
+  border: 1.5px solid var(--line);
+  border-radius: 50%;
+  background: var(--side, var(--slate));
+}
+
+.cmp-picker {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  padding: 14px;
+}
+
+.cmp-slot,
+.cmp-add {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  padding: 6px 8px 6px 12px;
+  border: var(--bw) solid var(--line);
+  border-radius: 12px;
+  background: var(--bg);
+}
+
+.cmp-slot {
+  box-shadow: inset 4px 0 0 var(--side);
+}
+
+.cmp-slot select,
+.cmp-add select {
+  min-width: 0;
+  max-width: 15em;
+  padding: 4px 2px;
+  border: 0;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.cmp-add {
+  border-style: dashed;
+  color: var(--text-2);
+}
+
+.cmp-x {
+  padding: 0 6px;
+  border: 0;
+  background: none;
+  color: var(--text-3);
+  font-size: 1.2rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.cmp-x:hover {
+  color: var(--bad);
+}
+
+.cmp-share {
+  margin-left: auto;
+}
+
+.cmp-cards {
+  display: grid;
+  grid-template-columns: repeat(var(--n, 2), minmax(0, 1fr));
+  gap: 16px;
+}
+
+.cmp-card {
+  padding: 18px 18px 14px;
+}
+
+.cmp-card header {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin-bottom: 12px;
+  padding-right: 44px;
+}
+
+.cmp-card header .cmp-dot {
+  width: 16px;
+  height: 16px;
+  margin-top: 6px;
+}
+
+.cmp-card h2 {
+  font-size: 1.3rem;
+  line-height: 1.2;
+}
+
+.cmp-card header p {
+  margin: 4px 0 0;
+  font-size: 0.85rem;
+}
+
+.cmp-card dl {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin: 0;
+}
+
+.cmp-stat {
+  padding: 10px 12px;
+  border: 1.5px solid var(--rule);
+  border-radius: 10px;
+}
+
+.cmp-stat.big {
+  grid-column: 1 / -1;
+  border: var(--bw) solid var(--line);
+  background: var(--yellow);
+  color: var(--on-color);
+}
+
+.cmp-stat dt {
+  font-family: var(--font-mono);
+  font-size: 0.66rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-2);
+}
+
+.cmp-stat.big dt,
+.cmp-stat.big em {
+  color: var(--on-color);
+}
+
+.cmp-stat dd {
+  display: flex;
+  flex-direction: column;
+  margin: 2px 0 0;
+}
+
+.cmp-stat strong {
+  font-family: var(--font-display);
+  font-size: 1.45rem;
+  line-height: 1.15;
+}
+
+.cmp-stat.big strong {
+  font-size: 2.3rem;
+}
+
+.cmp-stat em {
+  font-size: 0.8rem;
+  font-style: normal;
+  color: var(--text-3);
+}
+
+.cmp-th {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  white-space: nowrap;
+}
+
+.cmp-table td:first-child {
+  color: var(--text-2);
+}
+
+.cmp-group th {
+  padding-top: 18px;
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  text-align: left;
+  color: var(--text-3);
+}
+
+.cmp-wins td {
+  background: var(--bg-2);
+}
+
+td.cmp-win {
+  font-weight: 800;
+  background: var(--green-t);
+  color: var(--text);
+}
+
+td.cmp-win::after {
+  content: ' ★';
+  color: var(--good);
+}
+
+.cmp-bars {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px 28px;
+}
+
+.cmp-bar-group h3 {
+  margin-bottom: 8px;
+  font-size: 1rem;
+}
+
+.cmp-bar {
+  display: grid;
+  grid-template-columns: minmax(0, 11em) 1fr 3.2em;
+  align-items: center;
+  gap: 10px;
+  margin: 6px 0;
+  font-size: 0.85rem;
+}
+
+.cmp-bar-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text-2);
+}
+
+.cmp-bar-track {
+  min-width: 60px;
+  height: 18px;
+  border: 1.5px solid var(--line);
+  border-radius: 6px;
+  background: var(--bg-2);
+  overflow: hidden;
+}
+
+.cmp-bar-fill {
+  display: block;
+  height: 100%;
+  background: var(--side);
+  border-right: 1.5px solid var(--line);
+}
+
+.cmp-bar-value {
+  font-family: var(--font-mono);
+  font-weight: 700;
+  text-align: right;
+}
+
+.cmp-levels + .cmp-levels {
+  margin-top: 18px;
+}
+
+.cmp-levels-head {
+  margin-bottom: 8px;
+  font-size: 1.05rem;
+}
+
+.cmp-lv-table {
+  border-collapse: separate;
+  border-spacing: 3px;
+}
+
+.cmp-lv-table th,
+.cmp-lv-table td {
+  padding: 0;
+  border: 0;
+}
+
+.cmp-lv-table th,
+.cmp-lv-table td:not(.heat-cell) {
+  background: none;
+}
+
+.cmp-lv-table thead th {
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  color: var(--text-3);
+  text-align: center;
+}
+
+.cmp-lv-table tbody th {
+  padding-right: 8px;
+  font-size: 0.85rem;
+  text-align: left;
+}
+
+.cmp-lv-table td.heat-cell {
+  padding: 4px 8px;
+  border-radius: 6px;
+  font-weight: 700;
+}
+
+.lv {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border: 1.5px solid var(--rule);
+  border-radius: 7px;
+  background: var(--bg-2);
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--text);
+  text-decoration: none;
+}
+
+a.lv:hover {
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-sm);
+}
+
+.lv-ok {
+  border-color: var(--line);
+  background: var(--green);
+  color: var(--on-color);
+}
+
+.lv-retry {
+  border-color: var(--line);
+  background: var(--green-t);
+}
+
+.lv-fail {
+  border-color: var(--line);
+  background: var(--red);
+  color: var(--on-color);
+}
+
+.lv-live {
+  border-color: var(--line);
+  background: var(--yellow);
+  color: var(--on-color);
+}
+
+.lv sup {
+  position: absolute;
+  top: -7px;
+  right: -5px;
+  font-size: 0.7rem;
+  color: var(--text);
+}
+
+.lv-miss {
+  position: absolute;
+  bottom: -1px;
+  left: 0;
+  right: 0;
+  font-size: 0.55rem;
+  line-height: 1;
+  color: var(--bad);
+  text-align: center;
+}
+
+.cmp-legend .lv {
+  width: 14px;
+  height: 14px;
+  border-radius: 4px;
+}
+
+@media (max-width: 900px) {
+  .cmp-cards {
+    grid-template-columns: repeat(min(var(--n, 2), 2), minmax(0, 1fr));
+  }
+
+  .cmp-bars {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 560px) {
+  .cmp-cards {
+    grid-template-columns: 1fr;
+  }
+
+  .cmp-share {
+    margin-left: 0;
+  }
+
+  .cmp-slot,
+  .cmp-add {
+    width: 100%;
+  }
+
+  .cmp-slot select:first-of-type {
+    flex: 1;
+    max-width: none;
+  }
+
+  .cmp-bar {
+    grid-template-columns: minmax(0, 7em) 1fr 3em;
+  }
+
+  /* The table scrolls sideways under a narrow, pinned Measure column. */
+  .cmp-table th,
+  .cmp-table td {
+    padding: 9px 10px;
+    font-size: 0.82rem;
+  }
+
+  .cmp-table tr > :first-child:not([colspan]) {
+    position: sticky;
+    left: 0;
+    z-index: 1;
+    min-width: 8.5em;
+    max-width: 9.5em;
+    white-space: normal;
+    background: var(--card);
+    box-shadow: 1px 0 0 var(--rule);
+  }
+
+  .cmp-table .cmp-wins td:first-child {
+    background: var(--bg-2);
+  }
+}

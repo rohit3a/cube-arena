@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { BarChart } from '@/components/charts';
 import CopyButton from '@/components/CopyButton';
+import Exportable from '@/components/Exportable';
 import WaitingNote from '@/components/WaitingNote';
 import { PersonName } from '@/components/People';
 import { type CodeEntry, codeBoard, sweepCode } from '@/lib/arena/code';
@@ -61,7 +62,7 @@ export default async function CodeBoardPage() {
         </div>
       </div>
 
-      <section className="card ix-card">
+      <Exportable name="Cube Arena coding benchmark" className="card ix-card">
         <header className="ix-head">
           <h2>Score</h2>
           <p>Mean over the {CODE.cases} hidden cubes: 100 × {CODE.reference} ÷ moves for each one solved, 0 for the rest.</p>
@@ -80,7 +81,7 @@ export default async function CodeBoardPage() {
           empty="No solver has been graded yet."
         />
         <WaitingNote waiting={waiting} />
-      </section>
+      </Exportable>
 
       {graded.length > 0 && (
         <>

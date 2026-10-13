@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from 'next';
 import { Bricolage_Grotesque, Inter, JetBrains_Mono } from 'next/font/google';
 import Link from 'next/link';
 import NavLinks from '@/components/NavLinks';
+import { MARK } from '@/lib/brand';
 import { GITHUB_URL, SITE_URL, X_HANDLE, X_URL } from '@/lib/site';
 import './globals.css';
 
@@ -29,8 +30,6 @@ export const viewport: Viewport = {
 
 // Applies a saved theme before first paint, so a dark-mode choice never flashes light.
 const THEME_SCRIPT = `try{var t=localStorage.getItem('theme');if(t==='light'||t==='dark')document.documentElement.dataset.theme=t}catch(e){}`;
-
-const MARK = ['#ffffff', '#f2545b', '#2bb673', '#ffd23f', '#ff9f1c', '#3d7bff', '#2bb673', '#ffffff', '#ffd23f'];
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (

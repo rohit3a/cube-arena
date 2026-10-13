@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { useMemo, useState } from 'react';
 import { BarChart, LineChart, ScatterChart, type Series } from '@/components/charts';
+import Exportable from '@/components/Exportable';
 import WaitingNote from '@/components/WaitingNote';
 import { OUT_OF_OUTPUT, OUT_OF_OUTPUT_WHY, fmtCost, fmtDuration, fmtScore, fmtTokens, heat } from '@/lib/arena/format';
 import { averageByLabel, resultHref } from '@/lib/arena/aggregate';
@@ -195,7 +196,7 @@ export default function IndexExplorer({ entries, suites, running }: { entries: S
           </p>
         )}
 
-        <section id="index" className="card ix-card">
+        <Exportable id="index" name={`Cube Arena Index ${suite.name} ${suite.version}`} className="card ix-card">
           <header className="ix-head">
             <h2>Cube Arena Index</h2>
             <p>
@@ -205,9 +206,9 @@ export default function IndexExplorer({ entries, suites, running }: { entries: S
           <BarChart items={bars} empty={<EmptyIndex kind={kind} />} />
           <Legend entries={rows} />
           <WaitingNote waiting={waiting} />
-        </section>
+        </Exportable>
 
-        <section id="tests" className="card ix-card">
+        <Exportable id="tests" name={`Cube Arena ${suite.name} score by test`} className="card ix-card">
           <header className="ix-head">
             <h2>Score by test</h2>
             <p>
@@ -267,9 +268,9 @@ export default function IndexExplorer({ entries, suites, running }: { entries: S
               <Link href="/benchmark#method">Why</Link>
             </p>
           )}
-        </section>
+        </Exportable>
 
-        <section id="tradeoffs" className="card ix-card">
+        <Exportable id="tradeoffs" name={`Cube Arena ${suite.name} index vs ${tradeoff}`} className="card ix-card">
           <header className="ix-head">
             <h2>What the score costs</h2>
             <p>Top left is where you want to be: a high score for few moves, little time or little money. The dotted line joins the models nobody beats on both.</p>
@@ -294,9 +295,9 @@ export default function IndexExplorer({ entries, suites, running }: { entries: S
               themselves used subscriptions.
             </p>
           )}
-        </section>
+        </Exportable>
 
-        <section id="effort" className="card ix-card">
+        <Exportable id="effort" name={`Cube Arena ${suite.name} effort`} className="card ix-card">
           <header className="ix-head">
             <h2>Does more effort help?</h2>
             <p>
@@ -305,9 +306,9 @@ export default function IndexExplorer({ entries, suites, running }: { entries: S
             </p>
           </header>
           <LineChart series={series} xs={EFFORT_ORDER} empty="Effort curves appear once a model has been run at two or more efforts." />
-        </section>
+        </Exportable>
 
-        <section id="table" className="card ix-card">
+        <Exportable id="table" name={`Cube Arena ${suite.name} all results`} className="card ix-card">
           <header className="ix-head">
             <h2>All results</h2>
             <p>
@@ -378,7 +379,7 @@ export default function IndexExplorer({ entries, suites, running }: { entries: S
               </table>
             </div>
           )}
-        </section>
+        </Exportable>
       </div>
     </div>
   );
