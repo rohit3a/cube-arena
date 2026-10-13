@@ -500,7 +500,7 @@ function LevelGrid({ test, sides }: { test: TestName; sides: Colored[] }) {
   return (
     <>
       <h3 className="cmp-levels-head">{test.name}</h3>
-      <div className="table-wrap flat">
+      <div className="cmp-lv-wrap">
         <table className="cmp-lv-table">
           <thead>
             <tr>
@@ -519,9 +519,10 @@ function LevelGrid({ test, sides }: { test: TestName; sides: Colored[] }) {
               return (
                 <tr key={i} style={{ '--side': s.color } as CSSProperties}>
                   <th scope="row">
-                    <span className="cmp-th">
+                    <span className="cmp-lv-name">
                       <i className="cmp-dot" aria-hidden />
-                      {s.label}
+                      {s.model}
+                      {s.effort && <small>{s.effort}</small>}
                     </span>
                   </th>
                   {levels.map((l) => (
@@ -529,7 +530,7 @@ function LevelGrid({ test, sides }: { test: TestName; sides: Colored[] }) {
                       <LevelCell lv={d?.levels.find((x) => x.level === l)} starred={star.get(l)} />
                     </td>
                   ))}
-                  <td className={`num heat-cell ${heat(d?.score ?? null)}`}>{fmtScore(d?.score ?? null)}</td>
+                  <td className={`num cmp-lv-score${(d?.score ?? 0) < 100 ? ' lo' : ''}`}>{fmtScore(d?.score ?? null)}</td>
                 </tr>
               );
             })}

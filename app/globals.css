@@ -4456,86 +4456,137 @@ td.cmp-win::after {
 }
 
 .cmp-levels-head {
-  margin-bottom: 8px;
+  margin-bottom: 10px;
+  padding: 2px 90px 10px 0;
+  border-bottom: 1px solid color-mix(in srgb, var(--text) 10%, transparent);
   font-size: 1.05rem;
+}
+
+/* The Image button sits on the heading's line, not over the grid. */
+.cmp-levels > .export-menu {
+  top: 0;
+  right: 0;
+}
+
+.cmp-lv-wrap {
+  overflow-x: auto;
 }
 
 .cmp-lv-table {
   border-collapse: separate;
-  border-spacing: 3px;
+  border-spacing: 5px 6px;
+  margin: -6px -5px;
+  width: calc(100% + 10px);
 }
 
 .cmp-lv-table th,
 .cmp-lv-table td {
   padding: 0;
   border: 0;
-}
-
-.cmp-lv-table th,
-.cmp-lv-table td:not(.heat-cell) {
   background: none;
 }
 
 .cmp-lv-table thead th {
   font-family: var(--font-mono);
-  font-size: 0.7rem;
+  font-size: 0.68rem;
+  font-weight: 400;
   color: var(--text-3);
   text-align: center;
 }
 
+.cmp-lv-table thead th:last-child {
+  text-align: right;
+}
+
 .cmp-lv-table tbody th {
-  padding-right: 8px;
-  font-size: 0.85rem;
+  width: 1%;
+  padding-right: 12px;
   text-align: left;
 }
 
-.cmp-lv-table td.heat-cell {
-  padding: 4px 8px;
-  border-radius: 6px;
-  font-weight: 700;
+.cmp-lv-name {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-family: var(--font-body, inherit);
+  font-size: 0.88rem;
+  letter-spacing: normal;
+  text-transform: none;
+  color: var(--text);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.cmp-lv-name .cmp-dot {
+  width: 10px;
+  height: 10px;
+  border: 0;
+}
+
+.cmp-lv-name small {
+  font-weight: 500;
+  color: var(--text-3);
+}
+
+.cmp-lv-score {
+  min-width: 3.4em;
+  padding-left: 10px !important;
+  font-family: var(--font-display);
+  font-size: 1.1rem;
+  font-weight: 800;
+  text-align: right;
+}
+
+.cmp-lv-score.lo {
+  color: var(--orange);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) .cmp-lv-score.lo {
+    color: var(--yellow);
+  }
+}
+
+:root[data-theme='dark'] .cmp-lv-score.lo {
+  color: var(--yellow);
 }
 
 .lv {
   position: relative;
-  display: inline-flex;
+  display: flex;
   align-items: center;
   justify-content: center;
-  width: 30px;
-  height: 30px;
-  border: 1.5px solid var(--rule);
+  min-width: 30px;
+  height: 34px;
   border-radius: 7px;
-  background: var(--bg-2);
+  background: color-mix(in srgb, var(--text) 5%, transparent);
   font-family: var(--font-mono);
-  font-size: 0.72rem;
+  font-size: 0.76rem;
   font-weight: 700;
   color: var(--text);
   text-decoration: none;
 }
 
 a.lv:hover {
+  filter: brightness(1.08);
   transform: translateY(-1px);
-  box-shadow: var(--shadow-sm);
 }
 
 .lv-ok {
-  border-color: var(--line);
   background: var(--green);
   color: var(--on-color);
 }
 
 .lv-retry {
-  border-color: var(--line);
   background: var(--green-t);
 }
 
 .lv-fail {
-  border-color: var(--line);
   background: var(--red);
   color: var(--on-color);
 }
 
 .lv-live {
-  border-color: var(--line);
   background: var(--yellow);
   color: var(--on-color);
 }
@@ -4543,9 +4594,9 @@ a.lv:hover {
 .lv sup {
   position: absolute;
   top: -7px;
-  right: -5px;
-  font-size: 0.7rem;
-  color: var(--text);
+  right: -4px;
+  font-size: 0.68rem;
+  color: var(--yellow);
 }
 
 .lv-miss {
