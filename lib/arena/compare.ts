@@ -10,8 +10,7 @@ import { UUID, withDb } from './db';
 import { type SuiteEntry, suiteEntries } from './index-data';
 import { EFFORT_ORDER, effortRank } from './makers';
 import { suiteOrder } from './ranking';
-import { LADDER_MAX_LEVEL } from './rules';
-import { SUITES, type SuiteKind, suiteTests } from './suites';
+import { SUITES, type SuiteKind, suiteTests, testName } from './suites';
 
 export const MAX_PICKS = 4;
 
@@ -57,6 +56,8 @@ export interface LevelTries {
 export interface TestDetail {
   test: string;
   name: string;
+  /** Fast's 4×4 Gauntlet, played only after a perfect score on the other tests. */
+  gauntlet: boolean;
   /** Ladder top, or null for a full scramble. */
   max: number | null;
   score: number | null;
@@ -251,9 +252,6 @@ async function levelDetail(ids: string[]): Promise<Map<string, AttemptRow[]>> {
 
 function testDetail(e: SuiteEntry, rows: AttemptRow[]): TestDetail[] {
   const def = SUITES[e.kind];
-  const names = new Map(
-    suiteTests(def).map((t) => [t.test, `${t.size}×${t.size} ${t.challenge === 'ladder' ? 'ladder' : 'scramble'}, ${t.mode === 'one_shot' ? 'one-shot' : 'interactive'}`]),
-  );
   return suiteTests(def).map((t) => {
     const mine = rows.filter((r) => t.slots.includes(r.slot));
     const runs = e.runs.filter((r) => t.slots.includes(r.slot));
@@ -266,8 +264,9 @@ function testDetail(e: SuiteEntry, rows: AttemptRow[]): TestDetail[] {
     }
     return {
       test: t.test,
-      name: names.get(t.test) ?? t.test,
-      max: t.challenge === 'ladder' ? LADDER_MAX_LEVEL[t.size] : null,
+      name: testName(t).name,
+      gauntlet: t.gauntlet,
+      max: t.challenge === 'ladder' ? t.levels : null,
       score: e.tests.find((x) => x.test === t.test)?.score ?? null,
       best_level: runs.length ? Math.max(...runs.map((r) => r.best_level)) : null,
       end_reason: runs[0]?.end_reason ?? null,

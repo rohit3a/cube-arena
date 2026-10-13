@@ -3,7 +3,7 @@ import Link from 'next/link';
 import IndexExplorer, { type SuiteInfo } from '@/components/IndexExplorer';
 import { suiteEntries, testNames } from '@/lib/arena/index-data';
 import { sweepExpired } from '@/lib/arena/service';
-import { SUITES, SUITE_KINDS, suiteTests } from '@/lib/arena/suites';
+import { GAUNTLET, SUITES, SUITE_KINDS, suiteTests } from '@/lib/arena/suites';
 
 export const dynamic = 'force-dynamic';
 export const metadata: Metadata = {
@@ -16,8 +16,8 @@ export default async function Benchmark() {
   const entries = (await suiteEntries()).filter((e) => e.board === 'verified');
   const suites: SuiteInfo[] = SUITE_KINDS.map((k) => ({ kind: k, name: SUITES[k].name, version: SUITES[k].version, blurb: SUITES[k].blurb, tests: testNames(k) }));
   const running = entries.filter((e) => e.status === 'active');
-  const fast = SUITES.fast;
   const thorough = SUITES.thorough;
+  const g = `${GAUNTLET.size}×${GAUNTLET.size}`;
 
   return (
     <div className="wrap page-head">
@@ -37,8 +37,12 @@ export default async function Benchmark() {
           <div className="card">
             <h3>Two suites</h3>
             <p>
-              <strong>Fast</strong>: {fast.slots.length} ladders, 2×2 and 3×3 interactive and 3×3 one-shot. Every model gets it, at every effort
-              level.
+              <strong>Fast</strong>: three ladders, 2×2 and 3×3 interactive and 3×3 one-shot. Every model gets it, at every effort level.
+            </p>
+            <p>
+              <strong>The {g} {GAUNTLET.name}</strong> ends Fast, for the models that score 100 on all three: two {g} ladders, interactive and
+              one-shot, {GAUNTLET.levels} levels each. There are no easy levels: level 1 is already {GAUNTLET.startDepth} moves from solved, and
+              level {GAUNTLET.levels} is {GAUNTLET.startDepth + GAUNTLET.levels - 1}. It sorts the models that clear everything else.
             </p>
             <p>
               <strong>Thorough</strong>: all {suiteTests(thorough).length} model-only tests, 2×2 to 5×5, ladder and full scramble,
@@ -52,8 +56,10 @@ export default async function Benchmark() {
               scores 100 for a solve, 0 for a miss.
             </p>
             <p>
-              The index weighs the tests: in Fast, the 2×2 ladder counts 20% and each 3×3 ladder 40%, since every strong model clears the
-              2×2. Equal scores rank by the fewest moves, then the lowest cost, then the least time.
+              The index weighs the tests. In Fast, the 2×2 ladder counts 20%, since every strong model clears it, and each 3×3 ladder 30%. The
+              {` ${GAUNTLET.name}`} is worth the last 20%, 10% for each ladder, and only a perfect 100 on the other three unlocks it, so without it 80 is
+              the top score. A model that unlocked it but hasn&apos;t played it yet shows its 80, tagged <em>4×4 pending</em>. Equal scores rank by the
+              fewest moves, then the lowest cost, then the least time.
             </p>
             <p>
               <strong>Top effort first.</strong> A model is ranked once it has been run at its highest effort setting, so none is ranked on a
@@ -88,7 +94,10 @@ export default async function Benchmark() {
             <ul className="method-list">
               <li>Charts show Verified runs only. Community runs stay on the <Link href="/leaderboard">boards</Link>.</li>
               <li>Cost: Claude Code&apos;s API-equivalent cost, or GPT tokens at OpenAI&apos;s list prices. The runs used subscriptions.</li>
-              <li>Changing tests or grading makes a new version; scores only compare within one.</li>
+              <li>
+                Changing tests or grading makes a new version; scores only compare within one. Fast v3 added the {GAUNTLET.name} and kept v2&apos;s
+                three tests with the same cubes, so v2 results carried over, regraded with the new weights.
+              </li>
               <li>
                 Every cube has a replay. Open any result, or <Link href="/connect">run your own model</Link>.
               </li>

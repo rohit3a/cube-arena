@@ -22,7 +22,7 @@ import { commandFor } from './command.mjs';
 import { cursorBin, cursorModels, cursorSignedIn, cursorSlug } from './cursor.mjs';
 import { playSuite } from './play-suite.mjs';
 
-const VERSION = '0.4.5';
+const VERSION = '0.5.0';
 const DEFAULT_URL = 'https://cube.krnl.studio/mcp';
 const HOME = process.env.CUBE_ARENA_HOME || join(homedir(), '.cube-arena');
 const CONFIG = join(HOME, 'config.json');
@@ -41,14 +41,14 @@ const HELP = `cube-arena-runner ${VERSION}: run Cube Arena Index suites for the 
 
 play options:
   --effort <level>         low, medium, high, xhigh or max (what the model takes; see wanted)
-  --suite fast|thorough    default fast (three ladders); thorough is every test (many hours)
+  --suite fast|thorough    default fast (three ladders, then the 4×4 Gauntlet after a perfect 100); thorough is every test (many hours)
   --via <how>              claude-code, codex, cursor, muse, openrouter or api (default: the first you have)
   --base-url <url>         with --via api: an OpenAI-compatible endpoint, e.g. https://api.x.ai/v1
   --api-key-env <NAME>     with --via api: the environment variable holding its key
   --api-model <id>         with --via api: the model's id on that endpoint
   --codex-home <dir>       a Codex home just for this (default ~/.cube-arena/codex)
   --cursor-home <dir>      Cursor's config and data for the runner (default ~/.cube-arena/cursor)
-  --resume <suite id>      carry on a suite that stopped part way
+  --resume <suite id>      carry on a suite that stopped part way, or play the Gauntlet a suite unlocked
   --force                  play even if someone else has claimed this one
   --no-transcript          don't upload the session logs (they help us check results)
 
@@ -108,6 +108,13 @@ async function get(site, path, token, body) {
   const json = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(json.error ?? `${path}: ${res.status}`);
   return json;
+}
+
+/** "3 tests" or "3 tests, then 2 Gauntlet tests after a perfect score". */
+function testCount(tests) {
+  const g = tests.filter((t) => t.gauntlet).length;
+  const base = tests.length - g;
+  return `${base} test${base === 1 ? '' : 's'}${g ? `, then ${g} Gauntlet tests after a perfect score` : ''}`;
 }
 
 /** Says so when the site has a newer runner than this one. */
@@ -227,6 +234,12 @@ if (!command || command === 'help' || command === '--help' || command === '-h') 
     const status = r.runs ? `${r.runs} run${r.runs > 1 ? 's' : ''}, ${r.mean.toFixed(1)}` : r.claim ? `claimed${r.claim.by ? ` by ${r.claim.by}` : ''}${r.claim.mine ? ' (you)' : ''}` : 'needed';
     console.log(`${`${r.name}${r.effort ? ` (${r.effort})` : ''}`.padEnd(36)} ${status.padEnd(26)} ${r.command}`);
   }
+  // Suites of yours that scored 100 and haven't played the Gauntlet they unlocked.
+  const mine = rows.flatMap((r) => (r.gauntlets ?? []).filter((g) => g.mine).map((g) => ({ ...g, name: `${r.name}${r.effort ? ` (${r.effort})` : ''}` })));
+  if (mine.length) {
+    console.log('\nYour suites with the 4×4 Gauntlet unlocked and not played yet:');
+    for (const g of mine) console.log(`${g.name.padEnd(36)} ${`${g.score?.toFixed(1) ?? '-'} so far`.padEnd(26)} ${g.command}`);
+  }
 } else if (command === 'play') {
   await play();
 } else if (command === 'code') {
@@ -310,7 +323,11 @@ async function play() {
     if (suite.model_id !== model.id || (suite.effort ?? null) !== effort || suite.kind !== opt.suite) {
       fail(`That suite is ${suite.kind} for ${suite.model_name}, not ${opt.suite} for ${model.name}${effort ? ` (${effort})` : ''}.`);
     }
-    if (suite.status === 'finished') fail('That suite is already finished.');
+    // A finished suite carries on only into a Gauntlet it unlocked and hasn't played.
+    const gauntlet = suite.grade?.gauntlet;
+    if (suite.status === 'finished' && gauntlet !== 'pending' && gauntlet !== 'playing') {
+      fail(gauntlet === 'locked' ? 'That suite is finished: it scored under 100, so its Gauntlet stays locked.' : 'That suite is already finished.');
+    }
     played = new Set(suite.slots_played ?? []);
   } else {
     // Someone else on it already? Then pick another row, unless --force.
@@ -320,7 +337,7 @@ async function play() {
     ({ suite, tests } = await call('/api/admin/suites', { kind: opt.suite, model_id: model.id, effort, harness, credit: !!config.credit }).catch((e) => fail(e.message)));
   }
 
-  console.log(`${suite.model_name} via ${harness}: ${opt.suite} suite ${suite.version}, ${tests.length} tests → ${site}`);
+  console.log(`${suite.model_name} via ${harness}: ${opt.suite} suite ${suite.version}, ${testCount(tests)} → ${site}`);
   console.log(`suite ${suite.id} (resume with --resume ${suite.id})`);
   const r = await playSuite({
     url,

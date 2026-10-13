@@ -39,6 +39,9 @@ import { SYSTEM } from './system.mjs';
 
 export { SYSTEM } from './system.mjs';
 
+/** Sent with every call to the site, which turns away a runner too old for the suites it serves. */
+export const RUNNER_VERSION = JSON.parse(readFileSync(new URL('./package.json', import.meta.url), 'utf8')).version;
+
 /**
  * Calls to the site's runner API with the operator token or an invite code:
  * make and close suites, end, hide or annotate runs. A Buffer body is sent as
@@ -50,7 +53,7 @@ export function operator(url, token) {
     const raw = Buffer.isBuffer(body);
     const res = await fetch(`${site}${path}`, {
       method: body ? 'POST' : 'GET',
-      headers: { Authorization: `Bearer ${token}`, 'Content-Type': raw ? 'application/gzip' : 'application/json' },
+      headers: { Authorization: `Bearer ${token}`, 'Content-Type': raw ? 'application/gzip' : 'application/json', 'X-Cube-Arena-Runner': RUNNER_VERSION },
       body: raw ? body : body ? JSON.stringify(body) : undefined,
     });
     const json = await res.json().catch(() => ({}));

@@ -35,7 +35,12 @@ export function demoEntries(): SuiteEntry[] {
         if (kind === 'thorough' && effort !== 'max') continue;
         n += 1;
         const score = Math.max(0, top * (kind === 'thorough' ? 0.55 : 1) * (0.55 + 0.45 * (i / 4)) + ((n * 7) % 5) - 2);
-        const tests = suiteTests(SUITES[kind]).map((t, j) => ({ test: t.test, score: Math.max(0, Math.min(100, score * (1.6 - j * 0.35))), played: t.slots.length, cubes: t.slots.length, out_of_output: false }));
+        const tests = suiteTests(SUITES[kind]).map((t, j) =>
+          t.gauntlet
+            ? { test: t.test, gauntlet: true, score: 0, played: 0, cubes: t.slots.length, out_of_output: false }
+            : { test: t.test, gauntlet: false, score: Math.max(0, Math.min(100, score * (1.6 - j * 0.35))), played: t.slots.length, cubes: t.slots.length, out_of_output: false },
+        );
+        const base = tests.filter((t) => !t.gauntlet).length;
         const maker = makerOf(model);
         const solved = Math.round(score / 4);
         const moves = solved * (8 + ((n * 13) % 9));
@@ -57,6 +62,7 @@ export function demoEntries(): SuiteEntry[] {
           finished_at: new Date(Date.now() - n * 3_000_000).toISOString(),
           score,
           tests,
+          gauntlet: kind === 'fast' ? (score >= 80 ? 'pending' : 'locked') : null,
           moves,
           solved,
           moves_per_solve: solved ? moves / solved : null,
@@ -67,7 +73,7 @@ export function demoEntries(): SuiteEntry[] {
           cost_estimated: slug.startsWith('gpt'),
           runs: [],
           out_of_output: 0,
-          progress: { started: tests.length, of: tests.length },
+          progress: { started: base, of: base },
           n: 1,
           ids: [`00000000-0000-4000-8000-${String(n).padStart(12, '0')}`],
           run_by: [n % 4 === 3 ? 'an invited tester' : n % 4 === 0 ? 'Cube Arena' : PEOPLE[n % 3].name],

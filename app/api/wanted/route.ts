@@ -21,6 +21,7 @@ export async function GET(req: Request) {
         via: Object.keys(r.model.via),
         claim: r.claim,
         command: r.command,
+        gauntlets: r.gauntlets,
       })),
     },
     { headers: { 'Cache-Control': 'no-store' } },

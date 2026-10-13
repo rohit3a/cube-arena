@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import MiniFace from './MiniFace';
 import type { FeedItem } from '@/lib/arena/board';
-import { TOOL_USE_LABEL } from '@/lib/arena/rules';
+import { TOOL_USE_LABEL, levelLabel } from '@/lib/arena/rules';
 
 export function Feed({ items }: { items: FeedItem[] }) {
   if (items.length === 0) return <p className="empty">No finished attempts yet. The first one will show up here.</p>;
@@ -9,7 +9,7 @@ export function Feed({ items }: { items: FeedItem[] }) {
     <div className="feed">
       {items.map((a) => {
         const won = a.status === 'solved';
-        const what = a.level ? `level ${a.level}` : 'full scramble';
+        const what = levelLabel(a);
         return (
           <Link key={a.id} prefetch={false} href={`/replay/${a.id}`} className="feed-item">
             <MiniFace n={a.size} solved={won} seed={a.id} />

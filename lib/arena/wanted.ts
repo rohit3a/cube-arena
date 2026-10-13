@@ -5,6 +5,7 @@
 import type { Auth } from './auth';
 import { CATALOG, type CatalogModel } from './catalog';
 import { type Claim, openClaims } from './claims';
+import { withDb } from './db';
 import { type SuiteEntry, suiteEntries } from './index-data';
 import { SUITES, type SuiteKind } from './suites';
 
@@ -19,10 +20,26 @@ export interface WantedRow {
   mean: number | null;
   claim: Claim | null;
   command: string;
+  /** Its suites that unlocked the 4×4 Gauntlet and haven't played it: whoever ran one continues it. */
+  gauntlets: PendingGauntlet[];
+}
+
+export interface PendingGauntlet {
+  suite_id: string;
+  /** The score so far (80 with a perfect score), and who ran it. */
+  score: number | null;
+  run_by: string;
+  /** Run by the caller: the operator's own, or this invite's. */
+  mine: boolean;
+  command: string;
 }
 
 export const commandFor = (id: string, effort: string | null, kind: SuiteKind) =>
   `cube-arena-runner play --model ${id}${effort ? ` --effort ${effort}` : ''}${kind === 'thorough' ? ' --suite thorough' : ''}`;
+
+/** Plays an unlocked Gauntlet: the suite carries on where it closed. Only whoever ran the suite can. */
+export const gauntletCommand = (id: string, effort: string | null, suiteId: string) =>
+  `cube-arena-runner play --model ${id}${effort ? ` --effort ${effort}` : ''} --resume ${suiteId}`;
 
 const key = (id: string, effort: string | null, kind: SuiteKind) => `${id}|${effort ?? ''}|${kind}`;
 
@@ -35,10 +52,33 @@ export async function wantedRows(auth: Auth | null = null): Promise<{ rows: Want
     done.set(k, [...(done.get(k) ?? []), e]);
   }
   const claimOf = new Map(claims.map((c) => [key(c.model_id, c.effort, c.kind), c]));
+  // Who ran each suite with a Gauntlet waiting, to say whose it is to play.
+  const waiting = [...done.values()].flat().filter((e) => e.gauntlet === 'pending');
+  const owner = new Map(
+    waiting.length
+      ? (
+          await withDb((sql) => sql<{ id: string; invite_id: string | null }[]>`
+            select id, invite_id from cube_arena.suites where id = any(${sql.array(waiting.map((e) => e.id))}::uuid[])`)
+        ).map((r) => [r.id, r.invite_id])
+      : [],
+  );
+  const mine = (id: string) => (auth ? (auth.role === 'operator' ? owner.get(id) === null : owner.get(id) === auth.invite.id) : false);
   const row = (model: CatalogModel, effort: string | null, kind: SuiteKind): WantedRow => {
     const es = done.get(key(model.id, effort, kind)) ?? [];
     const mean = es.length ? es.reduce((a, e) => a + (e.score ?? 0), 0) / es.length : null;
-    return { model, effort, kind, runs: es.length, mean, claim: claimOf.get(key(model.id, effort, kind)) ?? null, command: commandFor(model.id, effort, kind) };
+    const gauntlets = es
+      .filter((e) => e.gauntlet === 'pending')
+      .map((e) => ({ suite_id: e.id, score: e.score, run_by: e.contributor?.name ?? e.run_by[0], mine: mine(e.id), command: gauntletCommand(model.id, effort, e.id) }));
+    return {
+      model,
+      effort,
+      kind,
+      runs: es.length,
+      mean,
+      claim: claimOf.get(key(model.id, effort, kind)) ?? null,
+      command: commandFor(model.id, effort, kind),
+      gauntlets,
+    };
   };
 
   const wanted = CATALOG.filter((m) => m.wanted);

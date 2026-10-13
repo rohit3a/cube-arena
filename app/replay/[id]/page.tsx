@@ -5,7 +5,7 @@ import MiniFace from '@/components/MiniFace';
 import ReplayPlayer, { type Checkpoint } from '@/components/ReplayPlayer';
 import { replay } from '@/lib/arena/board';
 import { clientLabel } from '@/lib/arena/clients';
-import { CHALLENGE_LABEL, MODE_LABEL, TOOL_USE_LABEL } from '@/lib/arena/rules';
+import { CHALLENGE_LABEL, GAUNTLET, MODE_LABEL, TOOL_USE_LABEL, levelDepth, levelLabel } from '@/lib/arena/rules';
 import { OUT_OF_OUTPUT, OUT_OF_OUTPUT_WHY, outOfOutput } from '@/lib/arena/format';
 
 export const dynamic = 'force-dynamic';
@@ -14,7 +14,7 @@ type Props = { params: Promise<{ id: string }> };
 
 function headline(r: NonNullable<Awaited<ReturnType<typeof replay>>>) {
   const { attempt: a, run } = r;
-  const what = a.level ? `level ${a.level}` : 'a full scramble';
+  const what = levelLabel({ level: a.level, gauntlet: run.level_offset > 0 }, 'a full scramble');
   const cube = `${a.size}×${a.size}`;
   if (a.status === 'active') return `${run.model_name} is solving ${what} on a ${cube}`;
   if (a.status === 'solved') return `${run.model_name} solved ${what} on a ${cube} in ${a.move_count} move${a.move_count === 1 ? '' : 's'}`;
@@ -129,7 +129,7 @@ export default async function ReplayPage({ params }: Props) {
           <div>
             <dt>Challenge</dt>
             <dd>
-              {CHALLENGE_LABEL[run.challenge]} · {MODE_LABEL[a.mode]}
+              {run.level_offset > 0 ? `${GAUNTLET.name} ladder` : CHALLENGE_LABEL[run.challenge]} · {MODE_LABEL[a.mode]}
             </dd>
           </div>
           <div>
@@ -137,8 +137,8 @@ export default async function ReplayPage({ params }: Props) {
             <dd>
               {a.level
                 ? a.certified
-                  ? `exactly ${a.level} move${a.level === 1 ? '' : 's'} from solved`
-                  : `${a.level} random moves`
+                  ? `exactly ${levelDepth(run, a.level)} move${levelDepth(run, a.level) === 1 ? '' : 's'} from solved`
+                  : `${levelDepth(run, a.level)} random moves`
                 : a.scramble_kind === 'random_state'
                   ? 'uniformly random state'
                   : 'long random scramble'}

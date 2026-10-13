@@ -10,12 +10,14 @@ import { atlasPng } from '../render/png';
 import { CLAIM_HOURS } from './claims';
 import { type AttemptRow, type RunRow, type SuiteRow, type Tx, UUID, transaction, withDb } from './db';
 import {
-  type Board, type Challenge, LADDER_LIVES, LADDER_MAX_LEVEL, MAX_INVALID, MAX_LOOKS, MAX_TURN_BATCH, MODE_LABEL, type Mode,
-  MODEL_NAME_HELP, RUNS_PER_HOUR, RUNS_PER_HOUR_TOTAL, SCRAMBLE_MOVE_CAP, type Size, TOOL_USE_LABEL, type ToolUse, isFamilyOnly, ladderMoveCap, scoringLine,
-  CHALLENGE_LABEL,
+  type Board, type Challenge, LADDER_LIVES, MAX_INVALID, MAX_LOOKS, MAX_TURN_BATCH, MODE_LABEL, type Mode,
+  MODEL_NAME_HELP, RUNS_PER_HOUR, RUNS_PER_HOUR_TOTAL, SCRAMBLE_MOVE_CAP, type Size, TOOL_USE_LABEL, type ToolUse, isFamilyOnly, ladderMoveCap, levelDepth,
+  scoringLine, topLevel, CHALLENGE_LABEL,
 } from './rules';
 import { gradeSuites } from './suite-data';
-import { SUITES, SUITE_SCORING, type SuiteKind, suiteSeed } from './suites';
+import {
+  GAUNTLET, SUITES, SUITE_SCORING, type SuiteDef, type SuiteGrade, type SuiteKind, gauntletToPlay, seedVersionOf, suiteSeed, testName,
+} from './suites';
 
 export const BASE_URL = (process.env.PUBLIC_BASE_URL || 'https://cube.krnl.studio').replace(/\/$/, '');
 
@@ -86,8 +88,9 @@ function header(run: RunRow): string {
 function attemptLine(run: RunRow, a: AttemptRow): string {
   const left = a.move_cap - a.move_count;
   if (run.challenge === 'ladder') {
-    const exact = a.certified ? `exactly ${a.level} move${a.level === 1 ? '' : 's'} from solved` : `scrambled with ${a.level} random moves`;
-    return `Level ${a.level} of ${LADDER_MAX_LEVEL[run.size]} (${exact}). Lives: ${run.lives}. Moves left this attempt: ${left}.`;
+    const depth = levelDepth(run, a.level ?? 0);
+    const exact = a.certified ? `exactly ${depth} move${depth === 1 ? '' : 's'} from solved` : `scrambled with ${depth} random moves`;
+    return `Level ${a.level} of ${topLevel(run)} (${exact}). Lives: ${run.lives}. Moves left this attempt: ${left}.`;
   }
   const how = a.scramble_kind === 'random_state' ? 'a uniformly random state' : `${a.scramble?.split(' ').length ?? 0} random moves`;
   return `Full scramble (${how}). Moves allowed: ${left}.`;
@@ -136,7 +139,7 @@ async function newAttempt(tx: Tx, run: RunRow): Promise<AttemptRow> {
     const [suite] = await tx<{ kind: SuiteKind; version: string }[]>`select kind, version from cube_arena.suites where id = ${run.suite_id}`;
     const [{ tries }] = await tx<{ tries: number }[]>`
       select count(*)::int as tries from cube_arena.attempts where run_id = ${run.id} and level is not distinct from ${level}`;
-    seed = suiteSeed(suite.kind, suite.version, run.suite_slot ?? 0, level, tries);
+    seed = suiteSeed(suite.kind, seedVersionOf(suite.kind, suite.version, run.suite_slot ?? 0), run.suite_slot ?? 0, level, tries);
   }
   const random = rng(seed);
   let state: string;
@@ -145,12 +148,14 @@ async function newAttempt(tx: Tx, run: RunRow): Promise<AttemptRow> {
   let certified = false;
   let cap: number;
   if (run.challenge === 'ladder') {
-    const sc = levelScramble(n, run.level, random);
+    // Level N is N moves from solved, or more on a ladder that starts higher (the Gauntlet).
+    const depth = levelDepth(run, run.level);
+    const sc = levelScramble(n, depth, random);
     state = stateToString(sc.state);
     scramble = sc.moves.map((m) => m.token).join(' ');
     kind = 'walk';
     certified = sc.certified;
-    cap = ladderMoveCap(n, run.level);
+    cap = ladderMoveCap(n, depth);
   } else {
     const sc = fullScramble(n, random);
     state = stateToString(sc.state);
@@ -191,15 +196,31 @@ async function finishRun(tx: Tx, run: RunRow, reason: string) {
   if (run.suite_id) run.suite_note = await afterSuiteTest(tx, run.suite_id, run.suite_slot ?? 0);
 }
 
-/** A suite test ended: close the suite if it was the last, and say what comes next. */
+/** "test 2 of 3", or "Gauntlet test 1 of 2": tests are counted apart from the Gauntlet, which most suites never reach. */
+function slotLabel(def: SuiteDef, slot: number): string {
+  const gauntlet = !!def.slots[slot]?.gauntlet;
+  const same = def.slots.flatMap((s, i) => (!!s.gauntlet === gauntlet ? [i] : []));
+  return `${gauntlet ? `${GAUNTLET.name} test` : 'test'} ${same.indexOf(slot) + 1} of ${same.length}`;
+}
+
+const gradeOf = async (tx: Tx, suite: SuiteRow): Promise<SuiteGrade> => (await gradeSuites(tx, [suite])).get(suite.id) as SuiteGrade;
+
+/**
+ * A suite test ended: say what comes next. Once every test but the Gauntlet
+ * is over, the suite closes with that score; a perfect one unlocks the
+ * Gauntlet, played after the close, and the suite's result line says so.
+ */
 async function afterSuiteTest(tx: Tx, suiteId: string, slot: number): Promise<string> {
   const [suite] = await tx<SuiteRow[]>`select * from cube_arena.suites where id = ${suiteId} for update`;
   const def = SUITES[suite.kind];
-  const [{ done }] = await tx<{ done: number }[]>`
-    select count(*)::int as done from cube_arena.runs where suite_id = ${suiteId} and status = 'finished'`;
+  const runs = await tx<{ suite_slot: number }[]>`
+    select suite_slot from cube_arena.runs where suite_id = ${suiteId} and status = 'finished'`;
+  const over = new Set(runs.map((r) => r.suite_slot));
   await tx`update cube_arena.suites set updated_at = now() where id = ${suiteId}`;
-  if (done < def.slots.length) {
-    return `Suite test ${slot + 1} of ${def.slots.length} is over (${done} done). Call next_test with suite_id "${suiteId}" for the next one.`;
+  const gauntlet = !!def.slots[slot]?.gauntlet;
+  const left = def.slots.filter((s, i) => !!s.gauntlet === gauntlet && !over.has(i)).length;
+  if (left > 0) {
+    return `Suite ${slotLabel(def, slot)} is over (${left} to go). Call next_test with suite_id "${suiteId}" for the next one.`;
   }
   return finishSuite(tx, suite);
 }
@@ -209,36 +230,58 @@ async function afterSuiteTest(tx: Tx, suiteId: string, slot: number): Promise<st
  * complete: every test played to an end the model made (cleared, out of
  * lives, gave up, quit). A test never played, or one stopped for a reason
  * nobody knows (a crash, a killed runner), says nothing about the model, so
- * that suite is hidden, its runs with it.
+ * that suite is hidden, its runs with it. The Gauntlet doesn't count here: the
+ * suite closes before it, and a Gauntlet cut short scores what it reached.
  */
 async function finishSuite(tx: Tx, suite: SuiteRow): Promise<string> {
+  const def = SUITES[suite.kind];
   if (suite.status !== 'finished') {
     await tx`update cube_arena.suites set status = 'finished', finished_at = now(), updated_at = now() where id = ${suite.id}`;
-    // Its claim, if any, is done: the model and effort are free for another run.
-    await tx`update cube_arena.claims set released_at = now() where suite_id = ${suite.id} and released_at is null`;
     suite.status = 'finished';
     const gap = await incomplete(tx, suite);
     if (gap) {
       await tx`update cube_arena.suites set hidden = true, hidden_reason = coalesce(hidden_reason, ${`incomplete: ${gap}`}) where id = ${suite.id}`;
       await tx`update cube_arena.runs set hidden = true, hidden_reason = coalesce(hidden_reason, ${`incomplete suite: ${gap}`}) where suite_id = ${suite.id}`;
       suite.hidden = true;
+      suite.hidden_reason ??= `incomplete: ${gap}`;
     }
   }
-  if (suite.hidden && (suite.hidden_reason ?? 'incomplete').startsWith('incomplete')) {
-    return `Suite closed: ${SUITES[suite.kind].name} ${suite.version} is incomplete, so it isn't shown on the boards. Start a new one to run it again.`;
+  const closed = suite.hidden && (suite.hidden_reason ?? 'incomplete').startsWith('incomplete');
+  const grade = closed ? null : await gradeOf(tx, suite);
+  // Its claim, if any, is done (the model and effort are free for another run), unless the Gauntlet is still to play.
+  if (grade?.gauntlet !== 'pending' && grade?.gauntlet !== 'playing') {
+    await tx`update cube_arena.claims set released_at = now() where suite_id = ${suite.id} and released_at is null`;
   }
-  const grade = (await gradeSuites(tx, [suite])).get(suite.id);
-  const score = grade?.score ?? 0;
+  if (!grade) {
+    return `Suite closed: ${def.name} ${suite.version} is incomplete, so it isn't shown on the boards. Start a new one to run it again.`;
+  }
+  const score = (grade.score ?? 0).toFixed(1);
+  const name = `${def.name} ${suite.version}`;
   // Hidden by the operator (an unreleased model, say): the player still gets the score, but there's no public page.
   const where = suite.hidden ? '' : ` Results: ${BASE_URL}/suites/${suite.id}`;
-  return `Suite complete: ${SUITES[suite.kind].name} ${suite.version}, score ${score.toFixed(1)} out of 100.${where}`;
+  const g = `the ${GAUNTLET.size}×${GAUNTLET.size} ${GAUNTLET.name}`;
+  const base = def.slots.filter((s) => !s.gauntlet).length;
+  const all = `100 on all ${base === 3 ? 'three' : base} tests`;
+  if (grade.gauntlet === 'pending') {
+    return (
+      `Suite score so far: ${name}, ${score} out of 100, with ${all}. That unlocks ${g}: ` +
+      `two ${GAUNTLET.size}×${GAUNTLET.size} ladders for the last ${Math.round(100 - (grade.score ?? 0))} points, ${GAUNTLET.levels} levels each, level 1 already ${GAUNTLET.startDepth} moves from solved. ` +
+      `Call next_test with suite_id "${suite.id}" to play it.${where}`
+    );
+  }
+  if (grade.gauntlet === 'playing') return `Suite score so far: ${name}, ${score} out of 100; ${g} is under way. Call next_test with suite_id "${suite.id}" to go on.${where}`;
+  if (grade.gauntlet === 'locked') {
+    return `Suite complete: ${name}, score ${score} out of 100. ${g[0].toUpperCase()}${g.slice(1)} unlocks only with ${all}, so the suite ends here.${where}`;
+  }
+  return `Suite complete: ${name}, score ${score} out of 100${grade.gauntlet === 'done' ? `, ${g} included` : ''}.${where}`;
 }
 
-/** Why a suite isn't complete ("test 2 never played"), or null if every test ended the model's way. */
+/** Why a suite isn't complete ("test 2 never played"), or null if every test (the Gauntlet aside) ended the model's way. */
 async function incomplete(tx: Tx, suite: SuiteRow): Promise<string | null> {
   const runs = await tx<{ suite_slot: number; status: string; end_reason: string | null }[]>`
     select suite_slot, status, end_reason from cube_arena.runs where suite_id = ${suite.id}`;
-  const gaps = SUITES[suite.kind].slots.flatMap((_, i) => {
+  const gaps = SUITES[suite.kind].slots.flatMap((s, i) => {
+    if (s.gauntlet) return [];
     const r = runs.find((x) => x.suite_slot === i);
     if (!r || r.status !== 'finished') return [`test ${i + 1} never played`];
     return r.end_reason === 'stopped' ? [`test ${i + 1} stopped for an unknown reason`] : [];
@@ -259,7 +302,7 @@ async function advance(tx: Tx, run: RunRow, a: AttemptRow): Promise<AttemptRow |
   }
   if (a.status === 'solved') {
     run.best_level = Math.max(run.best_level, a.level ?? 0);
-    if (run.level >= LADDER_MAX_LEVEL[run.size]) {
+    if (run.level >= topLevel(run)) {
       await finishRun(tx, run, 'cleared');
       return null;
     }
@@ -391,7 +434,11 @@ export async function startSuite(kind: SuiteKind, input: { display_name: string;
   return nextTest(suite.id, caller);
 }
 
-/** Starts the suite's next test, or shows the one in progress. */
+/**
+ * Starts the suite's next test, or shows the one in progress. After the last
+ * test everyone plays the suite closes; with a perfect score the Gauntlet
+ * comes next, on the closed suite (its score so far stays on the boards).
+ */
 export async function nextTest(suiteId: string, caller: Caller): Promise<Reply> {
   if (!UUID.test(suiteId)) throw new ArenaError('bad_suite', 'That suite_id is not valid. Use the suite_id from start_suite.');
   return transaction(async (tx) => {
@@ -406,37 +453,62 @@ export async function nextTest(suiteId: string, caller: Caller): Promise<Reply> 
     const active = runs.find((r) => r.status === 'active');
     if (active && (only === undefined || active.suite_slot === only)) {
       const [a] = await tx<AttemptRow[]>`select * from cube_arena.attempts where run_id = ${active.id} and status = 'active' order by seq desc limit 1 for update`;
-      if (a) return presentAttempt(active, a, [`Suite test ${(active.suite_slot ?? 0) + 1} of ${def.slots.length} is in progress:`]);
+      if (a) return presentAttempt(active, a, [`Suite ${slotLabel(def, active.suite_slot ?? 0)} is in progress:`]);
     }
-    if (suite.status === 'finished') return { text: await finishSuite(tx, suite), data: { suite_id: suite.id, suite_status: 'finished' } };
+    if (only !== undefined && (only < 0 || only >= def.slots.length)) throw new ArenaError('bad_suite', `This suite has ${def.slots.length} tests.`);
+    const played = new Set(runs.map((r) => r.suite_slot ?? 0));
+    if (only !== undefined && played.has(only)) {
+      throw new ArenaError('suite_test_over', `Suite ${slotLabel(def, only)} is over. This session is done; stop here.`);
+    }
+    const closed = async () => ({ text: await finishSuite(tx, suite), data: { suite_id: suite.id, suite_status: 'finished' } });
 
-    const played = new Set(runs.map((r) => r.suite_slot));
-    const slot = only ?? def.slots.findIndex((_, i) => !played.has(i));
-    if (slot < 0) return { text: await finishSuite(tx, suite), data: { suite_id: suite.id, suite_status: 'finished' } };
-    if (slot >= def.slots.length) throw new ArenaError('bad_suite', `This suite has ${def.slots.length} tests.`);
-    if (played.has(slot)) {
-      throw new ArenaError('suite_test_over', `Suite test ${slot + 1} is over. This session is done; stop here.`);
+    if (suite.status !== 'finished') {
+      const slot = only ?? def.slots.findIndex((s, i) => !s.gauntlet && !played.has(i));
+      if (slot >= 0 && !def.slots[slot].gauntlet) return startSlot(tx, suite, slot, caller);
+      if (slot >= 0 && def.slots.some((s, i) => !s.gauntlet && !played.has(i))) {
+        throw new ArenaError('gauntlet_locked', `The ${GAUNTLET.name} comes after every other test, and only with a perfect score on them. Stop here.`);
+      }
+      // Every test everyone plays is over: close the suite. The Gauntlet, if unlocked, follows below.
+      const text = await finishSuite(tx, suite);
+      const open = gauntletToPlay(def, await gradeOf(tx, suite), played);
+      const next = only ?? open[0];
+      if (next === undefined || !open.includes(next)) return { text, data: { suite_id: suite.id, suite_status: 'finished' } };
+      return startSlot(tx, suite, next, caller, [text]);
+    }
+
+    // A closed suite plays on only into an unlocked Gauntlet.
+    const open = gauntletToPlay(def, await gradeOf(tx, suite), played);
+    const slot = only ?? open[0];
+    if (slot === undefined || !open.includes(slot)) {
+      if (only !== undefined && def.slots[only].gauntlet) {
+        throw new ArenaError('gauntlet_locked', `The ${GAUNTLET.name} unlocks only with 100 on every other test. This suite is over; stop here.`);
+      }
+      return closed();
     }
     return startSlot(tx, suite, slot, caller);
   });
 }
 
-async function startSlot(tx: Tx, suite: SuiteRow, slot: number, caller: Caller): Promise<Reply> {
+async function startSlot(tx: Tx, suite: SuiteRow, slot: number, caller: Caller, lead: string[] = []): Promise<Reply> {
   const def = SUITES[suite.kind];
   const t = def.slots[slot];
   const lives = t.challenge === 'ladder' ? LADDER_LIVES : 1;
   const level = t.challenge === 'ladder' ? 1 : 0;
+  const offset = t.challenge === 'ladder' ? (t.startDepth ?? 1) - 1 : 0;
   const [run] = await tx<RunRow[]>`
     insert into cube_arena.runs (board, display_name, model_name, tool_use, client, size, mode, challenge, lives, level, ip_hash,
-                                 suite_id, suite_slot, hidden, hidden_reason)
+                                 suite_id, suite_slot, hidden, hidden_reason, level_offset, top_level)
     values (${suite.board}, ${suite.display_name}, ${suite.model_name}, 'model_only', ${caller.client}, ${t.size}, ${t.mode}, ${t.challenge},
-            ${lives}, ${level}, ${caller.ipHash}, ${suite.id}, ${slot}, ${suite.hidden}, ${suite.hidden_reason})
+            ${lives}, ${level}, ${caller.ipHash}, ${suite.id}, ${slot}, ${suite.hidden}, ${suite.hidden_reason}, ${offset}, ${t.levels ?? null})
     returning *`;
   await tx`update cube_arena.suites set updated_at = now() where id = ${suite.id}`;
   const a = await newAttempt(tx, run);
+  const what = t.gauntlet
+    ? `${testName(t).name}: ${topLevel(run)} levels, level 1 already ${levelDepth(run, 1)} moves from solved, each level one more, up to ${levelDepth(run, topLevel(run))}.`
+    : `${t.size}×${t.size} ${CHALLENGE_LABEL[t.challenge]}, ${MODE_LABEL[t.mode]}.`;
   return presentAttempt(run, a, [
-    `${def.name} suite ${def.version}, test ${slot + 1} of ${def.slots.length}: ${t.size}×${t.size} ${CHALLENGE_LABEL[t.challenge]}, ${MODE_LABEL[t.mode]}. ` +
-      `No time limit. suite_id: ${suite.id}`,
+    ...lead,
+    `${def.name} suite ${suite.version}, ${slotLabel(def, slot)}: ${what} No time limit. suite_id: ${suite.id}`,
     SUITE_SCORING,
   ]);
 }
@@ -597,6 +669,14 @@ export async function sweepExpired(): Promise<void> {
     await tx`update cube_arena.claims set released_at = now() where suite_id in ${tx(ids)} and released_at is null`;
   });
 
+  // A Gauntlet is played on a closed suite, whose score so far stands: a runner gone quiet there ends only its Gauntlet test,
+  // which keeps the levels it reached.
+  const gauntlets = await withDb((sql) => sql<{ id: string }[]>`
+    select r.id from cube_arena.runs r join cube_arena.suites s on s.id = r.suite_id
+    where r.status = 'active' and s.status = 'finished' and s.board = 'verified' and s.updated_at < now() - ${RUNNER_QUIET}::interval
+    limit 25`);
+  for (const { id } of gauntlets) await stopRun(id, 'abandoned: the runner stopped');
+
   const idle = await withDb((sql) => sql<{ run_id: string }[]>`
     select a.run_id from cube_arena.attempts a join cube_arena.runs r on r.id = a.run_id
     where a.status = 'active' and r.board = 'community'
@@ -643,11 +723,15 @@ export async function stopRun(id: string, detail: string, quit = false): Promise
   });
 }
 
-/** A Verified runner is still playing this suite; its claim on the model stays too. Returns false if the suite isn't active. */
+/**
+ * A Verified runner is still playing this suite (or its Gauntlet, played after the suite closed); its claim on the model
+ * stays too. Returns false if nothing in it is being played.
+ */
 export async function heartbeat(suiteId: string): Promise<boolean> {
   if (!UUID.test(suiteId)) return false;
   return transaction(async (tx) => {
-    const rows = await tx`update cube_arena.suites set updated_at = now() where id = ${suiteId} and status = 'active' returning id`;
+    const rows = await tx`update cube_arena.suites s set updated_at = now() where s.id = ${suiteId}
+      and (s.status = 'active' or exists (select 1 from cube_arena.runs r where r.suite_id = s.id and r.status = 'active')) returning s.id`;
     if (!rows.length) return false;
     await tx`update cube_arena.claims set expires_at = greatest(expires_at, now() + make_interval(hours => ${CLAIM_HOURS}))
              where suite_id = ${suiteId} and released_at is null`;

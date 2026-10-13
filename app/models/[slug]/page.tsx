@@ -9,6 +9,7 @@ import { type CatalogModel, catalogModel, harnessLabel } from '@/lib/arena/catal
 import { type SuiteEntry, suiteEntries, testNames } from '@/lib/arena/index-data';
 import { effortRank } from '@/lib/arena/makers';
 import { suiteOrder } from '@/lib/arena/ranking';
+import { GAUNTLET_TAG } from '@/lib/arena/rules';
 import { SUITES, SUITE_KINDS } from '@/lib/arena/suites';
 import { commandFor } from '@/lib/arena/wanted';
 
@@ -66,7 +67,10 @@ export default async function ModelPage(props: { params: Promise<{ slug: string 
             <div key={k} className={`kpi ${k === 'fast' ? 'big' : ''}`}>
               <span>Best {SUITES[k].name}</span>
               <strong>{b ? fmtScore(b.score) : '–'}</strong>
-              <em>{b ? (b.effort ? `at ${b.effort} effort` : 'no effort setting') : 'not run yet'}</em>
+              <em>
+                {b ? (b.effort ? `at ${b.effort} effort` : 'no effort setting') : 'not run yet'}
+                {b && (b.gauntlet === 'pending' || b.gauntlet === 'playing') && ` · ${GAUNTLET_TAG[b.gauntlet]}`}
+              </em>
             </div>
           );
         })}
@@ -92,7 +96,14 @@ export default async function ModelPage(props: { params: Promise<{ slug: string 
             </header>
             <BarChart
               height={180}
-              items={rows.map((e) => ({ key: e.id, label: e.effort ?? model, value: e.score, color, href: resultHref(e) }))}
+              items={rows.map((e) => ({
+                key: e.id,
+                label: e.effort ?? model,
+                sub: e.gauntlet === 'pending' || e.gauntlet === 'playing' ? GAUNTLET_TAG[e.gauntlet] : null,
+                value: e.score,
+                color,
+                href: resultHref(e),
+              }))}
             />
             <div className="table-wrap flat">
               <table className="heat">
@@ -122,6 +133,13 @@ export default async function ModelPage(props: { params: Promise<{ slug: string 
                       {tests.map((t) => {
                         const g = e.tests.find((x) => x.test === t.test);
                         const s = g?.score ?? null;
+                        if (t.gauntlet && (e.gauntlet === 'locked' || (e.gauntlet !== 'done' && !g?.played))) {
+                          return (
+                            <td key={t.test} className="num faint" title={e.gauntlet === 'locked' ? 'Locked: it takes 100 on the other three tests' : 'Unlocked, not played yet'}>
+                              {e.gauntlet === 'locked' ? '–' : 'pending'}
+                            </td>
+                          );
+                        }
                         return (
                           <td key={t.test} className={`num heat-cell ${heat(s)}`}>
                             {fmtScore(s)}

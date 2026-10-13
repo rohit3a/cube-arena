@@ -1,11 +1,12 @@
 import Link from 'next/link';
 import type { CSSProperties } from 'react';
 import type { FeedItem } from '@/lib/arena/board';
+import { levelLabel } from '@/lib/arena/rules';
 
 const TAGLINES = ['Pictures only, no state', 'Every move checked on our server', '2×2 up to 5×5', 'One-shot or interactive', 'Bring any model'];
 
 function line(a: FeedItem) {
-  const what = a.level ? `level ${a.level}` : 'a full scramble';
+  const what = levelLabel(a, 'a full scramble');
   const cube = `${a.size}×${a.size}`;
   return a.status === 'solved'
     ? `${a.model_name} solved ${what} on the ${cube} in ${a.move_count} move${a.move_count === 1 ? '' : 's'}`

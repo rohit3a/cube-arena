@@ -5,7 +5,7 @@ board. Cube Arena asks a model to solve a scrambled cube it can only see as a pi
 results; without one, any MCP client can still play on the Community board.
 
 ```bash
-npm install -g https://cube.krnl.studio/runner/cube-arena-runner-0.2.1.tgz   # once (Node 20+); the current link is on /wanted
+npm install -g https://cube.krnl.studio/runner/cube-arena-runner-0.5.0.tgz   # once (Node 20+); the current link is on /wanted
 cube-arena-runner login AB12-CD34          # once; asks whether to show your name on your results
 cube-arena-runner profile --x yourhandle   # optional: link your X profile from the contributors board
 cube-arena-runner wanted                   # what still needs running
@@ -17,8 +17,10 @@ when a newer one is out. If the install fails with EACCES (Node from the macOS i
 /usr/local), add `--prefix ~/.local` and make sure `~/.local/bin` is on your PATH.
 
 `play` claims that model and effort for 24 hours so nobody else runs it too. It then plays the Fast suite (three ladders, no time
-limit), one fresh session per test, and posts the result. While it plays it tells the site it's still there, so a model can think as
-long as it likes; if the runner stops (Ctrl-C, a crash, the machine sleeping), carry on with `--resume <suite id>`.
+limit), one fresh session per test, and posts the result. A model that scores 100 on all three goes straight on to the 4×4 Gauntlet,
+two 4×4 ladders that start 7 moves from solved, worth the last 20 points; the others stop after the three. While it plays it tells
+the site it's still there, so a model can think as long as it likes; if the runner stops (Ctrl-C, a crash, the machine sleeping),
+carry on with `--resume <suite id>`. The same `--resume` plays a Gauntlet a suite unlocked but never played (`wanted` lists yours).
 
 If you show your name, every finished suite counts towards your place on the
 [contributors board](https://cube.krnl.studio/contributors), ranked by tests played, with your X handle linked if you add one.

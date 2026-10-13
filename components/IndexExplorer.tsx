@@ -10,6 +10,7 @@ import { averageByLabel, resultHref } from '@/lib/arena/aggregate';
 import type { SuiteEntry } from '@/lib/arena/index-data';
 import { EFFORT_ORDER } from '@/lib/arena/makers';
 import { fullEffort, suiteOrder } from '@/lib/arena/ranking';
+import { FAST_WEIGHTING, GAUNTLET, GAUNTLET_TAG } from '@/lib/arena/rules';
 import type { SuiteKind } from '@/lib/arena/suites';
 
 export interface SuiteInfo {
@@ -17,7 +18,29 @@ export interface SuiteInfo {
   name: string;
   version: string;
   blurb: string;
-  tests: { test: string; name: string; short: string }[];
+  tests: { test: string; name: string; short: string; gauntlet?: boolean }[];
+}
+
+/** The tag beside a Fast score while its Gauntlet is unlocked and not played to the end. */
+const gauntletTag = (e: SuiteEntry) => (e.gauntlet === 'pending' || e.gauntlet === 'playing' ? GAUNTLET_TAG[e.gauntlet] : null);
+
+/** Bars whose score still has the Gauntlet's 20 points to come (kept out of the bar labels, which are rotated and short). */
+function GauntletNote({ rows }: { rows: SuiteEntry[] }) {
+  const open = rows.filter((e) => gauntletTag(e));
+  if (open.length === 0) return null;
+  return (
+    <p className="ix-waiting">
+      100 on all three tests, so the {GAUNTLET.size}×{GAUNTLET.size} {GAUNTLET.name} is unlocked and the score isn&apos;t final yet:{' '}
+      {open.map((e, i) => (
+        <span key={e.id}>
+          {i > 0 && ', '}
+          <Link href={resultHref(e)}>{e.label}</Link>
+          {e.gauntlet === 'playing' && ' (playing it now)'}
+        </span>
+      ))}
+      .
+    </p>
+  );
 }
 
 type EffortMode = 'best' | 'all' | (typeof EFFORT_ORDER)[number];
@@ -205,6 +228,7 @@ export default function IndexExplorer({ entries, suites, running }: { entries: S
           </header>
           <BarChart items={bars} empty={<EmptyIndex kind={kind} />} />
           <Legend entries={rows} />
+          <GauntletNote rows={rows} />
           <WaitingNote waiting={waiting} />
         </Exportable>
 
@@ -212,8 +236,8 @@ export default function IndexExplorer({ entries, suites, running }: { entries: S
           <header className="ix-head">
             <h2>Score by test</h2>
             <p>
-              Each test out of 100. Ladders: how far up the model climbed, with up to 20% for using few moves. Full scrambles: whether it solved
-              the cube.
+              Each test out of 100. Ladders: how far up the model climbed; moves only break ties. Full scrambles: whether it solved the cube.
+              {kind === 'fast' && ` ${FAST_WEIGHTING}`}
             </p>
           </header>
           {rows.length === 0 ? (
@@ -245,6 +269,13 @@ export default function IndexExplorer({ entries, suites, running }: { entries: S
                       {suite.tests.map((t) => {
                         const g = e.tests.find((x) => x.test === t.test);
                         const s = g?.score ?? null;
+                        if (t.gauntlet && (e.gauntlet === 'locked' || (e.gauntlet !== 'done' && !g?.played))) {
+                          return (
+                            <td key={t.test} className="num faint" title={e.gauntlet === 'locked' ? 'Locked: it takes 100 on the other three tests' : 'Unlocked, not played yet'}>
+                              {e.gauntlet === 'locked' ? '–' : 'pending'}
+                            </td>
+                          );
+                        }
                         return (
                           <td key={t.test} className={`num heat-cell ${heat(s)}`}>
                             {fmtScore(s)}
@@ -345,6 +376,11 @@ export default function IndexExplorer({ entries, suites, running }: { entries: S
                           <i className="swatch" style={{ background: e.color }} />
                           {e.label}
                         </Link>
+                        {gauntletTag(e) && (
+                          <span className="tag tag-gauntlet" title="100 on all three tests unlocked the 4×4 Gauntlet, worth the last 20 points">
+                            {gauntletTag(e)}
+                          </span>
+                        )}
                         {e.out_of_output > 0 && (
                           <span
                             className="tag tag-oo"

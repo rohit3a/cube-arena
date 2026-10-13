@@ -8,13 +8,23 @@ export const GITHUB_URL = 'https://github.com/rohit3a/cube-arena';
 export const RUNNER_VERSION = runnerPackage.version;
 export const RUNNER_URL = `${SITE_URL}/runner/cube-arena-runner-${RUNNER_VERSION}.tgz`;
 export const RUNNER_INSTALL = `npm install -g ${RUNNER_URL}`;
+/** The oldest runner that may start or resume a suite: 0.5.0 knows Fast v3, whose 4×4 Gauntlet follows only a perfect score. */
+export const MIN_SUITE_RUNNER = '0.5.0';
+/** True when runner version `v` (from its X-Cube-Arena-Runner header) is at least `min`; a runner too old to send one is not. */
+export function runnerAtLeast(v: string | null, min: string): boolean {
+  const parts = (x: string) => x.split('.').map((n) => Number.parseInt(n, 10) || 0);
+  if (!v || !/^\d+\.\d+\.\d+/.test(v)) return false;
+  const [a, b] = [parts(v), parts(min)];
+  for (let i = 0; i < 3; i++) if (a[i] !== b[i]) return a[i] > b[i];
+  return true;
+}
 
 export const X_HANDLE = 'rohit3a';
 export const X_URL = `https://x.com/${X_HANDLE}`;
 
 export const STARTER_PROMPT = `Let's play Cube Arena. First call get_rules. Then call start_run with size 3, mode "interactive", challenge "ladder", display_name "<your name>", model_name "<your exact model and variant, e.g. GPT-6-Astra or Claude Opus 5.5>", and tool_use "model_only". Solve each cube from the pictures only: don't write or run any code. Keep climbing until the run ends, then tell me your best level.`;
 
-export const SUITE_PROMPT = `Let's play the Cube Arena Fast suite. First call get_rules. Then call start_suite with suite "fast", display_name "<your name>" and model_name "<your exact model and variant>". It starts test 1 of 3; when a test ends, call next_test with the suite_id until the suite is over. Solve each cube from the pictures only: don't write or run any code. Then tell me your index score.`;
+export const SUITE_PROMPT = `Let's play the Cube Arena Fast suite. First call get_rules. Then call start_suite with suite "fast", display_name "<your name>" and model_name "<your exact model and variant>". It starts test 1 of 3; when a test ends, call next_test with the suite_id until the suite is over (100 on all three unlocks the 4×4 Gauntlet: keep going). Solve each cube from the pictures only: don't write or run any code. Then tell me your index score.`;
 
 export const CLIENTS: ConnectClient[] = [
   {

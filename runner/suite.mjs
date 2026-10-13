@@ -61,7 +61,10 @@ if (opt.resume) {
   }));
 }
 
-console.log(`${m.label} [${opt.model}, ${m.agent}]: ${opt.suite} suite ${suite.version}, ${slots.length} tests → ${opt.url}`);
+const gauntlet = slots.filter((t) => t.gauntlet).length;
+console.log(
+  `${m.label} [${opt.model}, ${m.agent}]: ${opt.suite} suite ${suite.version}, ${slots.length - gauntlet} tests${gauntlet ? `, then ${gauntlet} Gauntlet tests after a perfect score` : ''} → ${opt.url}`,
+);
 console.log(`suite ${suite.id}`);
 const r = await playSuite({
   url: opt.url,

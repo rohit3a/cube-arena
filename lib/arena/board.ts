@@ -113,7 +113,8 @@ async function allBoardsQuery(): Promise<BoardSection[]> {
                  extract(epoch from max(coalesce(a.finished_at, now())) - min(a.created_at))::float as secs
           from cube_arena.attempts a where a.run_id = r.id
         ) t on true
-        where r.challenge = 'ladder' and not r.hidden and ${finished(sql)}
+        -- Gauntlet ladders start 7 moves from solved, so their levels don't compare with a plain ladder's: they stay on the Index.
+        where r.challenge = 'ladder' and r.level_offset = 0 and r.top_level is null and not r.hidden and ${finished(sql)}
       )
       select size, mode, tool_use, board, model_name, display_name,
              max(best_level)::int as best, count(*)::int as runs, max(updated_at) as last,
@@ -180,7 +181,8 @@ export interface Stats {
  */
 const playing = (sql: Tx) => sql`(
   exists (select 1 from cube_arena.runs pr join cube_arena.suites ps on ps.id = pr.suite_id
-          where pr.id = a.run_id and ps.board = 'verified' and ps.status = 'active' and ps.updated_at > now() - interval '30 minutes')
+          where pr.id = a.run_id and ps.board = 'verified' and (ps.status = 'active' or pr.status = 'active')
+            and ps.updated_at > now() - interval '30 minutes')
   or coalesce((select e.at from cube_arena.events e where e.attempt_id = a.id order by e.id desc limit 1), a.created_at) > now() - interval '3 hours')`;
 
 async function statsQuery(): Promise<Stats> {
@@ -209,12 +211,14 @@ export interface FeedItem {
   board: Board;
   tool_use: ToolUse;
   challenge: Challenge;
+  /** A Gauntlet level: level 1 is already 7 moves from solved. */
+  gauntlet: boolean;
 }
 
 async function recentFinishedQuery(limit = 12): Promise<FeedItem[]> {
   return withDb((sql) => sql<FeedItem[]>`
     select a.id, a.status, a.size, a.mode, a.level, a.move_count, a.finished_at, a.created_at,
-           r.model_name, r.display_name, r.board, r.tool_use, r.challenge
+           r.model_name, r.display_name, r.board, r.tool_use, r.challenge, r.level_offset > 0 as gauntlet
     from cube_arena.attempts a join cube_arena.runs r on r.id = a.run_id
     where a.status in ('solved', 'failed', 'invalid') and not r.hidden
     order by a.finished_at desc nulls last limit ${limit}`);
@@ -228,7 +232,7 @@ async function recentFinishedQuery(limit = 12): Promise<FeedItem[]> {
 export async function liveAttempts(limit = 24): Promise<FeedItem[]> {
   return withDb((sql) => sql<FeedItem[]>`
     select a.id, a.status, a.size, a.mode, a.level, a.move_count, a.finished_at, a.created_at,
-           r.model_name, r.display_name, r.board, r.tool_use, r.challenge
+           r.model_name, r.display_name, r.board, r.tool_use, r.challenge, r.level_offset > 0 as gauntlet
     from cube_arena.attempts a join cube_arena.runs r on r.id = a.run_id
     where a.status = 'active' and not r.hidden and ${playing(sql)}
     order by a.created_at desc limit ${limit}`);

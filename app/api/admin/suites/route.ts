@@ -14,6 +14,7 @@ import { claimFor } from '@/lib/arena/claims';
 import type { SuiteRow } from '@/lib/arena/db';
 import { closeSuite, createSuite, heartbeat } from '@/lib/arena/service';
 import { SUITES, SUITE_KINDS, type SuiteKind } from '@/lib/arena/suites';
+import { MIN_SUITE_RUNNER, RUNNER_INSTALL, runnerAtLeast } from '@/lib/site';
 
 export const dynamic = 'force-dynamic';
 
@@ -22,6 +23,14 @@ const owns = (auth: Auth, suite: SuiteRow) => auth.role === 'operator' || suite.
 const bad = (error: string) => Response.json({ error }, { status: 400 });
 const noSuite = () => Response.json({ error: 'no such suite' }, { status: 404 });
 const versions = () => Object.fromEntries(SUITE_KINDS.map((k) => [k, SUITES[k].version]));
+// A runner older than MIN_SUITE_RUNNER would play on past the three Fast tests without knowing about the Gauntlet.
+const tooOld = (req: Request) =>
+  runnerAtLeast(req.headers.get('x-cube-arena-runner'), MIN_SUITE_RUNNER)
+    ? null
+    : Response.json(
+        { error: `this runner is too old for ${SUITES.fast.name} ${SUITES.fast.version} (the 4×4 Gauntlet). Update it: ${RUNNER_INSTALL}` },
+        { status: 426 },
+      );
 
 export async function GET(req: Request) {
   const { auth, bad: badCode } = await authFrom(req);
@@ -29,6 +38,8 @@ export async function GET(req: Request) {
   const q = new URL(req.url).searchParams;
   const id = q.get('id');
   if (id) {
+    const old = tooOld(req);
+    if (old) return old;
     const suite = await getSuite(id);
     return suite && owns(auth, suite) ? Response.json({ suite, tests: SUITES[suite.kind].slots }) : noSuite();
   }
@@ -58,6 +69,8 @@ export async function POST(req: Request) {
 
   const kind = body.kind as SuiteKind;
   if (!SUITE_KINDS.includes(kind)) return bad('kind must be fast or thorough');
+  const old = tooOld(req);
+  if (old) return old;
   const caller = { board: 'verified' as const, ipHash: null, client: str(req.headers.get('user-agent'), 120) };
 
   // The operator's runner may still name a model itself (models not in the catalog yet).

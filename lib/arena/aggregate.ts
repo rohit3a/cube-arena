@@ -5,6 +5,8 @@
 import type { SuiteEntry } from './index-data';
 
 const mean = (xs: number[]) => xs.reduce((a, b) => a + b, 0) / xs.length;
+/** Averaged suites show the Gauntlet as the least far along of those that unlocked it: a play still to come wins. */
+const GAUNTLET_ORDER = ['playing', 'pending', 'done', 'locked'] as const;
 const meanOrNull = (xs: (number | null)[]) => (xs.every((x) => x !== null) && xs.length ? mean(xs as number[]) : null);
 
 /** One entry per label (model and effort): the mean of its finished suites. Entries newest first. */
@@ -24,6 +26,7 @@ export function averageByLabel(entries: SuiteEntry[]): SuiteEntry[] {
         const scores = es.map((e) => e.tests.find((x) => x.test === t.test)?.score ?? null).filter((s): s is number => s !== null);
         return { ...t, score: scores.length ? mean(scores) : null, out_of_output: es.some((e) => e.tests.find((x) => x.test === t.test)?.out_of_output) };
       }),
+      gauntlet: GAUNTLET_ORDER.find((g) => es.some((e) => e.gauntlet === g)) ?? latest.gauntlet,
       out_of_output: es.reduce((a, e) => a + e.out_of_output, 0),
       moves: Math.round(moves / es.length),
       solved: Math.round((solved / es.length) * 10) / 10,

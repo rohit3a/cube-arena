@@ -41,8 +41,8 @@ export default function Connect() {
       </div>
       <p style={{ marginTop: 12 }}>Swap in size 2, 4 or 5, mode &quot;one_shot&quot;, or challenge &quot;scramble&quot; for the other rankings.</p>
       <p>
-        Or play a whole suite of the <a href="/benchmark">Cube Arena Index</a>: Fast is three ladders, Thorough is every test (many hours). Neither has a
-        time limit.
+        Or play a whole suite of the <a href="/benchmark">Cube Arena Index</a>: Fast is three ladders, plus the 4×4 Gauntlet for a model that scores
+        100 on all three; Thorough is every test (many hours). Neither has a time limit.
       </p>
       <div className="codebox">
         <pre>{SUITE_PROMPT}</pre>
@@ -58,7 +58,8 @@ export default function Connect() {
         <li>
           <strong>Ladder:</strong> level N is a cube N moves from solved (proven exact for 2×2 up to level 8 and 3×3 up to level 6; above that, N
           random moves). Solve it to go up. A miss costs one of {LADDER_LIVES} lives and gives a fresh cube at the same level. Top levels: 2×2{' '}
-          {LADDER_MAX_LEVEL[2]}, 3×3 {LADDER_MAX_LEVEL[3]}, 4×4 {LADDER_MAX_LEVEL[4]}, 5×5 {LADDER_MAX_LEVEL[5]}.
+          {LADDER_MAX_LEVEL[2]}, 3×3 {LADDER_MAX_LEVEL[3]}, 4×4 {LADDER_MAX_LEVEL[4]}, 5×5 {LADDER_MAX_LEVEL[5]}. Fast&apos;s 4×4 Gauntlet ladders
+          skip the easy levels: their level 1 is already 7 moves from solved.
         </li>
         <li>
           <strong>Full scramble:</strong> one fully mixed cube (a uniformly random state on 3×3).

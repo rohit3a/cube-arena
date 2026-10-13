@@ -9,7 +9,7 @@ import { type SuiteRow, type Usage, UUID, withDb } from './db';
 import { contributorSlug } from './invites';
 import { estimateCost, makerOf, slugOf, splitLabel } from './makers';
 import { gradeSuites } from './suite-data';
-import { SUITES, type SuiteKind, suiteTests } from './suites';
+import { type GauntletState, SUITES, type SuiteKind, suiteTests, testName } from './suites';
 
 export interface SuiteRunInfo {
   slot: number;
@@ -17,6 +17,8 @@ export interface SuiteRunInfo {
   status: string;
   end_reason: string | null;
   best_level: number;
+  /** Its top level when not the size's usual one (a Gauntlet's 20). */
+  top_level: number | null;
   solves: number;
   /** Every move made in the run, failed attempts included. */
   moves: number;
@@ -51,7 +53,12 @@ export interface SuiteEntry {
   /** 0-100; null while unfinished. */
   score: number | null;
   /** out_of_output: a reply hit the model's output limit before it answered, which ended this test. */
-  tests: { test: string; score: number | null; played: number; cubes: number; out_of_output: boolean }[];
+  tests: { test: string; gauntlet: boolean; score: number | null; played: number; cubes: number; out_of_output: boolean }[];
+  /**
+   * Fast's 4×4 Gauntlet: locked (no perfect score on the other tests), pending (unlocked, not played yet: the score so
+   * far is all there is), playing, or done. Null for suites without one.
+   */
+  gauntlet: GauntletState | null;
   /** Tests that ended because a reply hit the model's output limit. */
   out_of_output: number;
   moves: number;
@@ -65,7 +72,7 @@ export interface SuiteEntry {
   /** True when the cost comes from token counts at list prices, not from the CLI. */
   cost_estimated: boolean;
   runs: SuiteRunInfo[];
-  /** Tests started so far, of how many: "test 2 of 3" while it runs. */
+  /** Tests started so far, of how many, the Gauntlet aside: "test 2 of 3" while it runs. */
   progress: { started: number; of: number };
   /** Suites this entry stands for: 1, or more once averaged (aggregate.ts). */
   n: number;
@@ -91,7 +98,7 @@ async function suiteEntriesQuery(): Promise<SuiteEntry[]> {
         coalesce((
           select json_agg(json_build_object(
             'slot', r.suite_slot, 'run_id', r.id, 'status', r.status, 'end_reason', r.end_reason,
-            'best_level', r.best_level, 'solves', r.solves, 'usage', r.usage, 'client', r.client,
+            'best_level', r.best_level, 'top_level', r.top_level, 'solves', r.solves, 'usage', r.usage, 'client', r.client,
             'moves', coalesce(a.moves, 0), 'secs', coalesce(a.secs, 0), 'replay', a.replay, 'out_of_output', a.out_of_output
           ) order by r.suite_slot)
           from cube_arena.runs r
@@ -151,7 +158,15 @@ async function suiteEntriesQuery(): Promise<SuiteEntry[]> {
         created_at: new Date(s.created_at).toISOString(),
         finished_at: s.finished_at ? new Date(s.finished_at).toISOString() : null,
         score: s.status === 'finished' ? (grade?.score ?? 0) : null,
-        tests: (grade?.tests ?? []).map((t) => ({ test: t.test, score: t.score, played: t.played, cubes: t.cubes, out_of_output: ranOut.has(t.test) })),
+        tests: (grade?.tests ?? []).map((t) => ({
+          test: t.test,
+          gauntlet: t.gauntlet,
+          score: t.score,
+          played: t.played,
+          cubes: t.cubes,
+          out_of_output: ranOut.has(t.test),
+        })),
+        gauntlet: grade?.gauntlet ?? null,
         out_of_output: s.runs.filter((r) => r.out_of_output !== null).length,
         moves,
         solved,
@@ -163,8 +178,8 @@ async function suiteEntriesQuery(): Promise<SuiteEntry[]> {
         cost_estimated: estimated,
         runs: s.runs.map(({ usage: _u, client, ...r }) => ({ ...r, via: clientLabel(client) })),
         progress: {
-          started: new Set(s.runs.map((r) => SUITES[s.kind].slots[r.slot]?.test)).size,
-          of: suiteTests(SUITES[s.kind]).length,
+          started: new Set(s.runs.filter((r) => !SUITES[s.kind].slots[r.slot]?.gauntlet).map((r) => SUITES[s.kind].slots[r.slot]?.test)).size,
+          of: suiteTests(SUITES[s.kind]).filter((t) => !t.gauntlet).length,
         },
         n: 1,
         ids: [s.id],
@@ -195,11 +210,7 @@ export async function suiteEntry(id: string): Promise<SuiteEntry | null> {
   return (await suiteEntries()).find((s) => s.id === id) ?? null;
 }
 
-/** Test ids in a suite, in order, with readable names. */
-export function testNames(kind: SuiteKind): { test: string; name: string; short: string }[] {
-  return suiteTests(SUITES[kind]).map((t) => {
-    const what = t.challenge === 'ladder' ? 'ladder' : 'scramble';
-    const mode = t.mode === 'one_shot' ? 'one-shot' : 'interactive';
-    return { test: t.test, name: `${t.size}×${t.size} ${what}, ${mode}`, short: `${t.size}×${t.size} ${what === 'ladder' ? 'L' : 'S'} ${mode === 'one-shot' ? '1×' : 'int'}` };
-  });
+/** Test ids in a suite, in order, with readable names; `gauntlet` marks Fast's 4×4 Gauntlet tests. */
+export function testNames(kind: SuiteKind): { test: string; name: string; short: string; gauntlet: boolean }[] {
+  return suiteTests(SUITES[kind]).map((t) => ({ test: t.test, ...testName(t), gauntlet: t.gauntlet }));
 }

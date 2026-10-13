@@ -118,6 +118,10 @@ export interface RunRow {
   /** Suite tests: the suite and which of its slots. */
   suite_id: string | null;
   suite_slot: number | null;
+  /** Ladders: level N of this run is N + level_offset moves from solved (the Gauntlet starts at 7). */
+  level_offset: number;
+  /** Ladders: the last level, when not the size's usual top (LADDER_MAX_LEVEL). */
+  top_level: number | null;
   /** Unused since suites v2 (no clocks); older suite runs have one. */
   deadline_at: Date | null;
   /** Tokens and cost the Verified runner measured. */

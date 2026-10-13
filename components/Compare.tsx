@@ -13,6 +13,7 @@ import Exportable from '@/components/Exportable';
 import type { LevelTries, ModelOption, Pick, Side, SuiteSide } from '@/lib/arena/compare';
 import { fmtCost, fmtDuration, fmtMs, fmtScore, fmtTokens, heat } from '@/lib/arena/format';
 import { EFFORT_ORDER } from '@/lib/arena/makers';
+import { FAST_WEIGHTING, GAUNTLET, GAUNTLET_TAG } from '@/lib/arena/rules';
 
 const MAX = 4;
 /** One colour per side, so two models from one maker still tell apart. */
@@ -20,7 +21,14 @@ const SIDE_COLORS = ['var(--orange)', 'var(--blue)', 'var(--green)', 'var(--purp
 const pickParam = (p: Pick) => (p.effort ? `${p.slug}:${p.effort}` : p.slug);
 const href = (picks: Pick[]) => `/compare?${picks.map((p) => `m=${encodeURIComponent(pickParam(p))}`).join('&')}`;
 
-type TestName = { test: string; name: string; short: string };
+type TestName = { test: string; name: string; short: string; gauntlet?: boolean };
+
+/** Fast's Gauntlet tests show only once a side here has unlocked it; the others never played them. */
+const unlocked = (s: Side) => !!s.fast?.avg.gauntlet && s.fast.avg.gauntlet !== 'locked';
+const withGauntlet = (tests: TestName[], sides: Side[]) => tests.filter((t) => !t.gauntlet || sides.some(unlocked));
+/** An unlocked Gauntlet test this side hasn't started: it counts 0 in the score so far, but shows as pending, not 0. */
+const notPlayed = (s: Side, test: string) =>
+  unlocked(s) && s.fast?.avg.gauntlet !== 'done' && !s.fast?.tests.find((x) => x.test === test)?.levels.length;
 
 const labelOf = (s: Side) => (s.effort ? `${s.model} (${s.effort})` : s.model);
 
@@ -162,7 +170,12 @@ function Cards({ sides, title }: { sides: Colored[]; title: string }) {
               <p className="muted">No results for this model yet.</p>
             ) : (
               <dl>
-                <Stat label="Fast Index" big value={s.fast ? fmtScore(s.fast.avg.score) : '–'} note={s.fast ? `#${s.fast.rank} of ${s.fast.of}${s.fast.avg.n > 1 ? ` · avg of ${s.fast.avg.n}` : ''}` : 'not run at this effort'} />
+                <Stat label="Fast Index" big value={s.fast ? fmtScore(s.fast.avg.score) : '–'} note={
+                    s.fast
+                      ? `#${s.fast.rank} of ${s.fast.of}${s.fast.avg.n > 1 ? ` · avg of ${s.fast.avg.n}` : ''}${unlocked(s) && s.fast.avg.gauntlet !== 'done' ? ` · ${GAUNTLET_TAG[s.fast.avg.gauntlet ?? 'pending']}` : ''}`
+                      : 'not run at this effort'
+                  }
+                />
                 <Stat label="Thorough" value={s.thorough ? fmtScore(s.thorough.avg.score) : '–'} note={s.thorough ? `#${s.thorough.rank} of ${s.thorough.of}` : 'not run'} />
                 <Stat
                   label="Coding"
@@ -213,10 +226,18 @@ function HeadToHead({ sides, fastTests, title }: { sides: Colored[]; fastTests: 
   const fastRows: Row[] = [
     { label: 'Fast Index', get: (s) => f(s)?.score ?? null, show: (s) => fmtScore(f(s)?.score ?? null), better: 'high' },
     { label: 'Rank on the Fast Index', get: (s) => s.fast?.rank ?? null, show: (s) => (s.fast ? `#${s.fast.rank} of ${s.fast.of}` : '–'), better: 'low' },
-    ...fastTests.map<Row>((t) => ({
+    {
+      label: `4×4 ${GAUNTLET.name}`,
+      get: () => null,
+      show: (s) => (f(s)?.gauntlet ? GAUNTLET_TAG[f(s)?.gauntlet ?? 'locked'] : '–'),
+      title: 'Unlocked by 100 on all three Fast tests; pending until the model plays it',
+    },
+    ...withGauntlet(fastTests, sides).map<Row>((t) => ({
       label: t.name,
-      get: (s) => f(s)?.tests.find((x) => x.test === t.test)?.score ?? null,
+      get: (s) => (t.gauntlet && (!unlocked(s) || notPlayed(s, t.test)) ? null : (f(s)?.tests.find((x) => x.test === t.test)?.score ?? null)),
       show: (s) => {
+        if (t.gauntlet && !unlocked(s)) return s.fast ? 'locked' : '–';
+        if (t.gauntlet && notPlayed(s, t.test)) return 'pending';
         const d = s.fast?.tests.find((x) => x.test === t.test);
         const v = f(s)?.tests.find((x) => x.test === t.test)?.score ?? null;
         return d?.max && d.best_level !== null ? `${fmtScore(v)} · L${d.best_level}/${d.max}` : fmtScore(v);
@@ -409,12 +430,12 @@ const costOf = (v: number | null, est: boolean) => (v === null ? '–' : `${fmtC
 function FastByTest({ sides, fastTests, title }: { sides: Colored[]; fastTests: TestName[]; title: string }) {
   const have = sides.filter((s) => s.fast);
   if (!have.length) return null;
-  const tests = [{ test: 'index', name: 'Fast Index', short: 'Index' }, ...fastTests];
+  const tests: TestName[] = [{ test: 'index', name: 'Fast Index', short: 'Index' }, ...withGauntlet(fastTests, have)];
   return (
     <Exportable name={`${title} fast by test`} caption={title} className="card ix-card">
       <header className="ix-head">
         <h2>Fast, test by test</h2>
-        <p>Each test out of 100. The Index weighs the 2×2 ladder 20% and each 3×3 ladder 40%.</p>
+        <p>Each test out of 100. {FAST_WEIGHTING}</p>
       </header>
       <div className="cmp-bars">
         {tests.map((t) => (
@@ -422,13 +443,15 @@ function FastByTest({ sides, fastTests, title }: { sides: Colored[]; fastTests: 
             <h3>{t.name}</h3>
             {have.map((s, i) => {
               const v = t.test === 'index' ? (s.fast?.avg.score ?? null) : (s.fast?.avg.tests.find((x) => x.test === t.test)?.score ?? null);
+              const locked = t.gauntlet && !unlocked(s);
+              const waiting = t.gauntlet && notPlayed(s, t.test);
               return (
                 <div key={i} className="cmp-bar" style={{ '--side': s.color } as CSSProperties}>
                   <span className="cmp-bar-name">{s.label}</span>
                   <span className="cmp-bar-track">
-                    <span className="cmp-bar-fill" style={{ width: `${Math.max(0, Math.min(100, v ?? 0))}%` }} />
+                    <span className="cmp-bar-fill" style={{ width: `${locked || waiting ? 0 : Math.max(0, Math.min(100, v ?? 0))}%` }} />
                   </span>
-                  <span className="cmp-bar-value">{fmtScore(v)}</span>
+                  <span className="cmp-bar-value">{locked ? 'locked' : waiting ? 'pending' : fmtScore(v)}</span>
                 </div>
               );
             })}
@@ -456,9 +479,9 @@ function Levels({ sides, fastTests, title }: { sides: Colored[]; fastTests: Test
           cube on a level&apos;s first try, so the fewest moves there is starred. Click a level for its replay.
         </p>
       </header>
-      {fastTests.map((t) => (
+      {withGauntlet(fastTests, have).map((t) => (
         <Exportable as="div" key={t.test} name={`${title} ${t.name} levels`} caption={`${title} · ${t.name}`} className="cmp-levels">
-          <LevelGrid test={t} sides={have} />
+          <LevelGrid test={t} sides={t.gauntlet ? have.filter(unlocked) : have} />
         </Exportable>
       ))}
       <ul className="legend cmp-legend">
@@ -499,7 +522,10 @@ function LevelGrid({ test, sides }: { test: TestName; sides: Colored[] }) {
   }
   return (
     <>
-      <h3 className="cmp-levels-head">{test.name}</h3>
+      <h3 className="cmp-levels-head">
+        {test.name}
+        {test.gauntlet && <small> · level 1 is {GAUNTLET.startDepth} moves from solved</small>}
+      </h3>
       <div className="cmp-lv-wrap">
         <table className="cmp-lv-table">
           <thead>
@@ -530,7 +556,11 @@ function LevelGrid({ test, sides }: { test: TestName; sides: Colored[] }) {
                       <LevelCell lv={d?.levels.find((x) => x.level === l)} starred={star.get(l)} />
                     </td>
                   ))}
-                  <td className={`num cmp-lv-score${(d?.score ?? 0) < 100 ? ' lo' : ''}`}>{fmtScore(d?.score ?? null)}</td>
+                  {test.gauntlet && notPlayed(s, test.test) ? (
+                    <td className="num cmp-lv-score faint">pending</td>
+                  ) : (
+                    <td className={`num cmp-lv-score${(d?.score ?? 0) < 100 ? ' lo' : ''}`}>{fmtScore(d?.score ?? null)}</td>
+                  )}
                 </tr>
               );
             })}

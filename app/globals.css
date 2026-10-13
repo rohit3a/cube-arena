@@ -3472,6 +3472,13 @@ tbody tr:hover td.heat-cell {
   font-size: 1.1rem;
 }
 
+/* A Gauntlet test the model didn't unlock: there, but greyed out. */
+.test-card.locked {
+  border-style: dashed;
+  box-shadow: none;
+  opacity: 0.7;
+}
+
 .test-card ul {
   display: flex;
   flex-direction: column;
@@ -3506,6 +3513,13 @@ tbody tr:hover td.heat-cell {
   font-family: var(--font-mono);
   font-weight: 800;
   text-align: center;
+}
+
+/* A Gauntlet test that's locked or not played yet: no score to colour. */
+.score-chip.chip-off {
+  border-style: dashed;
+  color: var(--text-2);
+  font-weight: 600;
 }
 
 .page-head .ix-card {
@@ -3945,6 +3959,16 @@ table.wanted td.cmd {
   margin-left: 8px;
   vertical-align: middle;
   background: var(--orange-t);
+  text-transform: none;
+  letter-spacing: 0;
+  cursor: help;
+}
+
+/* A Fast score whose 4×4 Gauntlet is unlocked and still to be played. */
+.tag-gauntlet {
+  margin-left: 8px;
+  vertical-align: middle;
+  background: var(--yellow-t);
   text-transform: none;
   letter-spacing: 0;
   cursor: help;

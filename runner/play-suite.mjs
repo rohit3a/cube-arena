@@ -5,7 +5,8 @@
 // counts as giving up). A session ended any other way (an API error, a usage
 // limit, a crash) leaves the test open and picks it up again after a wait. A
 // test that never starts stops the suite for --resume: a suite with a test
-// missing is closed off the boards. Nothing is timed: while it plays, the
+// missing is closed off the boards. Fast closes after its three tests; with
+// a perfect score the 4×4 Gauntlet follows on the closed suite. Nothing is timed: while it plays, the
 // runner sends a heartbeat so the site can tell a model that is still
 // thinking from a runner that died.
 
@@ -40,18 +41,56 @@ export async function playSuite(p) {
   }
 }
 
+/** "2×2 ladder, interactive", or "4×4 Gauntlet ladder, one-shot (20 levels, level 1 is 7 moves from solved)". */
+function describe(t) {
+  const mode = t.mode === 'one_shot' ? 'one-shot' : 'interactive';
+  if (t.gauntlet) return `${t.size}×${t.size} Gauntlet ladder, ${mode} (${t.levels} levels, level 1 is ${t.startDepth} moves from solved)`;
+  return `${t.size}×${t.size} ${t.challenge === 'ladder' ? 'ladder' : 'full scramble'}, ${mode}`;
+}
+
+/**
+ * The tests everyone plays, then the suite closes with that score. A perfect
+ * score unlocks the Gauntlet (the server says so in the suite's grade): its
+ * tests follow, and the suite closes again with them counted. Anything less
+ * ends the suite after the tests everyone plays.
+ */
 async function playTests(p, call, started) {
   const { suite, tests } = p;
-  for (const [i, t] of tests.entries()) {
+  const all = tests.map((t, i) => ({ t, i }));
+  const base = all.filter(({ t }) => !t.gauntlet);
+  const gauntlet = all.filter(({ t }) => t.gauntlet);
+  const stop = await playSlots(p, base, 'test');
+  if (stop) return stop;
+  let { result, suite: done } = await call('/api/admin/suites', { id: suite.id, finish: true });
+  console.log(`\n${result}`);
+  const state = done.grade?.gauntlet ?? null;
+  if (gauntlet.length && (state === 'pending' || state === 'playing')) {
+    console.log(`\n*** 100 on all three: the ${gauntlet[0].t.size}×${gauntlet[0].t.size} Gauntlet is unlocked ***`);
+    const g = await playSlots(p, gauntlet, 'Gauntlet');
+    if (g) return g;
+    ({ result, suite: done } = await call('/api/admin/suites', { id: suite.id, finish: true }));
+    console.log(`\n${result}`);
+  } else if (gauntlet.length && state === 'locked') {
+    console.log('The Gauntlet takes 100 on all three tests, so the suite ends here.');
+  }
+  for (const t of done.grade?.tests ?? []) console.log(`  ${t.test.padEnd(26)} ${t.score === null ? '-' : t.score.toFixed(1).padStart(5)}  (${t.played}/${t.cubes} cubes)`);
+  console.log(`total ${((Date.now() - started) / 60_000).toFixed(1)} min`);
+  return { breach: null, result, suite: done };
+}
+
+/** Plays these slots in order, skipping those already played. Returns null when all are over, else why it stopped. */
+async function playSlots(p, slots, label) {
+  const { suite } = p;
+  for (const [k, { t, i }] of slots.entries()) {
     if (p.played.has(i)) continue;
-    const what = `${t.size}×${t.size} ${t.challenge === 'ladder' ? 'ladder' : 'full scramble'}, ${t.mode === 'one_shot' ? 'one-shot' : 'interactive'}`;
-    console.log(`\n=== test ${i + 1}/${tests.length}: ${what} ===`);
+    const what = describe(t);
+    console.log(`\n=== ${label} ${k + 1}/${slots.length}: ${what} ===`);
     let waited = 0;
     for (let tries = 0; ; tries++) {
       const stamp = new Date().toISOString().replace(/[:.]/g, '-');
       const prompt =
         `Let's play Cube Arena. First call get_rules. Then call next_test with suite_id "${suite.id}": it ${tries ? 'picks your test back up where the cube was left' : 'starts your test'} ` +
-        `(test ${i + 1} of ${tests.length}: ${what}, no time limit). Solve each cube from the pictures only, in as few moves as you can. ` +
+        `(${label === 'test' ? 'test' : `${label} test`} ${k + 1} of ${slots.length}: ${what}, no time limit). Solve each cube from the pictures only, in as few moves as you can. ` +
         'Play until this test ends, then stop and reply with your result in one line. Do not start another test.';
       const r = await playSession({
         ...p.session,
@@ -73,7 +112,7 @@ async function playTests(p, call, started) {
       if (!r.retry && r.runId) break;
       if (!r.retry) {
         const why = r.stopReason ?? (r.quit ? 'the model ended without starting it' : `the agent ended, exit ${r.code}`);
-        console.log(`!!! test ${i + 1} never started (${why}). Stopping; carry on with --resume ${suite.id} within 30 minutes.`);
+        console.log(`!!! ${label} ${k + 1} never started (${why}). Stopping; carry on with --resume ${suite.id} within 30 minutes.`);
         return { breach: null, result: null, suite, stopped: why };
       }
       // Not the model's doing: the cube waits where it is, and a fresh session picks it up.
@@ -87,10 +126,5 @@ async function playTests(p, call, started) {
       waited += wait;
     }
   }
-
-  const { result, suite: done } = await call('/api/admin/suites', { id: suite.id, finish: true });
-  console.log(`\n${result}`);
-  for (const t of done.grade?.tests ?? []) console.log(`  ${t.test.padEnd(26)} ${t.score === null ? '-' : t.score.toFixed(1).padStart(5)}  (${t.played}/${t.cubes} cubes)`);
-  console.log(`total ${((Date.now() - started) / 60_000).toFixed(1)} min`);
-  return { breach: null, result, suite: done };
+  return null;
 }

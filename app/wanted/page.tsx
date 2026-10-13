@@ -4,8 +4,9 @@ import WantedTable, { type WantedItem } from '@/components/WantedTable';
 import CopyButton from '@/components/CopyButton';
 import { CATALOG_BUILT, harnessLabel } from '@/lib/arena/catalog';
 import { CLAIM_HOURS } from '@/lib/arena/claims';
+import { fmtScore } from '@/lib/arena/format';
 import { sweepExpired } from '@/lib/arena/service';
-import { SUITES } from '@/lib/arena/suites';
+import { GAUNTLET, SUITES } from '@/lib/arena/suites';
 import { THOROUGH_TOP, type WantedRow, wantedRows } from '@/lib/arena/wanted';
 import { RUNNER_INSTALL } from '@/lib/site';
 
@@ -37,6 +38,7 @@ export default async function Wanted() {
   const claimed = rows.filter((r) => r.claim).length;
   const models = new Set(fast.map((r) => r.model.id)).size;
   const setup = `${RUNNER_INSTALL}\ncube-arena-runner login AB12-CD34`;
+  const gauntlets = fast.flatMap((r) => r.gauntlets.map((g) => ({ ...g, name: r.model.name, effort: r.effort })));
 
   return (
     <div className="wrap page-head">
@@ -86,7 +88,8 @@ export default async function Wanted() {
           </li>
           <li>
             <strong>Pick a row below and run its command.</strong> It claims that model and effort for {CLAIM_HOURS} hours, plays the{' '}
-            {SUITES.fast.name} suite (no time limit; often an hour or two at high effort), and posts the result. Claude models run through Claude Code, GPT models through Codex,
+            {SUITES.fast.name} suite (no time limit; often an hour or two at high effort), and posts the result. A model that scores 100 on all
+            three tests goes straight on to the {GAUNTLET.size}×{GAUNTLET.size} {GAUNTLET.name}, which can take hours more. Claude models run through Claude Code, GPT models through Codex,
             Meta&apos;s Muse models through Muse Code on your Muse plan (<code>--via muse</code>), and anything else through Cursor on your Cursor plan
             (<code>--via cursor</code>), OpenRouter (<code>OPENROUTER_API_KEY</code>) or another
             OpenAI-compatible API (<code>--via api</code>).
@@ -112,6 +115,52 @@ export default async function Wanted() {
         </header>
         <WantedTable items={fast.map(item)} empty="Everything here has a result or a claim. Thank you!" />
       </section>
+
+      {gauntlets.length > 0 && (
+        <section className="card ix-card">
+          <header className="ix-head">
+            <h2>
+              {GAUNTLET.size}×{GAUNTLET.size} {GAUNTLET.name}s waiting
+            </h2>
+            <p>
+              These scored 100 on all three {SUITES.fast.name} tests, which unlocks the {GAUNTLET.name}: two {GAUNTLET.size}×{GAUNTLET.size} ladders
+              for the last 20 points. Whoever ran the suite plays it by resuming the suite (Copy gives the command); until then the Index shows the
+              score so far, tagged 4×4 pending.
+            </p>
+          </header>
+          <div className="table-wrap flat">
+            <table>
+              <thead>
+                <tr>
+                  <th>Model</th>
+                  <th className="num">So far</th>
+                  <th>Run by</th>
+                  <th>Play it</th>
+                </tr>
+              </thead>
+              <tbody>
+                {gauntlets.map((g) => (
+                  <tr key={g.suite_id}>
+                    <td>
+                      <Link href={`/suites/${g.suite_id}`}>
+                        {g.name}
+                        {g.effort ? ` (${g.effort})` : ''}
+                      </Link>
+                    </td>
+                    <td className="num">{fmtScore(g.score)}</td>
+                    <td className="muted">{g.run_by}</td>
+                    <td className="cmd">
+                      <span title={g.command}>
+                        <CopyButton text={g.command} label="Copy" />
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      )}
 
       <section className="card ix-card">
         <header className="ix-head">

@@ -14,7 +14,7 @@ export async function gradeSuites(sql: Tx, suites: { id: string; kind: SuiteKind
   const out = new Map<string, SuiteGrade>();
   if (suites.length === 0) return out;
   const rows = await sql<SlotRow[]>`
-    select r.suite_id, r.suite_slot, r.size, r.challenge, r.best_level,
+    select r.suite_id, r.suite_slot, r.size, r.challenge, r.best_level, r.top_level, r.status,
            coalesce(json_agg(json_build_object('level', a.level, 'status', a.status, 'move_count', a.move_count) order by a.seq)
                     filter (where a.id is not null), '[]'::json) as attempts
     from cube_arena.runs r

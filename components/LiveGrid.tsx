@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
+import { levelLabel } from '@/lib/arena/rules';
 import MiniFace from './MiniFace';
 
 export interface LiveCard {
@@ -9,6 +10,7 @@ export interface LiveCard {
   size: number;
   mode: string;
   level: number | null;
+  gauntlet?: boolean;
   move_count: number;
   model_name: string;
   display_name: string;
@@ -65,7 +67,7 @@ export default function LiveGrid({ initial, at }: { initial: LiveCard[]; at: num
           <span className="tv-meta">
             <strong>{a.model_name}</strong>
             <span>
-              {a.size}×{a.size} · {a.level ? `level ${a.level}` : 'full scramble'} · {a.move_count} move{a.move_count === 1 ? '' : 's'} so far
+              {a.size}×{a.size} · {levelLabel(a)} · {a.move_count} move{a.move_count === 1 ? '' : 's'} so far
             </span>
             <span className="faint">
               {a.display_name} · {a.board === 'verified' ? 'Verified' : 'Community'}
