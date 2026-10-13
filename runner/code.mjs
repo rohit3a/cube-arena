@@ -17,6 +17,7 @@ import { appendFileSync, createWriteStream, existsSync, mkdirSync, readFileSync,
 import { join } from 'node:path';
 import { gunzipSync, gzipSync } from 'node:zlib';
 import { MAX_OUTPUT_TOKENS, OUTPUT_CAP, SYNTHETIC, operator, slim } from './agent.mjs';
+import { tieToRunner, treeKiller } from './children.mjs';
 import { takeCodexSession } from './codex-session.mjs';
 import { commandFor } from './command.mjs';
 import { listFiles, tarGz } from './tar.mjs';
@@ -200,6 +201,7 @@ export function codingSession(s) {
   const secs = () => `${Math.round((Date.now() - started) / 1000)}s`;
   const run = commandFor(cmd, args);
   const child = spawn(run.file, run.args, { cwd: s.dir, env, stdio: ['ignore', 'pipe', 'pipe'] });
+  const untie = tieToRunner(treeKiller(child, false));
   const out = { quit: false, deadline: false, apiError: null, stopReason: null, breach: null, harnessError: null, code: null, ms: 0, usage: {}, events: [] };
   const note = (kind, text, tool) => out.events.push({ t: Math.round((Date.now() - started) / 1000), kind, ...(tool && { tool }), text: String(text ?? '') });
   const claudeUsage = new Map();
@@ -354,6 +356,7 @@ export function codingSession(s) {
   return new Promise((resolve) => {
     child.on('close', (code) => {
       clearTimeout(timer);
+      untie();
       log.end();
       out.code = code;
       out.ms = Date.now() - started;

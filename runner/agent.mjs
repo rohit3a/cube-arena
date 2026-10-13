@@ -30,6 +30,7 @@ import { createWriteStream, mkdirSync, mkdtempSync, readFileSync, realpathSync, 
 import { tmpdir } from 'node:os';
 import { join, resolve, sep } from 'node:path';
 import { gzipSync } from 'node:zlib';
+import { tieToRunner, treeKiller } from './children.mjs';
 import { takeCodexSession } from './codex-session.mjs';
 import { commandFor } from './command.mjs';
 import { sameCursorModel } from './cursor.mjs';
@@ -228,6 +229,7 @@ function playCli(s) {
   // the runner stop the lot.
   const group = cursor && process.platform !== 'win32';
   const child = spawn(run.file, run.args, { cwd: work, env, stdio: ['ignore', 'pipe', 'pipe'], detached: group });
+  const untie = tieToRunner(treeKiller(child, group));
   const killGroup = (signal) => {
     try {
       process.kill(-child.pid, signal);
@@ -543,8 +545,9 @@ function playCli(s) {
       out.code = code;
       if (muse) afterMuse(code);
       rmSync(work, { recursive: true, force: true, maxRetries: 5 });
+      if (cursor && group) killGroup('SIGTERM');
+      untie();
       if (cursor) {
-        if (group) killGroup('SIGTERM');
         // Cursor's chats and per-folder state for this session: the log has it all.
         for (const d of [join(s.cursorHome, 'config', 'chats'), join(s.cursorHome, 'data', 'projects')]) rmSync(d, { recursive: true, force: true, maxRetries: 5 });
         // No result means Cursor gave up, not the model: a usage limit, a network error.
