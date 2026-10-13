@@ -13,11 +13,11 @@
 // spent waiting not counted.
 
 import { spawn, spawnSync } from 'node:child_process';
-import { appendFileSync, createWriteStream, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { appendFileSync, createWriteStream, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { gunzipSync, gzipSync } from 'node:zlib';
 import { MAX_OUTPUT_TOKENS, OUTPUT_CAP, SYNTHETIC, operator, slim } from './agent.mjs';
-import { tieToRunner, treeKiller } from './children.mjs';
+import { WORKSPACE_ENV, endLeftovers, tieToRunner, treeKiller } from './children.mjs';
 import { takeCodexSession } from './codex-session.mjs';
 import { commandFor } from './command.mjs';
 import { listFiles, tarGz } from './tar.mjs';
@@ -75,6 +75,48 @@ export function claudeSandboxProblem() {
     );
   }
   return null;
+}
+
+/**
+ * One coding run per machine at a time: the model's builds and tests share the
+ * CPU with whatever else runs there (Opus 5.5 xhigh coded beside two other runs
+ * on 2026-10-14). Holds `file` until the runner exits. Returns null, or
+ * { pid, id } of the run already holding it.
+ */
+export function claimMachine(file, id) {
+  for (;;) {
+    try {
+      writeFileSync(file, `${JSON.stringify({ pid: process.pid, id })}\n`, { flag: 'wx' });
+      break;
+    } catch (e) {
+      if (e.code !== 'EEXIST') throw e;
+      let held = null;
+      try {
+        held = JSON.parse(readFileSync(file, 'utf8'));
+      } catch {
+        // half written or gone: claim it
+      }
+      if (held && alive(held.pid)) return held;
+      rmSync(file, { force: true });
+    }
+  }
+  process.on('exit', () => {
+    try {
+      if (JSON.parse(readFileSync(file, 'utf8')).pid === process.pid) rmSync(file);
+    } catch {
+      // gone already
+    }
+  });
+  return null;
+}
+
+function alive(pid) {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch (e) {
+    return e.code === 'EPERM';
+  }
 }
 
 /** Puts the kit in the workspace: the spec, the reference cube, the checker, the practice cubes, and an empty solver/. */
@@ -169,7 +211,7 @@ function claudeCommand(s) {
   args.push('--permission-mode', 'dontAsk', '--permission-prompts', 'none', '--settings', JSON.stringify(CLAUDE_SETTINGS));
   args.push('--allowedTools', ...CLAUDE_TOOLS, '--disallowedTools', 'WebFetch', 'WebSearch', 'Agent', 'NotebookEdit', 'mcp__*');
   args.push('--strict-mcp-config', '--setting-sources', 'local', '--output-format', 'stream-json', '--verbose', '--no-session-persistence');
-  const env = { ...process.env, CLAUDE_CODE_MAX_OUTPUT_TOKENS: String(MAX_OUTPUT_TOKENS), CLAUDE_CODE_DISABLE_CLAUDE_MDS: '1', CLAUDE_CODE_DISABLE_AUTO_MEMORY: '1' };
+  const env = { ...process.env, [WORKSPACE_ENV]: s.dir, CLAUDE_CODE_MAX_OUTPUT_TOKENS: String(MAX_OUTPUT_TOKENS), CLAUDE_CODE_DISABLE_CLAUDE_MDS: '1', CLAUDE_CODE_DISABLE_AUTO_MEMORY: '1' };
   return { cmd: 'claude', args, env };
 }
 
@@ -182,7 +224,7 @@ function codexCommand(s) {
   for (const f of CODEX_OFF) args.push('--disable', f);
   args.push('-c', 'agents.enabled=false', '-c', 'web_search="disabled"', '-c', 'project_doc_max_bytes=0', '-c', 'sandbox_workspace_write.network_access=false');
   args.push(s.prompt);
-  return { cmd: 'codex', args, env: { ...process.env, CODEX_HOME: s.codexHome } };
+  return { cmd: 'codex', args, env: { ...process.env, [WORKSPACE_ENV]: s.dir, CODEX_HOME: s.codexHome } };
 }
 
 const short = (v, n) => {
@@ -397,6 +439,16 @@ export async function playCoding(p) {
   const beat = () => call('/api/code/submissions', { id, alive: true }).catch((e) => console.log(`  (heartbeat failed: ${e.message})`));
   beat();
   const heart = setInterval(beat, HEARTBEAT_MS);
+  // Nothing the model started runs on after its session, or after the runner.
+  const sweep = (when) => {
+    const ended = endLeftovers(p.dir);
+    if (!ended.length) return;
+    const what = ended.map((e) => short(e.command, 80)).join('; ');
+    console.log(`  ended ${ended.length} program${ended.length > 1 ? 's' : ''} the model left running ${when}: ${what}`);
+    appendFileSync(eventsFile, `${JSON.stringify({ session: state.sessions, t: 0, kind: 'note', text: `ended what it left running ${when}: ${what}` })}\n`);
+  };
+  const untie = tieToRunner(() => endLeftovers(p.dir));
+  sweep('from an earlier session');
   let waited = 0;
   // One session of the agent, its time, usage and events recorded. Returns { r }, or { end } when that ends the run.
   const runSession = async (prompt, budgetMs) => {
@@ -412,6 +464,7 @@ export async function playCoding(p) {
     state.sessions += 1;
     save();
     for (const e of r.events) appendFileSync(eventsFile, `${JSON.stringify({ session: state.sessions, ...e })}\n`);
+    sweep('when the session ended');
     const cost = r.usage.cost_usd !== undefined ? `, $${r.usage.cost_usd.toFixed(2)}` : '';
     console.log(`  session over after ${(r.ms / 60_000).toFixed(1)} min${cost} (${hm(state.usedMs)} used of ${p.limits.devHours} h)`);
     await call('/api/code/submissions', { id, usage: r.usage, dev_minutes: state.usedMs / 60_000 }).catch((e) => console.log(`  (could not record usage: ${e.message})`));
@@ -469,6 +522,7 @@ export async function playCoding(p) {
     }
   } finally {
     clearInterval(heart);
+    untie();
   }
 
   await uploadTranscript(call, id, p, eventsFile, state);

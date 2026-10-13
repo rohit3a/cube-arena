@@ -17,12 +17,12 @@ import { join } from 'node:path';
 import { createInterface } from 'node:readline/promises';
 import { parseArgs } from 'node:util';
 import { operator } from './agent.mjs';
-import { claudeSandboxProblem, playCoding, setUpWorkspace, waitForGrade } from './code.mjs';
+import { claimMachine, claudeSandboxProblem, playCoding, setUpWorkspace, waitForGrade } from './code.mjs';
 import { commandFor } from './command.mjs';
 import { cursorBin, cursorModels, cursorSignedIn, cursorSlug } from './cursor.mjs';
 import { playSuite } from './play-suite.mjs';
 
-const VERSION = '0.5.1';
+const VERSION = '0.5.2';
 const DEFAULT_URL = 'https://cube.krnl.studio/mcp';
 const HOME = process.env.CUBE_ARENA_HOME || join(homedir(), '.cube-arena');
 const CONFIG = join(HOME, 'config.json');
@@ -399,6 +399,15 @@ async function code() {
     session = { agent: 'codex', model: model.via.codex, effort, codexHome: codexHomeFor() };
   }
 
+  mkdirSync(join(HOME, 'code'), { recursive: true });
+  const lock = join(HOME, 'code', 'running.json');
+  const held = claimMachine(lock, opt.resume ?? null);
+  if (held) {
+    fail(
+      `Another coding run is going on this machine (${held.id ? `submission ${held.id}, ` : ''}runner pid ${held.pid}). ` +
+        'Coding runs go one at a time, so each model has the machine to itself: start this one when that one ends.',
+    );
+  }
   const call = operator(site, token);
   let submission;
   if (opt.resume) {
@@ -412,6 +421,7 @@ async function code() {
   } else {
     ({ submission } = await call('/api/code/submissions', { model_id: model.id, effort, harness: via, credit: !!config.credit }).catch((e) => fail(e.message)));
   }
+  writeFileSync(lock, `${JSON.stringify({ pid: process.pid, id: submission.id })}\n`);
   const dir = join(HOME, 'code', submission.id);
   const { limits } = await setUpWorkspace(site, dir).catch((e) => fail(e.message));
   console.log(`${submission.model_name} via ${via}: coding benchmark ${limits.version}, ${limits.devHours} h to write a 5×5 solver → ${site}`);

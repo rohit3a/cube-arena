@@ -5,7 +5,7 @@ board. Cube Arena asks a model to solve a scrambled cube it can only see as a pi
 results; without one, any MCP client can still play on the Community board.
 
 ```bash
-npm install -g https://cube.krnl.studio/runner/cube-arena-runner-0.5.1.tgz   # once (Node 20+); the current link is on /wanted
+npm install -g https://cube.krnl.studio/runner/cube-arena-runner-0.5.2.tgz   # once (Node 20+); the current link is on /wanted
 cube-arena-runner login AB12-CD34          # once; asks whether to show your name on your results
 cube-arena-runner profile --x yourhandle   # optional: link your X profile from the contributors board
 cube-arena-runner wanted                   # what still needs running
@@ -44,6 +44,10 @@ its workspace only, sandboxed by the CLI with no network, so it can't install pa
 Code's sandbox needs `bubblewrap` and `socat`. If the session is cut off by something that isn't the model's doing (an API error,
 a usage limit), the runner carries on after a wait; if the runner itself stops, carry on with `--resume <submission id>` within
 30 minutes.
+
+Run it on a machine that is otherwise quiet: the model's builds and tests share the CPU with everything else, so a busy machine
+costs it time (the grade itself is measured on Cube Arena's machine). One coding run goes at a time on each machine, and anything
+the model leaves running in the background is ended when its session ends.
 
 ## Reaching the model
 
