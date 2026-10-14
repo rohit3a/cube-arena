@@ -16,6 +16,7 @@ import { type Usage, UUID, transaction, withDb } from './db';
 import { contributorSlug } from './invites';
 import { estimateCost, makerOf, slugOf } from './makers';
 import { CODE, type CaseRun, type CaseStatus, codeRank, gradeCase, hiddenCases, summarize } from './code-rules';
+import { BENCHES2, isBench2 } from './code2-rules';
 import { ArenaError } from './service';
 
 export type CodeStatus = 'coding' | 'queued' | 'grading' | 'graded' | 'failed';
@@ -52,12 +53,15 @@ export interface CodeSubmission {
   mean_moves: number | null;
   mean_ms: number | null;
   error: string | null;
+  /** v2: each part's score, and each stage's build. */
+  parts: Record<string, unknown> | null;
+  builds: Record<string, unknown> | null;
 }
 
 const COLUMNS = [
   'id', 'created_at', 'updated_at', 'version', 'display_name', 'model_name', 'model', 'model_id', 'effort', 'agent', 'harness',
   'invite_id', 'credit', 'status', 'hidden', 'hidden_reason', 'dev_minutes', 'usage', 'bundle_sha256', 'bundle_bytes', 'queued_at',
-  'graded_at', 'grader', 'build_ok', 'build_ms', 'cases', 'solved', 'score', 'mean_moves', 'mean_ms', 'error',
+  'graded_at', 'grader', 'build_ok', 'build_ms', 'cases', 'solved', 'score', 'mean_moves', 'mean_ms', 'error', 'parts', 'builds',
 ] as const;
 
 /** numeric columns come back as strings. */
@@ -82,7 +86,15 @@ export async function getSubmission(id: string): Promise<CodeSubmission | null> 
 export const ownsSubmission = (auth: Auth, s: CodeSubmission) => auth.role === 'operator' || s.invite_id === auth.invite.id;
 
 /** Starts a submission for a catalog model, an effort it takes, and a way to reach it. */
-export async function createSubmission(auth: Auth, body: { model_id?: unknown; effort?: unknown; harness?: unknown; credit?: unknown }, client: string | null): Promise<CodeSubmission> {
+export async function createSubmission(
+  auth: Auth,
+  body: { model_id?: unknown; effort?: unknown; harness?: unknown; credit?: unknown; version?: unknown },
+  client: string | null,
+): Promise<CodeSubmission> {
+  // v1, or a v2 bench (operator only while v2 is tested; its runs start hidden).
+  const version = body.version === undefined ? CODE.version : body.version;
+  if (version !== CODE.version && !isBench2(version)) throw new ArenaError('bad_version', `version must be ${CODE.version}, ${BENCHES2.join(' or ')}`);
+  if (version !== CODE.version && auth.role !== 'operator') throw new ArenaError('bad_version', `${version} is not open yet`);
   const model = catalogModel(typeof body.model_id === 'string' ? body.model_id : '');
   if (!model) throw new ArenaError('bad_model', 'model_id is not in the catalog (GET /api/catalog lists them)');
   const effort = typeof body.effort === 'string' && body.effort ? body.effort.slice(0, 16) : null;
@@ -97,9 +109,10 @@ export async function createSubmission(auth: Auth, body: { model_id?: unknown; e
   const credit = auth.role === 'invite' && body.credit === true;
   const display = auth.role === 'operator' ? 'Cube Arena' : credit ? auth.invite.name.slice(0, 32).padEnd(2, '.') : 'Invited tester';
   const [row] = await withDb((sql) => sql`
-    insert into cube_arena.code_submissions (version, display_name, model_name, model, model_id, effort, agent, harness, client, invite_id, credit)
-    values (${CODE.version}, ${display}, ${labelOf(model, effort)}, ${model.name}, ${model.id}, ${effort}, ${harness === 'codex' ? 'codex' : 'claude'},
-            ${harness}, ${client}, ${auth.role === 'invite' ? auth.invite.id : null}, ${credit})
+    insert into cube_arena.code_submissions (version, display_name, model_name, model, model_id, effort, agent, harness, client, invite_id, credit, hidden, hidden_reason)
+    values (${version}, ${display}, ${labelOf(model, effort)}, ${model.name}, ${model.id}, ${effort}, ${harness === 'codex' ? 'codex' : 'claude'},
+            ${harness}, ${client}, ${auth.role === 'invite' ? auth.invite.id : null}, ${credit},
+            ${version !== CODE.version}, ${version !== CODE.version ? 'v2 in testing' : null})
     returning ${sql(COLUMNS)}`);
   return clean(row);
 }
@@ -133,19 +146,24 @@ export async function saveCoding(id: string, usage: Usage, devMinutes: number | 
   });
 }
 
+/** Checks that an upload is a gzipped tar within `maxBytes` (unpacked under 64 MB). */
+export function checkTarGz(gz: Buffer, maxBytes: number, what = 'solver/'): void {
+  if (gz.length > maxBytes) throw new ArenaError('too_big', `${what} over ${maxBytes} bytes gzipped; build big tables in build.py instead`);
+  let tar: Buffer;
+  try {
+    tar = gunzipSync(gz, { maxOutputLength: 64 * 1024 * 1024 });
+  } catch {
+    throw new ArenaError('bad_bundle', `${what} must be a gzipped tar (unpacked under 64 MB)`);
+  }
+  if (tar.length < 512 || tar.subarray(257, 262).toString('latin1') !== 'ustar') throw new ArenaError('bad_bundle', `${what} must be a gzipped tar`);
+}
+
 /**
  * Freezes the solver: a gzipped tar of solver/. Only once, while coding; the
  * submission then waits for the grader.
  */
 export async function saveBundle(id: string, gz: Buffer): Promise<CodeSubmission> {
-  if (gz.length > CODE.bundleMaxBytes) throw new ArenaError('too_big', `solver over ${CODE.bundleMaxBytes} bytes gzipped; build big tables in build.py instead`);
-  let tar: Buffer;
-  try {
-    tar = gunzipSync(gz, { maxOutputLength: 64 * 1024 * 1024 });
-  } catch {
-    throw new ArenaError('bad_bundle', 'the solver must be a gzipped tar (unpacked under 64 MB)');
-  }
-  if (tar.length < 512 || tar.subarray(257, 262).toString('latin1') !== 'ustar') throw new ArenaError('bad_bundle', 'the solver must be a gzipped tar');
+  checkTarGz(gz, CODE.bundleMaxBytes);
   const sha = createHash('sha256').update(gz).digest('hex');
   const [row] = await withDb((sql) => sql`
     update cube_arena.code_submissions
@@ -188,13 +206,9 @@ export async function nextJob(): Promise<CodeJob | null> {
   return transaction(async (tx) => {
     const [row] = await tx<{ id: string; version: string; bundle_sha256: string }[]>`
       select id, version, bundle_sha256 from cube_arena.code_submissions
-      where status = 'queued' or (status = 'grading' and lease_until < now())
+      where version = ${CODE.version} and (status = 'queued' or (status = 'grading' and lease_until < now()))
       order by queued_at limit 1 for update skip locked`;
     if (!row) return null;
-    if (row.version !== CODE.version) {
-      await tx`update cube_arena.code_submissions set status = 'failed', error = ${`made for ${row.version}; this grader runs ${CODE.version}`} where id = ${row.id}`;
-      return null;
-    }
     await tx`update cube_arena.code_submissions set status = 'grading', lease_until = now() + ${LEASE}::interval, updated_at = now() where id = ${row.id}`;
     return { ...row, limits: CODE, cases: hiddenCases().map(({ n, state }) => ({ n, state })) };
   });
@@ -248,7 +262,7 @@ export async function failJob(id: string, error: string): Promise<boolean> {
 export async function requeue(id: string): Promise<boolean> {
   const rows = await withDb((sql) => sql`
     update cube_arena.code_submissions set status = 'queued', error = null, lease_until = null, updated_at = now()
-    where id = ${id} and bundle is not null and status in ('graded', 'failed', 'grading') returning id`);
+    where id = ${id} and queued_at is not null and status in ('graded', 'failed', 'grading') returning id`);
   return rows.length > 0;
 }
 
@@ -312,7 +326,7 @@ async function codeEntriesQuery(): Promise<CodeEntry[]> {
   const rows = await withDb((sql) => sql<(CodeSubmission & { invite_name: string | null; invite_x: string | null })[]>`
     select ${sql(COLUMNS.map((c) => `s.${c}`))}, i.name as invite_name, i.x_handle as invite_x
     from cube_arena.code_submissions s left join cube_arena.invites i on i.id = s.invite_id
-    where not s.hidden and s.status <> 'failed'
+    where s.version = ${CODE.version} and not s.hidden and s.status <> 'failed'
     order by s.created_at desc limit 500`);
   return rows.map((raw) => {
     const s = { ...clean(raw as never), invite_name: raw.invite_name, invite_x: raw.invite_x };

@@ -18,11 +18,12 @@ import { createInterface } from 'node:readline/promises';
 import { parseArgs } from 'node:util';
 import { operator } from './agent.mjs';
 import { claimMachine, claudeSandboxProblem, playCoding, setUpWorkspace, waitForGrade } from './code.mjs';
+import { playCoding2 } from './code2.mjs';
 import { commandFor } from './command.mjs';
 import { cursorBin, cursorModels, cursorSignedIn, cursorSlug } from './cursor.mjs';
 import { playSuite } from './play-suite.mjs';
 
-const VERSION = '0.5.3';
+const VERSION = '0.6.0';
 const DEFAULT_URL = 'https://cube.krnl.studio/mcp';
 const HOME = process.env.CUBE_ARENA_HOME || join(homedir(), '.cube-arena');
 const CONFIG = join(HOME, 'config.json');
@@ -157,6 +158,7 @@ const { values: opt, positionals } = parseArgs({
     force: { type: 'boolean', default: false },
     'no-transcript': { type: 'boolean', default: false },
     'no-wait': { type: 'boolean', default: false },
+    bench: { type: 'string' },
     'show-name': { type: 'boolean' },
     'hide-name': { type: 'boolean' },
     name: { type: 'string' },
@@ -419,10 +421,34 @@ async function code() {
       return report(await waitForGrade(call, submission.id, 180));
     }
   } else {
-    ({ submission } = await call('/api/code/submissions', { model_id: model.id, effort, harness: via, credit: !!config.credit }).catch((e) => fail(e.message)));
+    const version = opt.bench;
+    if (version && !['v2', 'v2-mini'].includes(version)) fail('--bench must be v2 or v2-mini');
+    ({ submission } = await call('/api/code/submissions', { model_id: model.id, effort, harness: via, credit: !!config.credit, ...(version && { version }) }).catch((e) =>
+      fail(e.message),
+    ));
   }
   writeFileSync(lock, `${JSON.stringify({ pid: process.pid, id: submission.id })}\n`);
   const dir = join(HOME, 'code', submission.id);
+  if (submission.version === 'v2' || submission.version === 'v2-mini') {
+    console.log(`${submission.model_name} via ${via}: coding benchmark ${submission.version}, three stages (centres, edges, finish) → ${site}`);
+    console.log(`submission ${submission.id} (resume with --resume ${submission.id})`);
+    console.log(`workspaces ${dir}/<stage>`);
+    const r2 = await playCoding2({
+      site,
+      token,
+      submission,
+      session,
+      bench: submission.version,
+      root: dir,
+      stateFile: join(HOME, 'code', `${submission.id}.json`),
+      logDir: join(HOME, 'logs'),
+      transcript: !opt['no-transcript'],
+      wait: opt['no-wait'] ? 0 : 600,
+    });
+    if (r2.breach) process.exit(3);
+    if (r2.stopped) process.exit(1);
+    return report(r2.submission);
+  }
   const { limits } = await setUpWorkspace(site, dir).catch((e) => fail(e.message));
   console.log(`${submission.model_name} via ${via}: coding benchmark ${limits.version}, ${limits.devHours} h to write a 5×5 solver → ${site}`);
   console.log(`submission ${submission.id} (resume with --resume ${submission.id})`);
@@ -444,7 +470,10 @@ async function code() {
   report(r.submission);
 
   function report(s) {
-    if (s?.status === 'graded') {
+    if (s?.status === 'graded' && s.parts) {
+      const parts = ['centres', 'edges', 'finish', 'e2e'].map((k) => `${k} ${(100 * s.parts[k].score).toFixed(1)}`).join(', ');
+      console.log(`\nscore ${Number(s.score).toFixed(1)} (${parts}); ${s.solved}/${s.cases} cases met the goal within the limits.`);
+    } else if (s?.status === 'graded') {
       console.log(`\n${s.solved}/${s.cases} hidden cubes solved, score ${Number(s.score).toFixed(2)}${s.mean_moves ? `, ${Number(s.mean_moves).toFixed(1)} moves per solve` : ''}.`);
     } else if (s?.status === 'failed') console.log(`\nThe grader could not run it (${s.error}). We'll look into it.`);
     else console.log('\nStill waiting for the grader; the result will show on the site.');

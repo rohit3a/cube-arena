@@ -1,6 +1,7 @@
 // Coding benchmark submissions (Authorization: Bearer <operator token or invite code>).
 //   GET  /api/code/submissions?id=…                           one submission (its owner or the operator); operator: ?limit= lists recent ones
-//   POST /api/code/submissions {model_id, effort, harness, credit}   start one (harness: claude-code or codex)
+//   POST /api/code/submissions {model_id, effort, harness, credit, version}   start one (harness: claude-code or codex;
+//                                                             version v1, or v2 / v2-mini for the operator while v2 is tested)
 //   POST /api/code/submissions {id, alive: true}             heartbeat while the model codes
 //   POST /api/code/submissions {id, usage, dev_minutes}      add a coding session's tokens and cost, set the coding time
 //   POST /api/code/submissions {id, hidden, reason}          hide (owner or operator) or unhide (operator)
@@ -19,6 +20,8 @@ import {
   setCodeHidden,
   sweepCode,
 } from '@/lib/arena/code';
+import { isBench2 } from '@/lib/arena/code2-rules';
+import { code2CaseRows, stageBundles } from '@/lib/arena/code2';
 import { ArenaError } from '@/lib/arena/service';
 
 export const dynamic = 'force-dynamic';
@@ -37,7 +40,8 @@ export async function GET(req: Request) {
   const s = await getSubmission(id);
   if (!s || !ownsSubmission(auth, s)) return noSuch();
   const detail = auth.role === 'operator' && q.get('detail') === '1' ? await codeGradingDetail(id) : null;
-  return Response.json({ submission: s, ...(detail && { detail }) }, { headers: { 'Cache-Control': 'no-store' } });
+  const v2 = isBench2(s.version) ? { stages: await stageBundles(id), ...(auth.role === 'operator' && q.get('detail') === '1' && { cases: await code2CaseRows(id) }) } : null;
+  return Response.json({ submission: s, ...(detail && { detail }), ...(v2 && { v2 }) }, { headers: { 'Cache-Control': 'no-store' } });
 }
 
 export async function POST(req: Request) {

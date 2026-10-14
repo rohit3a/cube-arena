@@ -210,7 +210,10 @@ function claudeCommand(s) {
   if (s.effort) args.push('--effort', s.effort);
   args.push('--permission-mode', 'dontAsk', '--permission-prompts', 'none', '--settings', JSON.stringify(CLAUDE_SETTINGS));
   args.push('--allowedTools', ...CLAUDE_TOOLS, '--disallowedTools', 'WebFetch', 'WebSearch', 'Agent', 'NotebookEdit', 'mcp__*');
-  args.push('--strict-mcp-config', '--setting-sources', 'local', '--output-format', 'stream-json', '--verbose', '--no-session-persistence');
+  args.push('--strict-mcp-config', '--setting-sources', 'local', '--output-format', 'stream-json', '--verbose');
+  // Kept only when the runner may pick the session up again (v2's time-left message).
+  if (s.resume) args.push('--resume', s.resume);
+  else if (!s.persist) args.push('--no-session-persistence');
   const env = { ...process.env, [WORKSPACE_ENV]: s.dir, CLAUDE_CODE_MAX_OUTPUT_TOKENS: String(MAX_OUTPUT_TOKENS), CLAUDE_CODE_DISABLE_CLAUDE_MDS: '1', CLAUDE_CODE_DISABLE_AUTO_MEMORY: '1' };
   return { cmd: 'claude', args, env };
 }
@@ -218,11 +221,15 @@ function claudeCommand(s) {
 function codexCommand(s) {
   const toml = JSON.stringify;
   // Not --ephemeral: the session file has the tokens if the session is stopped (codex-session.mjs).
-  const args = ['exec', '--json', '--skip-git-repo-check', '--ignore-user-config', '--ignore-rules', '-s', 'workspace-write', '-C', s.dir];
+  // Picking a session up again takes no -s or -C: the sandbox goes in as config, and it runs in the workspace.
+  const args = s.resume
+    ? ['exec', 'resume', '--json', '--skip-git-repo-check', '--ignore-user-config', '--ignore-rules', '-c', 'sandbox_mode="workspace-write"']
+    : ['exec', '--json', '--skip-git-repo-check', '--ignore-user-config', '--ignore-rules', '-s', 'workspace-write', '-C', s.dir];
   args.push('-m', s.model);
   if (s.effort) args.push('-c', `model_reasoning_effort=${toml(s.effort)}`);
   for (const f of CODEX_OFF) args.push('--disable', f);
   args.push('-c', 'agents.enabled=false', '-c', 'web_search="disabled"', '-c', 'project_doc_max_bytes=0', '-c', 'sandbox_workspace_write.network_access=false');
+  if (s.resume) args.push(s.resume);
   args.push(s.prompt);
   return { cmd: 'codex', args, env: { ...process.env, [WORKSPACE_ENV]: s.dir, CODEX_HOME: s.codexHome } };
 }
@@ -244,7 +251,7 @@ export function codingSession(s) {
   const run = commandFor(cmd, args);
   const child = spawn(run.file, run.args, { cwd: s.dir, env, stdio: ['ignore', 'pipe', 'pipe'] });
   const untie = tieToRunner(treeKiller(child, false));
-  const out = { quit: false, deadline: false, apiError: null, stopReason: null, breach: null, harnessError: null, code: null, ms: 0, usage: {}, events: [] };
+  const out = { quit: false, deadline: false, apiError: null, stopReason: null, breach: null, harnessError: null, code: null, ms: 0, usage: {}, events: [], sessionId: s.resume ?? null };
   const note = (kind, text, tool) => out.events.push({ t: Math.round((Date.now() - started) / 1000), kind, ...(tool && { tool }), text: String(text ?? '') });
   const claudeUsage = new Map();
   let claudeTotal = null;
@@ -282,6 +289,7 @@ export function codingSession(s) {
 
   function onClaude(ev) {
     if (ev.type === 'system' && ev.subtype === 'init') {
+      if (ev.session_id) out.sessionId = ev.session_id;
       if (ev.model !== s.model) lockdown(`asked for ${s.model}, the CLI started ${ev.model}`);
       const extra = (ev.tools ?? []).filter((t) => !CLAUDE_OK.has(t));
       if (extra.length) lockdown(`tools besides files and the shell: ${extra.join(', ')}`);
@@ -329,7 +337,7 @@ export function codingSession(s) {
 
   function onCodex(ev) {
     const item = ev.item;
-    if (ev.type === 'thread.started') codexThread = ev.thread_id;
+    if (ev.type === 'thread.started') codexThread = out.sessionId = ev.thread_id;
     if (ev.type === 'item.started' || ev.type === 'item.completed') {
       if (!CODEX_OK.has(item.type)) return lockdown(`a ${item.type} item`);
     }
@@ -412,8 +420,10 @@ export function codingSession(s) {
         if (Number.isFinite(thinking)) out.usage.reasoning_tokens = thinking;
       } else {
         // Stopped before its turn completed, Codex reported no tokens: its session file has them.
-        const saved = takeCodexSession(s.codexHome, codexThread);
+        // A session kept to be picked up again is the caller's to take (its file totals every turn).
+        const saved = s.persist ? null : takeCodexSession(s.codexHome, codexThread);
         if (!codexReported && saved) Object.assign(out.usage, saved);
+        out.codexReported = codexReported;
       }
       // Killed at the deadline, or ended by the model: either way the coding is over.
       if (out.deadline) out.quit = true;
