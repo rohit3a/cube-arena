@@ -5,7 +5,7 @@
 //
 //   node --env-file=.env.local scripts/code2-par.mjs --set [--replace]   hidden cubes: par from the graded runs (the site keeps them fixed)
 //   node --env-file=.env.local scripts/code2-par.mjs --rescore           value every graded v2 submission again against the pars
-//   ADMIN_ENV_FILE=… node --env-file=.env.local scripts/code2-par.mjs --practice [--top 3] [--stage centres] [--fresh]
+//   ADMIN_ENV_FILE=… node --env-file=.env.local scripts/code2-par.mjs --practice [--top 3] [--stage centres] [--bench v2] [--fresh]
 //       practice cubes: run the best graded programs of each stage and bench on them (on
 //       every size, a mini program too, until it fails at a size), in the
 //       grading sandbox on a core that isn't the grader's (CODE_GRADER_CPU,
@@ -23,6 +23,7 @@ const { values: opt } = parseArgs({
     rescore: { type: 'boolean', default: false },
     practice: { type: 'boolean', default: false },
     fresh: { type: 'boolean', default: false },
+    bench: { type: 'string' },
     top: { type: 'string', default: '3' },
     stage: { type: 'string' },
     url: { type: 'string', default: process.env.CUBE_ARENA_SITE ?? 'https://cube.krnl.studio' },
@@ -78,7 +79,7 @@ if (opt.practice) {
           select id, version, model_id, effort, (parts -> ${stage} ->> 'score')::float as score,
             row_number() over (partition by version order by (parts -> ${stage} ->> 'score')::float desc) as rank
           from cube_arena.code_submissions
-          where status = 'graded' and version in ('v2', 'v2-mini')
+          where status = 'graded' and version = any(${opt.bench ? [opt.bench] : ['v2', 'v2-mini']})
             and coalesce(hidden_reason, '') not like 'runner %' and coalesce(hidden_reason, '') not like 'reference %'
             and (parts -> ${stage} ->> 'score') is not null) ranked
         where rank <= ${Number(opt.top)}
