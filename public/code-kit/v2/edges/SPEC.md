@@ -145,10 +145,10 @@ Each hidden cube is worth between 0 and 1:
 | 4×4 | 4 | 36 | 71 | 143 | 5 s |
 | 5×5 | 5 | 89 | 180 | 360 | 5 s |
 | 6×6 | 6 | 132 | 242 | 484 | 5 s |
-| 7×7 | 7 | 357 | 357 | 715 | 5 s |
-| 8×8 | 8 | 402 | 402 | 803 | 6 s |
-| 9×9 | 9 | 548 | 548 | 1095 | 7 s |
-| 10×10 | 10 | 569 | 569 | 1137 | 7 s |
+| 7×7 | 7 | 233 | 357 | 715 | 5 s |
+| 8×8 | 8 | 300 | 402 | 803 | 6 s |
+| 9×9 | 9 | 359 | 548 | 1095 | 7 s |
+| 10×10 | 10 | 413 | 569 | 1137 | 7 s |
 
 The stage score is the mean value at each size, weighted by N (weights sum to
 49), over 10 hidden cubes per size: bigger cubes count more.
