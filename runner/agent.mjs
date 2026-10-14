@@ -16,7 +16,9 @@
 // block them (shell, files, web, other servers) and allow only the cube
 // server. A blocked attempt is noted in the log; one that went through (a
 // shell command, a web search, a file read outside the empty session folder)
-// breaks the lockdown. Its config and data live in the runner's own folder
+// breaks the lockdown. Cursor's file searches can't be blocked; one by name
+// (glob, ls) shows names only, since reading is blocked, so it is noted and
+// play goes on. Grok 4.7 lost four suites hunting for the picture's file. Its config and data live in the runner's own folder
 // (cursor.mjs), and its background worker is stopped with the session.
 //
 // Muse Code sessions get the cube tools by name and contributor mode off
@@ -154,6 +156,8 @@ function museCommandFor(s, sessionId) {
 const CURSOR_HARMLESS = new Set(['getMcpToolsToolCall', 'updateTodosToolCall', 'readTodosToolCall', 'partialToolCall', 'truncatedToolCall']);
 /** Cursor's tools that look at files, and the argument naming where. */
 const CURSOR_LOOKS = { grepToolCall: 'path', globToolCall: 'targetDirectory', lsToolCall: 'path', readToolCall: 'path', semSearchToolCall: 'path' };
+/** Those that see only file names: with reading blocked, they can't reach anything in a file. */
+const CURSOR_NAMES_ONLY = new Set(['globToolCall', 'lsToolCall']);
 
 // Transcripts keep everything but the pictures, which the site can redraw.
 /** The model name on messages Claude Code writes itself: API errors, usage limits. */
@@ -422,9 +426,10 @@ function playCli(s) {
         return;
       }
       const what = `${kind.replace(/ToolCall$/, '')} ${JSON.stringify(call?.args ?? {}).slice(0, 120)}`;
-      if (r.success && !inWork(kind, call?.args)) return lockdown(`Cursor ran ${what}`);
-      note(r.success ? 'call' : 'blocked', what);
-      console.log(`  [${secs()}] ${r.success ? 'looked in its empty folder' : 'blocked'}: ${what}`);
+      const outside = r.success && !inWork(kind, call?.args);
+      if (outside && !CURSOR_NAMES_ONLY.has(kind)) return lockdown(`Cursor ran ${what}`);
+      note(r.success && !outside ? 'call' : 'blocked', what);
+      console.log(`  [${secs()}] ${outside ? 'looked for file names outside its folder' : r.success ? 'looked in its empty folder' : 'blocked'}: ${what}`);
     }
     if (ev.type === 'result') {
       // The model finished its turn: it chose to stop here.

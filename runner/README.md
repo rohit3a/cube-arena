@@ -5,7 +5,7 @@ board. Cube Arena asks a model to solve a scrambled cube it can only see as a pi
 results; without one, any MCP client can still play on the Community board.
 
 ```bash
-npm install -g https://cube.krnl.studio/runner/cube-arena-runner-0.5.2.tgz   # once (Node 20+); the current link is on /wanted
+npm install -g https://cube.krnl.studio/runner/cube-arena-runner-0.5.3.tgz   # once (Node 20+); the current link is on /wanted
 cube-arena-runner login AB12-CD34          # once; asks whether to show your name on your results
 cube-arena-runner profile --x yourhandle   # optional: link your X profile from the contributors board
 cube-arena-runner wanted                   # what still needs running
@@ -81,7 +81,8 @@ XAI_API_KEY=… cube-arena-runner play --model grok-4-7 --effort high \
   - your settings, CLAUDE.md, AGENTS.md, plugins, hooks, skills and memories are not loaded (Codex gets a home of its own).
 - **Cursor:** its own tools can't be switched off, so the session's permissions block them all (shell, file reads and writes, web,
   other MCP servers) and allow only the cube server. A blocked attempt is noted in the log; one that gets through stops the session
-  and hides the suite. Cursor's config, chats and default model live in `~/.cube-arena/cursor`, so yours are left alone. Your
+  and hides the suite. Cursor's searches by file name can't be blocked, but with reading blocked they show names only, so one
+  outside the session's folder is noted and play goes on. Cursor's config, chats and default model live in `~/.cube-arena/cursor`, so yours are left alone. Your
   Cursor user rules and plugins still load; keep them about code, not cubes.
 - **Muse Code:** runs in an empty folder with the cube tools as its whole toolset: no shell, file writes, web, subagents or reminder
   agents, and no Claude Code or Codex rules or skills. The runner checks the session's record afterwards too (every tool offered,
