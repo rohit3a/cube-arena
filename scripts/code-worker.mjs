@@ -57,13 +57,30 @@ if (!TOKEN) {
 }
 
 async function api(path, body) {
-  const res = await fetch(`${SITE}${path}`, {
-    method: body ? 'POST' : 'GET',
-    headers: { Authorization: `Bearer ${TOKEN}`, ...(body && { 'Content-Type': 'application/json' }) },
-    body: body ? JSON.stringify(body) : undefined,
-  });
-  if (!res.ok) throw new Error(`${path}: ${res.status} ${(await res.text()).slice(0, 200)}`);
-  return path.includes('kind=bundle') ? Buffer.from(await res.arrayBuffer()) : res.json();
+  // A network blip or a 5xx mid-grade would drop the job (its lease keeps it from anyone else for hours):
+  // try again a few times, about three minutes in all, before giving up.
+  for (let attempt = 1; ; attempt++) {
+    let res;
+    try {
+      res = await fetch(`${SITE}${path}`, {
+        method: body ? 'POST' : 'GET',
+        headers: { Authorization: `Bearer ${TOKEN}`, ...(body && { 'Content-Type': 'application/json' }) },
+        body: body ? JSON.stringify(body) : undefined,
+      });
+    } catch (e) {
+      if (attempt >= 6) throw e;
+      log(`${path.split('?')[0]}: ${e.message}; trying again (${attempt})`);
+      await new Promise((r) => setTimeout(r, 5000 * 2 ** (attempt - 1)));
+      continue;
+    }
+    if (res.status >= 500 && attempt < 6) {
+      log(`${path.split('?')[0]}: ${res.status}; trying again (${attempt})`);
+      await new Promise((r) => setTimeout(r, 5000 * 2 ** (attempt - 1)));
+      continue;
+    }
+    if (!res.ok) throw new Error(`${path}: ${res.status} ${(await res.text()).slice(0, 200)}`);
+    return path.includes('kind=bundle') ? Buffer.from(await res.arrayBuffer()) : res.json();
+  }
 }
 
 async function grade(job) {
