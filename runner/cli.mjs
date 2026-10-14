@@ -57,6 +57,7 @@ code options (macOS or Linux; the model codes in a sandbox with no network):
   --effort, --via claude-code|codex, --codex-home   as for play
   --resume <submission id> carry on coding after the runner stopped part way
   --no-wait                don't wait for the grade (it shows on the site)
+  --deny-read <a,b,...>    more paths the model can't read (your own solutions, earlier runs)
 
 Your keys stay on your machine: the runner talks to the model provider directly,
 and only sends Cube Arena the moves, token counts and a text log of each session.
@@ -153,6 +154,7 @@ const { values: opt, positionals } = parseArgs({
     'api-key-env': { type: 'string' },
     'api-model': { type: 'string' },
     'codex-home': { type: 'string' },
+    'deny-read': { type: 'string' },
     'cursor-home': { type: 'string' },
     resume: { type: 'string' },
     force: { type: 'boolean', default: false },
@@ -400,6 +402,8 @@ async function code() {
     if (!has('codex')) fail('Codex is not installed: npm i -g @openai/codex');
     session = { agent: 'codex', model: model.via.codex, effort, codexHome: codexHomeFor() };
   }
+  const denyRead = (opt['deny-read'] ?? '').split(',').map((p) => p.trim()).filter(Boolean);
+  if (denyRead.length) session.denyRead = denyRead;
 
   mkdirSync(join(HOME, 'code'), { recursive: true });
   const lock = join(HOME, 'code', 'running.json');

@@ -14,6 +14,7 @@
 
 import { spawn, spawnSync } from 'node:child_process';
 import { appendFileSync, createWriteStream, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { gunzipSync, gzipSync } from 'node:zlib';
 import { MAX_OUTPUT_TOKENS, OUTPUT_CAP, SYNTHETIC, operator, slim } from './agent.mjs';
@@ -233,15 +234,22 @@ function claudeCommand(s) {
 
 function codexCommand(s) {
   const toml = JSON.stringify;
+  // Paths kept from the model need a permission profile (Codex 0.125+), which the older sandbox
+  // settings would switch off, so it replaces them: the workspace profile, plus those paths denied.
+  const deny = s.denyRead?.length ? [...PRIVATE, ...s.denyRead, s.codexHome].filter(Boolean).map((p) => p.replace(/^~(?=\/)/, homedir())) : null;
+  const sandbox = deny
+    ? ['-c', 'default_permissions="bench"', '-c', 'permissions.bench.extends=":workspace"', '-c', `permissions.bench.filesystem={${deny.map((p) => `${toml(p)}="deny"`).join(',')}}`]
+    : null;
   // Not --ephemeral: the session file has the tokens if the session is stopped (codex-session.mjs).
   // Picking a session up again takes no -s or -C: the sandbox goes in as config, and it runs in the workspace.
   const args = s.resume
-    ? ['exec', 'resume', '--json', '--skip-git-repo-check', '--ignore-user-config', '--ignore-rules', '-c', 'sandbox_mode="workspace-write"']
-    : ['exec', '--json', '--skip-git-repo-check', '--ignore-user-config', '--ignore-rules', '-s', 'workspace-write', '-C', s.dir];
+    ? ['exec', 'resume', '--json', '--skip-git-repo-check', '--ignore-user-config', '--ignore-rules', ...(sandbox ?? ['-c', 'sandbox_mode="workspace-write"'])]
+    : ['exec', '--json', '--skip-git-repo-check', '--ignore-user-config', '--ignore-rules', ...(sandbox ?? ['-s', 'workspace-write']), '-C', s.dir];
   args.push('-m', s.model);
   if (s.effort) args.push('-c', `model_reasoning_effort=${toml(s.effort)}`);
   for (const f of CODEX_OFF) args.push('--disable', f);
-  args.push('-c', 'agents.enabled=false', '-c', 'web_search="disabled"', '-c', 'project_doc_max_bytes=0', '-c', 'sandbox_workspace_write.network_access=false');
+  args.push('-c', 'agents.enabled=false', '-c', 'web_search="disabled"', '-c', 'project_doc_max_bytes=0');
+  if (!sandbox) args.push('-c', 'sandbox_workspace_write.network_access=false');
   if (s.resume) args.push(s.resume);
   args.push(s.prompt);
   return { cmd: 'codex', args, env: { ...process.env, [WORKSPACE_ENV]: s.dir, CODEX_HOME: s.codexHome } };
