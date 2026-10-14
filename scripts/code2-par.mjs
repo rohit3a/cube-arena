@@ -5,8 +5,8 @@
 //
 //   node --env-file=.env.local scripts/code2-par.mjs --set [--replace]   hidden cubes: par from the graded runs (the site keeps them fixed)
 //   node --env-file=.env.local scripts/code2-par.mjs --rescore           value every graded v2 submission again against the pars
-//   ADMIN_ENV_FILE=… node --env-file=.env.local scripts/code2-par.mjs --practice [--top 3] [--stage centres]
-//       practice cubes: run the best graded programs of each stage on them (on
+//   ADMIN_ENV_FILE=… node --env-file=.env.local scripts/code2-par.mjs --practice [--top 3] [--stage centres] [--fresh]
+//       practice cubes: run the best graded programs of each stage and bench on them (on
 //       every size, a mini program too, until it fails at a size), in the
 //       grading sandbox on a core that isn't the grader's (CODE_GRADER_CPU,
 //       default 2), and write par_moves into each kit's practice.json; then run
@@ -22,6 +22,7 @@ const { values: opt } = parseArgs({
     replace: { type: 'boolean', default: false },
     rescore: { type: 'boolean', default: false },
     practice: { type: 'boolean', default: false },
+    fresh: { type: 'boolean', default: false },
     top: { type: 'string', default: '3' },
     stage: { type: 'string' },
     url: { type: 'string', default: process.env.CUBE_ARENA_SITE ?? 'https://cube.krnl.studio' },
@@ -67,24 +68,28 @@ if (opt.practice) {
   const kit = (bench, stage) => join(REPO, 'public/code-kit', bench, stage, 'practice.json');
   const { adminSql } = await import('./admin-db.mjs');
   const sql = adminSql();
-  // Each stage's best programs so far (by that stage's score, which goes by moves against par once pars are set).
+  // Each stage's best programs so far, the top few of each bench (a full run's programs reach the big sizes),
+  // by that stage's score (which goes by moves against par once pars are set).
   const best = {};
   try {
     for (const stage of STAGES) {
       best[stage] = await sql`
-        select id, version, model_id, effort, (parts -> ${stage} ->> 'score')::float as score
-        from cube_arena.code_submissions
-        where status = 'graded' and version in ('v2', 'v2-mini')
-          and coalesce(hidden_reason, '') not like 'runner %' and coalesce(hidden_reason, '') not like 'reference %'
-          and (parts -> ${stage} ->> 'score') is not null
-        order by (parts -> ${stage} ->> 'score')::float desc limit ${Number(opt.top)}`;
+        select id, version, model_id, effort, score from (
+          select id, version, model_id, effort, (parts -> ${stage} ->> 'score')::float as score,
+            row_number() over (partition by version order by (parts -> ${stage} ->> 'score')::float desc) as rank
+          from cube_arena.code_submissions
+          where status = 'graded' and version in ('v2', 'v2-mini')
+            and coalesce(hidden_reason, '') not like 'runner %' and coalesce(hidden_reason, '') not like 'reference %'
+            and (parts -> ${stage} ->> 'score') is not null) ranked
+        where rank <= ${Number(opt.top)}
+        order by version, score desc`;
     }
   } finally {
     await sql.end();
   }
   ensureImage(IMAGE, 'grader/v2');
   const limits = { cpus: 1, memoryMb: 2048, buildSecs: 600 };
-  log(`practice par: the best ${opt.top} programs per stage, on CPU ${CORE?.cpu ?? 'any'}`);
+  log(`practice par: the best ${opt.top} programs per stage and bench, on CPU ${CORE?.cpu ?? 'any'}`);
   for (const stage of STAGES) {
     const file = kit('v2', stage);
     const practice = JSON.parse(readFileSync(file, 'utf8'));
@@ -129,10 +134,11 @@ if (opt.practice) {
     for (const bench of ['v2', 'v2-mini']) {
       const f = kit(bench, stage);
       const p = JSON.parse(readFileSync(f, 'utf8'));
-      for (const c of p.cases) c.par_moves = Math.min(c.ref_moves, fewest.get(`${c.n}:${c.case}`) ?? c.ref_moves);
+      // Par only comes down: programs rerun earlier count too (--fresh starts again from the reference).
+      for (const c of p.cases) c.par_moves = Math.min(c.ref_moves, (!opt.fresh && c.par_moves) || c.ref_moves, fewest.get(`${c.n}:${c.case}`) ?? c.ref_moves);
       writeFileSync(f, `${JSON.stringify(p, null, 1)}\n`);
     }
-    const all = practice.cases.map((c) => Math.min(c.ref_moves, fewest.get(`${c.n}:${c.case}`) ?? c.ref_moves) / c.ref_moves);
+    const all = JSON.parse(readFileSync(file, 'utf8')).cases.map((c) => c.par_moves / c.ref_moves);
     log(`${stage}: par is ${(100 * all.reduce((a, b) => a + b, 0) / all.length).toFixed(0)}% of our reference's moves on average`);
   }
   log('practice.json updated; now run node scripts/code2-kit.mjs');
