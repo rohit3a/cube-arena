@@ -26,7 +26,8 @@ Pairing is always possible. On even sizes the paired cube may need moves a
 yours.
 
 Meet the goal on every cube, within the move cap and the CPU limit; after
-that, fewer moves score a little more (see Scoring).
+that, fewer moves score more: half of each cube's value goes by how close you
+come to par (see Scoring).
 
 ## Rules
 
@@ -45,7 +46,7 @@ that, fewer moves score a little more (see Scoring).
 |---|---|
 | `SPEC.md` | This file. |
 | `cube.py` | The reference N×N cube: the same sticker order, moves, move counting and stage checks as the grader. Copy it into `edges/` to import it. |
-| `practice.json` | 30 practice cubes per size, made like the hidden ones: the input `state`, our reference's moves on it (`ref_moves`), the move `cap` and the CPU limit (`cpu_limit_ms`). |
+| `practice.json` | 30 practice cubes per size, made like the hidden ones: the input `state`, our reference's moves on it (`ref_moves`), par (`par_moves`), the move `cap` and the CPU limit (`cpu_limit_ms`). |
 | `check.py` | Runs your program on practice cubes exactly as the grader does and prints the stage score: the first 10 per size by default (the grader uses 10 hidden cubes per size), `--held-out` for the other 20, `--all` for all 30. |
 | `edges/` | Your program. Only this folder is submitted. |
 
@@ -130,23 +131,24 @@ Each hidden cube is worth between 0 and 1:
 - **0** if, after your moves, the goal isn't met; if the answer isn't moves,
   the program crashes or exits non-zero; if it uses more CPU time than the
   cube's limit; or if it uses more moves than the cube's cap.
-- Otherwise **0.9 + 0.1 × min(1, ref ÷ your moves)**, where ref is our
-  reference program's move count on that cube. Meeting the goal within the
-  limits is worth 0.9; matching our reference's length (or beating it) earns
-  the last 0.1.
-- The **cap** is 2 × ref. The **CPU limit** is 5 × our reference's CPU time on
-  that cube, at least 5 s and at most 60 s. Our reference is a plain
-  commutator-based solver; for scale (practice cubes):
+- Otherwise **0.5 + 0.5 × min(1, par ÷ your moves)**. **Par** is the fewest
+  moves any program we have graded has used on that cube (never more than our
+  reference program's), fixed for this benchmark. Meeting the goal within the
+  limits is worth 0.5; matching par (or beating it) earns the other 0.5.
+- The **cap** is 2 × ref, where ref is our reference program's move count on
+  that cube. The **CPU limit** is 5 × our reference's CPU time on that cube,
+  at least 5 s and at most 60 s. Our reference is a plain commutator-based
+  solver, well above par; for scale (practice cubes):
 
-| Size | Weight | Reference moves (practice mean) | Cap | CPU limit |
-|---|---|---|---|---|
-| 4×4 | 4 | 71 | 143 | 5 s |
-| 5×5 | 5 | 180 | 360 | 5 s |
-| 6×6 | 6 | 242 | 484 | 5 s |
-| 7×7 | 7 | 357 | 715 | 5 s |
-| 8×8 | 8 | 402 | 803 | 6 s |
-| 9×9 | 9 | 548 | 1095 | 7 s |
-| 10×10 | 10 | 569 | 1137 | 7 s |
+| Size | Weight | Par (practice mean) | Reference moves | Cap | CPU limit |
+|---|---|---|---|---|---|
+| 4×4 | 4 | 71 | 71 | 143 | 5 s |
+| 5×5 | 5 | 180 | 180 | 360 | 5 s |
+| 6×6 | 6 | 242 | 242 | 484 | 5 s |
+| 7×7 | 7 | 357 | 357 | 715 | 5 s |
+| 8×8 | 8 | 402 | 402 | 803 | 6 s |
+| 9×9 | 9 | 548 | 548 | 1095 | 7 s |
+| 10×10 | 10 | 569 | 569 | 1137 | 7 s |
 
 The stage score is the mean value at each size, weighted by N (weights sum to
 49), over 10 hidden cubes per size: bigger cubes count more.
@@ -155,5 +157,5 @@ The benchmark score is 100 × the mean of four parts: the three stages, and
 **end to end**, where the grader chains the centres, edges and finish
 programs from the three sessions on each scrambled cube (each program with
 its own stage's CPU limit; the cap is 2 × our reference's three stages
-together). So your program also runs on what the previous stage's program
+together, and par is the fewest moves any graded chain has used on that cube). So your program also runs on what the previous stage's program
 leaves, not just on what our reference leaves.

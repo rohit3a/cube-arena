@@ -8,7 +8,7 @@
     python3 check.py --no-build      skip the build (it already ran)
 
 It prints, for each cube, whether the stage's goal is met, the moves against
-the cap, the CPU time against the limit, and the case value; then the mean
+the cap and par, the CPU time against the limit, and the case value; then the mean
 value per size and the stage score (sizes weighted by N), as the grader
 counts them. The grader does the same on 10 hidden cubes per size, made the same way, on
 a Linux machine (Python 3.12, gcc/g++ 12, one CPU core, 2 GB of memory, no
@@ -37,6 +37,8 @@ BUILD_SECS = 600
 # check.py's default: the first 10 cubes of each size, as many as the grader's hidden cubes.
 FIRST = 10
 OUTPUT_MAX = 512 * 1024
+# A solved cube is worth this much; the rest goes by moves against par.
+SOLVED_FLOOR = 0.5
 BUNDLE_MAX = 3_000_000
 BINARY_MAGIC = (b"\x7fELF", b"\xcf\xfa\xed\xfe", b"\xce\xfa\xed\xfe", b"MZ")
 GOAL = {
@@ -120,7 +122,8 @@ def grade(stage, n, state, code, out, timed_out, case):
         return "unsolved", moves, 0.0, why
     if moves > case["cap"]:
         return "over_cap", moves, 0.0, "%d moves, over the cap of %d" % (moves, case["cap"])
-    return "solved", moves, 0.9 + 0.1 * min(1.0, case["ref_moves"] / max(1, moves)), None
+    par = case.get("par_moves", case["ref_moves"])
+    return "solved", moves, SOLVED_FLOOR + (1 - SOLVED_FLOOR) * min(1.0, par / max(1, moves)), None
 
 
 def main():
@@ -189,8 +192,8 @@ def run_cases(stage, alone, cases):
         code, out, err, cpu, secs, timed_out = run([sys.executable, "solve.py"], alone, "%d\n%s\n" % (n, c["state"]), limit)
         status, moves, value, detail = grade(stage, n, c["state"], code, out, timed_out, c)
         by_size.setdefault(n, []).append(value)
-        line = "%2dx%-2d #%d  %-8s %5s moves (cap %4d, ref %4d)  %6.2f s CPU (limit %4.1f)  value %.3f" % (
-            n, n, c["case"], status, moves if moves is not None else "-", c["cap"], c["ref_moves"], cpu, limit, value)
+        line = "%2dx%-2d #%d  %-8s %5s moves (cap %4d, par %4d)  %6.2f s CPU (limit %4.1f)  value %.3f" % (
+            n, n, c["case"], status, moves if moves is not None else "-", c["cap"], c.get("par_moves", c["ref_moves"]), cpu, limit, value)
         if detail:
             line += "   (%s)" % detail
         print(line, flush=True)
@@ -215,7 +218,7 @@ def report(stage, folder, by_size):
         den += n
         print("%2dx%-2d  mean value %.3f  (%d of %d met the goal within the limits)" % (n, n, mean, sum(1 for v in by_size[n] if v > 0), len(by_size[n])))
     if den:
-        print("stage score %.3f  (sizes weighted by N; 1.000 = every cube within the limits at or under our reference's moves)" % (num / den))
+        print("stage score %.3f  (sizes weighted by N; 1.000 = every cube within the limits at or under par)" % (num / den))
     size = gz_size(folder)
     print("%s/ is %d bytes gzipped (limit %d)%s" % (stage, size, BUNDLE_MAX, "  OVER THE LIMIT" if size > BUNDLE_MAX else ""))
     return 0
