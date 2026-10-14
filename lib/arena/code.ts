@@ -155,7 +155,9 @@ export function checkTarGz(gz: Buffer, maxBytes: number, what = 'solver/'): void
   } catch {
     throw new ArenaError('bad_bundle', `${what} must be a gzipped tar (unpacked under 64 MB)`);
   }
-  if (tar.length < 512 || tar.subarray(257, 262).toString('latin1') !== 'ustar') throw new ArenaError('bad_bundle', `${what} must be a gzipped tar`);
+  // An empty folder is an archive of zeros only: it goes in, and scores 0.
+  const empty = tar.length >= 1024 && tar.every((b) => b === 0);
+  if (!empty && (tar.length < 512 || tar.subarray(257, 262).toString('latin1') !== 'ustar')) throw new ArenaError('bad_bundle', `${what} must be a gzipped tar`);
 }
 
 /**
