@@ -26,7 +26,7 @@ describe('coding v2 grading', () => {
     expect(caseValue('solved', 600, 300)).toBeCloseTo(0.95);
     expect(caseValue('solved', 100, 300)).toBeCloseTo(1);
     expect(caseValue('unsolved', 100, 300)).toBe(0);
-    expect(nudgeText(40, 'edges')).toBe('You have 40 min left in this stage. Keep improving, or reply DONE to submit edges/ as it stands.');
+    expect(nudgeText(40, 'edges')).toBe('You have 40 min left in this stage. Keep working on edges/ until the time is up; it is submitted then.');
   });
 
   it('grades the reference answers as solved at value 1, each stage and end to end', () => {

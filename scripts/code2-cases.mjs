@@ -7,7 +7,7 @@
 // the cube; its reference moves and CPU time set the move cap and CPU limit.
 //
 //   ADMIN_ENV_FILE=… node scripts/code2-cases.mjs --hidden      10 per size into cube_arena.code_cases (crypto randomness)
-//   node scripts/code2-cases.mjs --practice                     3 per size into public/code-kit/{v2,v2-mini}/<stage>/practice.json
+//   node scripts/code2-cases.mjs --practice                     30 per size into public/code-kit/{v2,v2-mini}/<stage>/practice.json
 //   … --sizes 4,5 --count 2 --dry                               try it without writing anything
 //
 // Hidden scrambles never leave this machine except into the database.
@@ -38,7 +38,8 @@ const IMAGE = 'cube-arena-code:v2';
 const VERSION = 'v2';
 const STAGES = ['centres', 'edges', 'finish'];
 const SIZES = opt.sizes.split(',').map(Number);
-const COUNT = Number(opt.count ?? (opt.hidden ? 10 : 3));
+// CODE2.casesPerSize and CODE2.practicePerSize (lib/arena/code2-rules.ts).
+const COUNT = Number(opt.count ?? (opt.hidden ? 10 : 30));
 /** The grading sandbox's limits (lib/arena/code2-rules.ts). */
 const LIMITS = { cpus: 1, memoryMb: 2048 };
 /** The reference itself may take this long on any cube (it takes under 5 s). */

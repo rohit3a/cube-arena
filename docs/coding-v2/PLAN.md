@@ -17,12 +17,14 @@ NxN ladder
 - cap = 2 x reference moves; cpu_limit = clamp(5 x reference CPU, 5 s, 60 s).
 - case value = 0 if unsolved / over cap / over CPU, else 0.9 + 0.1*min(1, ref/moves).
 - stage score = sum N*mean_N / 49; bench = 100*(centres+edges+finish+e2e)/4.
-- Early stop: > 25% of stage time left -> one identical message:
-  "You have X min left in this stage. Keep improving, or reply DONE to submit <stage>/ as it stands."
-  A second stop or DONE submits.
+- Early stop: > 10% of stage time left -> the same message, up to 5 times a stage (session resumed):
+  "You have X min left in this stage. Keep working on <stage>/ until the time is up; it is submitted then."
+  A stop with less left, or after the fifth message, submits. (Was: > 25%, once, with "or reply DONE":
+  in the first mini runs every message got an immediate DONE, once with the stage unfinished.)
 - Interface: <stage>/solve.py (stdin: N, then 6N^2 letters URFDLB), prints moves; optional build.py (10 min).
 - Python 3.12 + gcc 12 stdlib; 2 GB; 3 MB gzipped per stage folder.
-- Kit per stage: SPEC.md, cube.py (NxN), check.py, practice.json (3 per size, ref moves + cap + cpu limit).
+- Kit per stage: SPEC.md, cube.py (NxN), check.py, practice.json (30 per size, ref moves + cap + cpu limit;
+  check.py runs 10 per size by default, --held-out the other 20).
 
 Subagent bench
 - 30 tasks x 20 min, one try each, fresh workspace from a fixed starter commit.

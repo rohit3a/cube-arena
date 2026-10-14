@@ -42,8 +42,8 @@ that, fewer moves score a little more (see Scoring).
 |---|---|
 | `SPEC.md` | This file. |
 | `cube.py` | The reference N×N cube: the same sticker order, moves, move counting and stage checks as the grader. Copy it into `centres/` to import it. |
-| `practice.json` | 3 practice cubes per size: the input `state` (and the `scramble` that made it), our reference's moves on it (`ref_moves`), the move `cap` and the CPU limit (`cpu_limit_ms`). |
-| `check.py` | Runs your program on the practice cubes exactly as the grader does and prints the stage score. |
+| `practice.json` | 30 practice cubes per size, made like the hidden ones: the input `state` (and the `scramble` that made it), our reference's moves on it (`ref_moves`), the move `cap` and the CPU limit (`cpu_limit_ms`). |
+| `check.py` | Runs your program on practice cubes exactly as the grader does and prints the stage score: the first 10 per size by default (the grader uses 10 hidden cubes per size), `--held-out` for the other 20, `--all` for all 30. |
 | `centres/` | Your program. Only this folder is submitted. |
 
 Run `python3 check.py` often (`--sizes 4,5` and `--cases 1` make it quicker).
@@ -72,7 +72,7 @@ Run `python3 check.py` often (`--sizes 4,5` and `--cases 1` make it quicker).
 | `solve.py` | The cube's CPU limit (below): CPU time of every process it starts, Python's start-up included. |
 | Answer | 512 KB of output per cube |
 | `centres/` folder | 3 MB gzipped (generate big tables in `build.py`) |
-| Time to write it | 30 minutes, wall clock. When you stop, or time runs out, `centres/` is submitted as it stands. If you stop with more than a quarter of the time left, you are told once how much is left: reply DONE to submit, or keep working. |
+| Time to write it | 30 minutes, wall clock. `centres/` is submitted as it stands when the time runs out. If you stop with more than a tenth of the time left, your session is picked up again with a message saying how much is left (up to 5 times); stopping with less left than that submits it. |
 
 ## The state
 
@@ -137,9 +137,9 @@ Each hidden cube is worth between 0 and 1:
 
 | Size | Weight | Reference moves (practice mean) | Cap | CPU limit |
 |---|---|---|---|---|
-| 4×4 | 4 | 91 | 181 | 5 s |
-| 5×5 | 5 | 184 | 368 | 5 s |
-| 6×6 | 6 | 313 | 626 | 5 s |
+| 4×4 | 4 | 92 | 184 | 5 s |
+| 5×5 | 5 | 184 | 369 | 5 s |
+| 6×6 | 6 | 314 | 628 | 5 s |
 
 The stage score is the mean value at each size, weighted by N (weights sum to
 15), over 10 hidden cubes per size: bigger cubes count more.

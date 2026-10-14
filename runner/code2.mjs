@@ -6,9 +6,10 @@
 //
 // The lockdown, the sandbox and the retries are code.mjs's. What is new: a
 // stage has its own time, and a model that ends its turn with more than a
-// quarter of that left gets one message, the same words for every model,
-// saying how long is left (its session picked up again, so it keeps its
-// context). Ending again, or replying DONE, submits.
+// tenth of that left gets a message, the same words for every model, saying
+// how long is left (its session picked up again, so it keeps its context),
+// up to limits.nudgeMax times a stage. Ending with less left than that, or
+// after the last message, submits.
 
 import { appendFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -83,7 +84,7 @@ function packPrompt2(stage, packed, budgetMs, limits) {
 
 /** The time-left message: the same words for every model (lib/arena/code2-rules.ts nudgeText). */
 export const nudgeText = (minutesLeft, stage) =>
-  `You have ${minutesLeft} min left in this stage. Keep improving, or reply DONE to submit ${stage}/ as it stands.`;
+  `You have ${minutesLeft} min left in this stage. Keep working on ${stage}/ until the time is up; it is submitted then.`;
 
 /**
  * Codes the three stages, submits each, and (with `wait`) waits for the grade.
@@ -181,12 +182,14 @@ export async function playCoding2(p) {
           }
           if (r.quit && !r.apiError) {
             const left = budget - st.usedMs;
-            // Ended early: once, the time left; a second end (or DONE) submits.
-            if (!r.deadline && !st.nudged && left > kit.limits.nudgeShare * budget && st.sessionId) {
+            // Ended early: the time left, up to nudgeMax times (a runner from before nudgeMax sent it once).
+            const max = kit.limits.nudgeMax ?? 1;
+            if (!r.deadline && (st.nudges ?? 0) < max && left > kit.limits.nudgeShare * budget && st.sessionId) {
+              st.nudges = (st.nudges ?? 0) + 1;
               st.nudged = true;
               st.nudgeDue = true;
               save();
-              console.log(`  ended with ${mins(left)} min left: telling it once`);
+              console.log(`  ended with ${mins(left)} min left: time-left message ${st.nudges} of ${max}`);
               continue;
             }
             st.ended = true;
@@ -250,7 +253,7 @@ export async function playCoding2(p) {
 async function uploadTranscript(call, id, p, eventsFile, state) {
   if (!p.transcript || !existsSync(eventsFile)) return;
   const events = readFileSync(eventsFile, 'utf8').trim().split('\n').filter(Boolean).map((l) => JSON.parse(l));
-  const stages = Object.fromEntries(Object.entries(state.stages).map(([k, v]) => [k, { minutes: v.usedMs / 60_000, sessions: v.sessions, nudged: v.nudged }]));
+  const stages = Object.fromEntries(Object.entries(state.stages).map(([k, v]) => [k, { minutes: v.usedMs / 60_000, sessions: v.sessions, nudged: v.nudged, nudges: v.nudges ?? (v.nudged ? 1 : 0) }]));
   const digest = { model: p.session.model, effort: p.session.effort ?? null, agent: p.session.agent, bench: p.bench, minutes: state.usedMs / 60_000, sessions: state.sessions, stages, events };
   let gz = gzipSync(JSON.stringify(digest));
   if (gz.length > 2_000_000) gz = gzipSync(JSON.stringify({ ...digest, events: events.map((e) => ({ ...e, text: e.text.slice(0, 300) })) }));

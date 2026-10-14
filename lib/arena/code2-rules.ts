@@ -23,7 +23,8 @@ export const CODE2 = {
   /** Where the hidden and practice cases come from: one set, the mini bench uses its small sizes. */
   caseVersion: 'v2',
   casesPerSize: 10,
-  practicePerSize: 3,
+  /** In each kit's practice.json; check.py runs the first 10 per size (the hidden count) and holds out the rest. */
+  practicePerSize: 30,
   buildSecs: 600,
   cpus: 1,
   memoryMb: 2048,
@@ -35,8 +36,9 @@ export const CODE2 = {
   cpuFactor: 5,
   cpuMinMs: 5_000,
   cpuMaxMs: 60_000,
-  /** A stage ended with more than this share of its time left gets one "time left" message. */
-  nudgeShare: 0.25,
+  /** A stage ended with more than this share of its time left gets the "time left" message, up to nudgeMax times. */
+  nudgeShare: 0.1,
+  nudgeMax: 5,
   benches: {
     v2: { sizes: [4, 5, 6, 7, 8, 9, 10], minutes: { centres: 90, edges: 90, finish: 60 } },
     'v2-mini': { sizes: [4, 5, 6], minutes: { centres: 30, edges: 30, finish: 20 } },
@@ -51,7 +53,7 @@ export const cpuLimitMs = (refCpuMs: number) => Math.min(CODE2.cpuMaxMs, Math.ma
 
 /** The early-stop message, word for word the same for every model. */
 export const nudgeText = (minutesLeft: number, stage: Stage) =>
-  `You have ${minutesLeft} min left in this stage. Keep improving, or reply DONE to submit ${stage}/ as it stands.`;
+  `You have ${minutesLeft} min left in this stage. Keep working on ${stage}/ until the time is up; it is submitted then.`;
 
 /** The text of the time-left message the runner sends, and the share of time left that triggers it. */
 export function limits2(bench: Bench2) {
@@ -71,6 +73,7 @@ export function limits2(bench: Bench2) {
     cpuMinMs: CODE2.cpuMinMs,
     cpuMaxMs: CODE2.cpuMaxMs,
     nudgeShare: CODE2.nudgeShare,
+    nudgeMax: CODE2.nudgeMax,
   };
 }
 

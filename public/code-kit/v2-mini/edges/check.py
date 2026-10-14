@@ -1,6 +1,8 @@
 """Runs your stage program the way the grader does, on the practice cubes.
 
-    python3 check.py                 build (build.py, if there is one), then run every practice cube
+    python3 check.py                 build (build.py, if there is one), then run the first 10 practice cubes of each size
+    python3 check.py --held-out      the other 20 of each size: cubes you haven't been tuning on
+    python3 check.py --all           all 30 of each size
     python3 check.py --sizes 4,5     only these sizes
     python3 check.py --cases 1       only the first cube of each size
     python3 check.py --no-build      skip the build (it already ran)
@@ -8,7 +10,7 @@
 It prints, for each cube, whether the stage's goal is met, the moves against
 the cap, the CPU time against the limit, and the case value; then the mean
 value per size and the stage score (sizes weighted by N), as the grader
-counts them. The grader does the same on hidden cubes, made the same way, on
+counts them. The grader does the same on 10 hidden cubes per size, made the same way, on
 a Linux machine (Python 3.12, gcc/g++ 12, one CPU core, 2 GB of memory, no
 network), with your folder read-only while it solves.
 """
@@ -28,6 +30,8 @@ sys.path.insert(0, HERE)
 import cube  # noqa: E402
 
 BUILD_SECS = 600
+# check.py's default: the first 10 cubes of each size, as many as the grader's hidden cubes.
+FIRST = 10
 OUTPUT_MAX = 512 * 1024
 BUNDLE_MAX = 3_000_000
 BINARY_MAGIC = (b"\x7fELF", b"\xcf\xfa\xed\xfe", b"\xce\xfa\xed\xfe", b"MZ")
@@ -119,6 +123,8 @@ def main():
     ap = argparse.ArgumentParser(description="Run your stage program on the practice cubes, as the grader would.")
     ap.add_argument("--sizes", default=None, help="only these sizes, e.g. 4,5")
     ap.add_argument("--cases", type=int, default=None, help="only the first N cubes of each size")
+    ap.add_argument("--held-out", action="store_true", help="the cubes after the first 10 of each size")
+    ap.add_argument("--all", action="store_true", help="every practice cube")
     ap.add_argument("--no-build", action="store_true", help="skip build.py")
     opt = ap.parse_args()
 
@@ -130,8 +136,12 @@ def main():
     if opt.sizes:
         keep = {int(x) for x in opt.sizes.split(",")}
         cases = [c for c in cases if c["n"] in keep]
-    if opt.cases:
+    if opt.held_out:
+        cases = [c for c in cases if c["case"] >= FIRST]
+    elif opt.cases:
         cases = [c for c in cases if c["case"] < opt.cases]
+    elif not opt.all:
+        cases = [c for c in cases if c["case"] < FIRST]
 
     if not os.path.isfile(os.path.join(folder, "solve.py")):
         print("%s/solve.py is missing: it reads N and a state from stdin and prints moves (see SPEC.md)." % stage)
