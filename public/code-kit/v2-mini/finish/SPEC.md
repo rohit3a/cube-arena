@@ -139,9 +139,9 @@ Each hidden cube is worth between 0 and 1:
 
 | Size | Weight | Par (practice mean) | Reference moves | Cap | CPU limit |
 |---|---|---|---|---|---|
-| 4×4 | 4 | 166 | 166 | 332 | 5 s |
-| 5×5 | 5 | 155 | 155 | 310 | 5 s |
-| 6×6 | 6 | 170 | 170 | 340 | 5 s |
+| 4×4 | 4 | 31 | 166 | 332 | 5 s |
+| 5×5 | 5 | 20 | 155 | 310 | 5 s |
+| 6×6 | 6 | 37 | 170 | 340 | 5 s |
 
 The stage score is the mean value at each size, weighted by N (weights sum to
 15), over 10 hidden cubes per size: bigger cubes count more.
