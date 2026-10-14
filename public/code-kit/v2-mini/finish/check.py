@@ -12,7 +12,9 @@ the cap, the CPU time against the limit, and the case value; then the mean
 value per size and the stage score (sizes weighted by N), as the grader
 counts them. The grader does the same on 10 hidden cubes per size, made the same way, on
 a Linux machine (Python 3.12, gcc/g++ 12, one CPU core, 2 GB of memory, no
-network), with your folder read-only while it solves.
+network), with your folder on its own and read-only while it solves. So does this:
+after the build it runs a copy of your folder alone in a temporary folder, so a
+program that reaches outside its folder (for ../cube.py, say) fails here too.
 """
 
 import argparse
@@ -20,9 +22,11 @@ import io
 import json
 import os
 import resource
+import shutil
 import subprocess
 import sys
 import tarfile
+import tempfile
 import time
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -163,12 +167,26 @@ def main():
         if bins:
             print("warning: compiled files in %s/ (%s) but no build.py. The grader runs Linux x86-64: compile there, in build.py." % (stage, ", ".join(bins[:5])))
 
-    before = snapshot(folder)
+    # The grader runs the folder on its own: so does this, on a copy alone in a temporary folder.
+    tmp = tempfile.mkdtemp(prefix="check-")
+    alone = os.path.join(tmp, "solver")
+    shutil.copytree(folder, alone, ignore=shutil.ignore_patterns("__pycache__"))
+    try:
+        by_size = run_cases(stage, alone, cases)
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+    print()
+    return report(stage, folder, by_size)
+
+
+def run_cases(stage, alone, cases):
+    """Runs solve.py in `alone` on each cube, a line per cube; returns the case values by size."""
+    before = snapshot(alone)
     by_size = {}
     for c in cases:
         n = c["n"]
         limit = c["cpu_limit_ms"] / 1000
-        code, out, err, cpu, secs, timed_out = run([sys.executable, "solve.py"], folder, "%d\n%s\n" % (n, c["state"]), limit)
+        code, out, err, cpu, secs, timed_out = run([sys.executable, "solve.py"], alone, "%d\n%s\n" % (n, c["state"]), limit)
         status, moves, value, detail = grade(stage, n, c["state"], code, out, timed_out, c)
         by_size.setdefault(n, []).append(value)
         line = "%2dx%-2d #%d  %-8s %5s moves (cap %4d, ref %4d)  %6.2f s CPU (limit %4.1f)  value %.3f" % (
@@ -178,13 +196,18 @@ def main():
         print(line, flush=True)
         if status == "crash" and err.strip():
             print("      " + err.strip().splitlines()[-1][:300])
-        after = snapshot(folder)
+            if "No module named" in err or "No such file" in err:
+                print("      (the grader runs %s/ on its own: copy what solve.py needs, cube.py too, into %s/)" % (stage, stage))
+        after = snapshot(alone)
         diff = sorted(k for k in set(before) | set(after) if before.get(k) != after.get(k))
         if diff:
             print("      warning: solve.py changed %s/ (%s). It is read-only when graded: write to /tmp instead." % (stage, ", ".join(diff[:5])))
             before = after
+    return by_size
 
-    print()
+
+def report(stage, folder, by_size):
+    """The mean value per size, the stage score and the folder's size, as the grader counts them."""
     num = den = 0.0
     for n in sorted(by_size):
         mean = sum(by_size[n]) / len(by_size[n])
