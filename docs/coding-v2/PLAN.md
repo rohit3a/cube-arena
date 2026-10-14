@@ -15,7 +15,12 @@ NxN ladder
 - 10 hidden cases per size per stage (70 per stage, 280 in all); one scramble per (size, case) feeds all four.
 - Scramble: 20*(N-2) moves of randomWalk (outer blocks up to half the cube), weight w = N (sum 49).
 - cap = 2 x reference moves; cpu_limit = clamp(5 x reference CPU, 5 s, 60 s).
-- case value = 0 if unsolved / over cap / over CPU, else 0.9 + 0.1*min(1, ref/moves).
+- case value = 0 if unsolved / over cap / over CPU, else 0.5 + 0.5*min(1, par/moves).
+  par (per case and part, e2e included) = min(reference moves, fewest moves any graded run used on it),
+  set per case set from the graded runs (scripts/code2-par.mjs --set), then frozen; past runs rescored
+  (--rescore). Practice cubes get a par too, from rerunning the best programs (--practice).
+  2026-10-15: first set from the mini runs; reset once after the full ladder (Sol/Astra medium..max), then frozen.
+  (Was 0.9 + 0.1*min(1, ref/moves): our reference is weak on moves, so the move term saturated: Sol scored ~100.)
 - stage score = sum N*mean_N / 49; bench = 100*(centres+edges+finish+e2e)/4.
 - Early stop: > 10% of stage time left -> the same message, up to 5 times a stage (session resumed):
   "You have X min left in this stage. Keep working on <stage>/ until the time is up; it is submitted then."

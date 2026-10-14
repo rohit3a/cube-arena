@@ -22,8 +22,9 @@ describe('coding v2 grading', () => {
     expect(cpuLimitMs(10)).toBe(5000);
     expect(cpuLimitMs(4000)).toBe(20000);
     expect(cpuLimitMs(100_000)).toBe(60000);
+    // Against par: 0.5 for solving, the other half by moves.
     expect(caseValue('solved', 300, 300)).toBeCloseTo(1);
-    expect(caseValue('solved', 600, 300)).toBeCloseTo(0.95);
+    expect(caseValue('solved', 600, 300)).toBeCloseTo(0.75);
     expect(caseValue('solved', 100, 300)).toBeCloseTo(1);
     expect(caseValue('unsolved', 100, 300)).toBe(0);
     expect(nudgeText(40, 'edges')).toBe('You have 40 min left in this stage. Keep working on edges/ until the time is up; it is submitted then.');
@@ -41,6 +42,14 @@ describe('coding v2 grading', () => {
       expect(e.status).toBe('solved');
       expect(e.states).toEqual(ins);
     }
+  });
+
+  it('values a solved case against par when one is set', () => {
+    const c = chain[0];
+    const ins = inputs(c);
+    expect(gradeStage('centres', c.n, ins[0], ok(c.centres), c.counts[0], 50, c.counts[0] / 2).value).toBeCloseTo(0.75);
+    const total = c.counts.reduce((a, b) => a + b, 0);
+    expect(gradeChain(c.n, c.scrambled, STAGES.map((st) => ok(c[st])), c.counts, [50, 50, 50], total / 2).value).toBeCloseTo(0.75);
   });
 
   it('fails answers that miss the goal, run over the cap or the CPU limit, or are not moves', () => {

@@ -8,7 +8,7 @@
 
 import { createHash } from 'node:crypto';
 import { withDb, transaction } from './db';
-import { CODE2, type Bench2, type Case2Status, type Part, type PartScore, type Run2, PARTS, benchScore, cpuLimitMs, gradeChain, gradeStage, isBench2, limits2, moveCap, partScore } from './code2-rules';
+import { BENCHES2, CODE2, type Bench2, type Case2Status, type Part, type PartScore, type Run2, PARTS, benchScore, caseValue, cpuLimitMs, gradeChain, gradeStage, isBench2, limits2, moveCap, partScore } from './code2-rules';
 import { checkTarGz } from './code';
 import { ArenaError } from './service';
 import { type Stage, STAGES } from '../cube/stages';
@@ -61,16 +61,30 @@ interface CaseRow {
   states: string[];
   ref_moves: number[];
   ref_cpu_ms: number[];
+  /** Par per part: code2_pars, or our reference's moves (end to end: its three stages) where none is set. */
+  par: Record<Part, number>;
 }
 
 async function casesFor(bench: Bench2): Promise<CaseRow[]> {
   const sizes = CODE2.benches[bench].sizes as readonly number[];
-  const rows = await withDb((sql) => sql<CaseRow[]>`
-    select size, case_no, states, ref_moves, ref_cpu_ms from cube_arena.code_cases
-    where version = ${CODE2.caseVersion} and size in ${sql(sizes as number[])} and case_no < ${CODE2.casesPerSize}
-    order by size, case_no`);
+  const [rows, pars] = await withDb((sql) =>
+    Promise.all([
+      sql<Omit<CaseRow, 'par'>[]>`
+        select size, case_no, states, ref_moves, ref_cpu_ms from cube_arena.code_cases
+        where version = ${CODE2.caseVersion} and size in ${sql(sizes as number[])} and case_no < ${CODE2.casesPerSize}
+        order by size, case_no`,
+      sql<{ size: number; case_no: number; part: Part; par_moves: number }[]>`
+        select size, case_no, part, par_moves from cube_arena.code2_pars where version = ${CODE2.caseVersion}`,
+    ]),
+  );
   if (rows.length !== sizes.length * CODE2.casesPerSize) throw new ArenaError('no_cases', `the ${bench} cases are not all in (found ${rows.length})`);
-  return rows;
+  const set = new Map(pars.map((p) => [`${p.part}:${p.size}:${p.case_no}`, p.par_moves]));
+  return rows.map((c) => ({
+    ...c,
+    par: Object.fromEntries(
+      PARTS.map((p, i) => [p, set.get(`${p}:${c.size}:${c.case_no}`) ?? (p === 'e2e' ? c.ref_moves.reduce((a, b) => a + b, 0) : c.ref_moves[i])]),
+    ) as Record<Part, number>,
+  }));
 }
 
 // ---------------------------------------------------------------------------
@@ -120,6 +134,7 @@ interface ResultRow {
   moves: number | null;
   cpu_ms: number | null;
   ref_moves: number;
+  par_moves: number;
   cap: number;
   cpu_limit_ms: number;
   value: number;
@@ -140,27 +155,27 @@ export async function saveResults2(id: string, reports: Report2[]): Promise<numb
     if (!c) throw new ArenaError('bad_case', `no case ${r.n}:${r.case_no} in ${s.version}`);
     if (r.part === 'e2e') {
       const ref = c.ref_moves.reduce((a, b) => a + b, 0);
-      const o = gradeChain(r.n, c.states[0], r.runs, c.ref_moves, c.ref_cpu_ms);
+      const o = gradeChain(r.n, c.states[0], r.runs, c.ref_moves, c.ref_cpu_ms, c.par.e2e);
       // The grader fed each program what the one before left; it must agree with this engine.
       if (o.states.some((st, i) => r.inputs[i] !== st)) throw new ArenaError('chain_mismatch', `the grader's chain for ${r.n}:${r.case_no} differs from the server's`);
       return {
-        submission_id: id, part: 'e2e', size: r.n, case_no: r.case_no, ...o, ref_moves: ref, cap: moveCap(ref),
+        submission_id: id, part: 'e2e', size: r.n, case_no: r.case_no, ...o, ref_moves: ref, par_moves: c.par.e2e, cap: moveCap(ref),
         cpu_limit_ms: c.ref_cpu_ms.map(cpuLimitMs).reduce((a, b) => a + b, 0), output: r.runs.map(keep).join('\n[next]\n'),
       };
     }
     const i = STAGES.indexOf(r.part);
-    const o = gradeStage(r.part, r.n, c.states[i], r.run, c.ref_moves[i], c.ref_cpu_ms[i]);
+    const o = gradeStage(r.part, r.n, c.states[i], r.run, c.ref_moves[i], c.ref_cpu_ms[i], c.par[r.part]);
     return {
-      submission_id: id, part: r.part, size: r.n, case_no: r.case_no, ...o, ref_moves: c.ref_moves[i], cap: moveCap(c.ref_moves[i]),
+      submission_id: id, part: r.part, size: r.n, case_no: r.case_no, ...o, ref_moves: c.ref_moves[i], par_moves: c.par[r.part], cap: moveCap(c.ref_moves[i]),
       cpu_limit_ms: cpuLimitMs(c.ref_cpu_ms[i]), output: keep(r.run),
     };
   });
   if (!rows.length) return 0;
-  const cols = ['submission_id', 'part', 'size', 'case_no', 'status', 'moves', 'cpu_ms', 'ref_moves', 'cap', 'cpu_limit_ms', 'value', 'output', 'detail'] as const;
+  const cols = ['submission_id', 'part', 'size', 'case_no', 'status', 'moves', 'cpu_ms', 'ref_moves', 'par_moves', 'cap', 'cpu_limit_ms', 'value', 'output', 'detail'] as const;
   await withDb((sql) => sql`
     insert into cube_arena.code2_results ${sql(rows.map((r) => Object.fromEntries(cols.map((k) => [k, r[k]]))), ...cols)}
     on conflict (submission_id, part, size, case_no) do update set
-      status = excluded.status, moves = excluded.moves, cpu_ms = excluded.cpu_ms, ref_moves = excluded.ref_moves, cap = excluded.cap,
+      status = excluded.status, moves = excluded.moves, cpu_ms = excluded.cpu_ms, ref_moves = excluded.ref_moves, par_moves = excluded.par_moves, cap = excluded.cap,
       cpu_limit_ms = excluded.cpu_limit_ms, value = excluded.value, output = excluded.output, detail = excluded.detail`);
   return rows.length;
 }
@@ -192,7 +207,7 @@ export async function finishJob2(id: string, grader: string, builds: Partial<Rec
       const i = STAGES.indexOf(part as Stage);
       const ref = i < 0 ? c.ref_moves.reduce((a, b) => a + b, 0) : c.ref_moves[i];
       missing.push({
-        submission_id: id, part, size: c.size, case_no: c.case_no, status: 'crash', moves: null, cpu_ms: null, ref_moves: ref, cap: moveCap(ref),
+        submission_id: id, part, size: c.size, case_no: c.case_no, status: 'crash', moves: null, cpu_ms: null, ref_moves: ref, par_moves: c.par[part], cap: moveCap(ref),
         cpu_limit_ms: i < 0 ? c.ref_cpu_ms.map(cpuLimitMs).reduce((a, b) => a + b, 0) : cpuLimitMs(c.ref_cpu_ms[i]), value: 0, output: null,
         detail: failed.length ? `the ${failed.join(', ')} build failed` : 'not run',
       });
@@ -207,7 +222,7 @@ export async function finishJob2(id: string, grader: string, builds: Partial<Rec
   const buildLog = STAGES.map((st) => `== ${st} ==\n${(builds[st]?.log ?? '').slice(-6000)}`).join('\n');
   return transaction(async (tx) => {
     if (missing.length) {
-      const cols = ['submission_id', 'part', 'size', 'case_no', 'status', 'moves', 'cpu_ms', 'ref_moves', 'cap', 'cpu_limit_ms', 'value', 'output', 'detail'] as const;
+      const cols = ['submission_id', 'part', 'size', 'case_no', 'status', 'moves', 'cpu_ms', 'ref_moves', 'par_moves', 'cap', 'cpu_limit_ms', 'value', 'output', 'detail'] as const;
       await tx`insert into cube_arena.code2_results ${tx(missing.map((r) => Object.fromEntries(cols.map((k) => [k, r[k]]))), ...cols)}
                on conflict do nothing`;
     }
@@ -227,8 +242,8 @@ export async function finishJob2(id: string, grader: string, builds: Partial<Rec
 
 /** Each case's outcome per part: status, moves, CPU and the limits, never the moves themselves. */
 export async function code2CaseRows(id: string) {
-  return withDb((sql) => sql<{ part: Part; size: number; case_no: number; status: Case2Status; moves: number | null; cpu_ms: number | null; ref_moves: number; cap: number; cpu_limit_ms: number; value: string; detail: string | null }[]>`
-    select part, size, case_no, status, moves, cpu_ms, ref_moves, cap, cpu_limit_ms, value, detail
+  return withDb((sql) => sql<{ part: Part; size: number; case_no: number; status: Case2Status; moves: number | null; cpu_ms: number | null; ref_moves: number; par_moves: number | null; cap: number; cpu_limit_ms: number; value: string; detail: string | null }[]>`
+    select part, size, case_no, status, moves, cpu_ms, ref_moves, par_moves, cap, cpu_limit_ms, value, detail
     from cube_arena.code2_results where submission_id = ${id} order by part, size, case_no`);
 }
 
@@ -236,4 +251,76 @@ export async function code2CaseRows(id: string) {
 export async function stageBundles(id: string) {
   return withDb((sql) => sql<{ stage: Stage; sha256: string; bytes: number; minutes: string | null; nudged: boolean }[]>`
     select stage, sha256, bytes, minutes, nudged from cube_arena.code_bundles where submission_id = ${id}`);
+}
+
+// ---------------------------------------------------------------------------
+// Par
+
+/**
+ * Sets each hidden cube's par per part: the fewest moves any graded program
+ * has used on it, never more than our reference's (runs whose lockdown broke
+ * don't count). Par is then kept fixed, so this refuses to run again unless
+ * `replace`. Returns how many pars are set and how many beat the reference.
+ */
+export async function setPars2({ replace = false } = {}): Promise<{ pars: number; below_reference: number }> {
+  return transaction(async (tx) => {
+    const [{ n }] = await tx<{ n: number }[]>`select count(*)::int n from cube_arena.code2_pars where version = ${CODE2.caseVersion}`;
+    if (n && !replace) throw new ArenaError('pars_set', `${n} pars are set already; they stay fixed (pass replace to set them again)`);
+    await tx`delete from cube_arena.code2_pars where version = ${CODE2.caseVersion}`;
+    await tx`
+      with best as (
+        select r.part, r.size, r.case_no, r.moves, r.submission_id,
+               row_number() over (partition by r.part, r.size, r.case_no order by r.moves, s.graded_at) as k
+        from cube_arena.code2_results r join cube_arena.code_submissions s on s.id = r.submission_id
+        where s.status = 'graded' and s.version in ${tx(BENCHES2 as string[])} and r.status = 'solved' and r.moves > 0
+          and coalesce(s.hidden_reason, '') not like 'runner lockdown%'
+      ), ref as (
+        select c.size, c.case_no, p.part,
+               case p.part when 'centres' then c.ref_moves[1] when 'edges' then c.ref_moves[2] when 'finish' then c.ref_moves[3]
+                           else c.ref_moves[1] + c.ref_moves[2] + c.ref_moves[3] end as moves
+        from cube_arena.code_cases c cross join (values ('centres'), ('edges'), ('finish'), ('e2e')) as p (part)
+        where c.version = ${CODE2.caseVersion} and c.case_no < ${CODE2.casesPerSize}
+      )
+      insert into cube_arena.code2_pars (version, size, case_no, part, par_moves, source)
+      select ${CODE2.caseVersion}, ref.size, ref.case_no, ref.part, least(ref.moves, coalesce(b.moves, ref.moves)),
+             case when b.moves < ref.moves then b.submission_id::text else 'reference' end
+      from ref left join best b on b.part = ref.part and b.size = ref.size and b.case_no = ref.case_no and b.k = 1`;
+    const [out] = await tx<{ pars: number; below_reference: number }[]>`
+      select count(*)::int pars, count(*) filter (where source <> 'reference')::int below_reference
+      from cube_arena.code2_pars where version = ${CODE2.caseVersion}`;
+    return out;
+  });
+}
+
+/** Values a graded v2 submission's cases again against the current pars and adds its score up again. */
+export async function rescore2(id: string): Promise<{ id: string; before: number; after: number }> {
+  const [s] = await withDb((sql) => sql<{ status: string; version: string; score: string }[]>`
+    select status, version, score from cube_arena.code_submissions where id = ${id}`);
+  if (s?.status !== 'graded' || !isBench2(s.version)) throw new ArenaError('not_graded', `That submission is ${s?.status ?? 'missing'}, not a graded v2 one.`);
+  const bench = s.version;
+  const cases = new Map((await casesFor(bench)).map((c) => [`${c.size}:${c.case_no}`, c]));
+  const have = await withDb((sql) => sql<Omit<ResultRow, 'output'>[]>`
+    select submission_id, part, size, case_no, status, moves, cpu_ms, ref_moves, par_moves, cap, cpu_limit_ms, value, detail
+    from cube_arena.code2_results where submission_id = ${id}`);
+  const rows = have.map((r) => {
+    const par = cases.get(`${r.size}:${r.case_no}`)?.par[r.part] ?? r.ref_moves;
+    return { ...r, par_moves: par, value: caseValue(r.status, r.moves, par) };
+  });
+  const sizes = CODE2.benches[bench].sizes as readonly number[];
+  const parts = Object.fromEntries(PARTS.map((p) => [p, partScore(rows.filter((r) => r.part === p), sizes)])) as Record<Part, PartScore>;
+  const score = benchScore(parts);
+  const cols = ['submission_id', 'part', 'size', 'case_no', 'status', 'moves', 'cpu_ms', 'ref_moves', 'par_moves', 'cap', 'cpu_limit_ms', 'value', 'detail'] as const;
+  await transaction(async (tx) => {
+    await tx`insert into cube_arena.code2_results ${tx(rows.map((r) => Object.fromEntries(cols.map((k) => [k, r[k]]))), ...cols)}
+             on conflict (submission_id, part, size, case_no) do update set value = excluded.value, par_moves = excluded.par_moves`;
+    await tx`update cube_arena.code_submissions set parts = ${tx.json(parts as never)}, score = ${score}, updated_at = now() where id = ${id}`;
+  });
+  return { id, before: Number(s.score), after: score };
+}
+
+/** The graded v2 submissions, for rescoring them all. */
+export async function graded2(): Promise<string[]> {
+  const rows = await withDb((sql) => sql<{ id: string }[]>`
+    select id from cube_arena.code_submissions where status = 'graded' and version in ${sql(BENCHES2 as string[])} order by graded_at`);
+  return rows.map((r) => r.id);
 }

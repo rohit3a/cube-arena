@@ -1,10 +1,11 @@
 // What the ROG's graders share: the core they keep to themselves, Docker
 // runs with a time limit, and the locked-down sandbox every untrusted step
-// runs in. Used by code-worker.mjs (which grades v1 and v2) and
-// code2-cases.mjs (which times our reference solvers the same way).
+// runs in. Used by code-worker.mjs (which grades v1 and v2),
+// code2-cases.mjs (which times our reference solvers the same way) and
+// code2-par.mjs (which runs graded solvers on the practice cubes).
 
 import { spawn, spawnSync } from 'node:child_process';
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { cpus, hostname, userInfo } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -14,6 +15,8 @@ export const REPO = join(dirname(fileURLToPath(import.meta.url)), '..');
 const SLICE = 'grader.slice';
 const { uid, gid } = userInfo();
 export const log = (...a) => console.log(new Date().toISOString().slice(11, 19), ...a);
+/** What build.py may leave in the solver's folder. */
+export const MAX_SOLVER_BYTES = 2 * 1024 ** 3;
 
 /** "0-2,4,6-7" → [0, 1, 2, 4, 6, 7] */
 const cpuList = (s) =>
@@ -145,4 +148,41 @@ export async function runStage(image, name, limits, dir, { n, state, cpuLimitMs,
     // The wrapper died with it (memory, or the host's timeout): no answer.
     return { stdout: '', truncated: false, stderr: r.stderr.slice(-2000), exit_code: r.timedOut ? null : (r.code ?? null), timed_out: r.timedOut ? 'wall' : null, cpu_ms: 0, wall_ms: wallMs };
   }
+}
+
+/** Unpacks a bundle into `folder` and runs its build.py (if any): {ok, ms, log}. Every step in the sandbox. */
+export async function unpackAndBuild(image, name, limits, folder, bundle) {
+  // Unpacked inside a container too: a crafted archive can't reach past its folder.
+  const unpack = await docker([...sandbox(image, `cube-unpack-${name}`, limits, folder, 'rw'), 'tar', '-xzf', '-', '--no-same-owner', '--no-same-permissions', '-C', '/solver'], {
+    input: bundle,
+    timeoutMs: 120_000,
+    name: `cube-unpack-${name}`,
+  });
+  if (unpack.code !== 0) return { ok: false, ms: 0, log: `[grader] could not unpack it: ${unpack.stderr.slice(-500)}` };
+  const build = { ok: true, ms: 0, log: '' };
+  if (existsSync(join(folder, 'build.py'))) {
+    const started = Date.now();
+    let tooBig = false;
+    const watch = setInterval(() => {
+      if (folderBytes(folder) > MAX_SOLVER_BYTES) {
+        tooBig = true;
+        spawnSync('docker', ['kill', `cube-build-${name}`], { stdio: 'ignore' });
+      }
+    }, 2000);
+    const r = await docker([...sandbox(image, `cube-build-${name}`, limits, folder, 'rw'), 'python3', 'build.py'], {
+      timeoutMs: limits.buildSecs * 1000,
+      name: `cube-build-${name}`,
+    });
+    clearInterval(watch);
+    build.ms = Date.now() - started;
+    build.log = `${r.stdout}\n${r.stderr}`.slice(-20_000);
+    build.ok = r.code === 0 && !r.timedOut && !tooBig;
+    if (r.timedOut) build.log += `\n[grader] build.py ran past ${limits.buildSecs} s`;
+    if (tooBig) build.log += `\n[grader] the folder grew past ${MAX_SOLVER_BYTES} bytes`;
+  }
+  if (!existsSync(join(folder, 'solve.py'))) {
+    build.ok = false;
+    build.log += '\n[grader] solve.py is missing';
+  }
+  return build;
 }

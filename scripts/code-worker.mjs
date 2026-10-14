@@ -28,7 +28,7 @@ import { createHash } from 'node:crypto';
 import { existsSync, mkdirSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { parseArgs } from 'node:util';
-import { CORE, docker, ensureImage, folderBytes, graderName, log, reserveCore, runStage, sandbox, step } from './grader-lib.mjs';
+import { CORE, MAX_SOLVER_BYTES, docker, ensureImage, folderBytes, graderName, log, reserveCore, runStage, sandbox, step, unpackAndBuild } from './grader-lib.mjs';
 
 const { values: opt } = parseArgs({
   options: {
@@ -44,8 +44,6 @@ const IMAGE = 'cube-arena-code:v1';
 const IMAGE2 = 'cube-arena-code:v2';
 const ROOT = process.env.CODE_GRADER_DIR || '/mnt/rog-data/cube-arena-grader';
 const POLL_MS = 60_000;
-/** What build.py may leave in solver/. */
-const MAX_SOLVER_BYTES = 2 * 1024 ** 3;
 const STAGES = ['centres', 'edges', 'finish'];
 /** Kept of each v2 answer, whitespace squeezed (the longest answer under any cap is a fraction of it). */
 const ANSWER_KEEP = 64 * 1024;
@@ -149,43 +147,6 @@ async function grade(job) {
     if (CORE) reserveCore(false);
     rmSync(dir, { recursive: true, force: true });
   }
-}
-
-/** Unpacks a bundle into `folder` and runs its build.py (if any): {ok, ms, log}. Every step in the sandbox. */
-async function unpackAndBuild(image, name, limits, folder, bundle) {
-  // Unpacked inside a container too: a crafted archive can't reach past its folder.
-  const unpack = await docker([...sandbox(image, `cube-unpack-${name}`, limits, folder, 'rw'), 'tar', '-xzf', '-', '--no-same-owner', '--no-same-permissions', '-C', '/solver'], {
-    input: bundle,
-    timeoutMs: 120_000,
-    name: `cube-unpack-${name}`,
-  });
-  if (unpack.code !== 0) return { ok: false, ms: 0, log: `[grader] could not unpack it: ${unpack.stderr.slice(-500)}` };
-  const build = { ok: true, ms: 0, log: '' };
-  if (existsSync(join(folder, 'build.py'))) {
-    const started = Date.now();
-    let tooBig = false;
-    const watch = setInterval(() => {
-      if (folderBytes(folder) > MAX_SOLVER_BYTES) {
-        tooBig = true;
-        spawnSync('docker', ['kill', `cube-build-${name}`], { stdio: 'ignore' });
-      }
-    }, 2000);
-    const r = await docker([...sandbox(image, `cube-build-${name}`, limits, folder, 'rw'), 'python3', 'build.py'], {
-      timeoutMs: limits.buildSecs * 1000,
-      name: `cube-build-${name}`,
-    });
-    clearInterval(watch);
-    build.ms = Date.now() - started;
-    build.log = `${r.stdout}\n${r.stderr}`.slice(-20_000);
-    build.ok = r.code === 0 && !r.timedOut && !tooBig;
-    if (r.timedOut) build.log += `\n[grader] build.py ran past ${limits.buildSecs} s`;
-    if (tooBig) build.log += `\n[grader] the folder grew past ${MAX_SOLVER_BYTES} bytes`;
-  }
-  if (!existsSync(join(folder, 'solve.py'))) {
-    build.ok = false;
-    build.log += '\n[grader] solve.py is missing';
-  }
-  return build;
 }
 
 /** What goes back to the site of one v2 run: the answer with whitespace squeezed, cut at ANSWER_KEEP (then it counts as too long). */

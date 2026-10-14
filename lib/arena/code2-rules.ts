@@ -7,9 +7,11 @@
 //
 // A case is worth 0 when the goal isn't met, the answer runs over the move cap
 // (2 x our reference's moves) or over the CPU limit (5 x our reference's CPU
-// time, 5 to 60 s); otherwise 0.9 + 0.1 x min(1, reference / moves). A stage
-// scores the size-weighted mean (weight N); the bench, 100 x the mean of the
-// three stages and end to end.
+// time, 5 to 60 s); otherwise 0.5 + 0.5 x min(1, par / moves), where par is the
+// fewest moves any graded program has used on that cube (never more than our
+// reference's; cube_arena.code2_pars, fixed for the case set). A stage scores
+// the size-weighted mean (weight N); the bench, 100 x the mean of the three
+// stages and end to end.
 
 import { MoveError, applyMoves, moveCost, parseMoves, stateFromString, stateToString } from '../cube/engine';
 import { type Stage, STAGES, stageDone } from '../cube/stages';
@@ -33,6 +35,8 @@ export const CODE2 = {
   /** Kept of each answer (a longer one is over the cap anyway). */
   outputMaxBytes: 512 * 1024,
   capFactor: 2,
+  /** A solved case is worth at least this; the rest goes by moves against par. */
+  solvedFloor: 0.5,
   cpuFactor: 5,
   cpuMinMs: 5_000,
   cpuMaxMs: 60_000,
@@ -69,6 +73,7 @@ export function limits2(bench: Bench2) {
     bundleMaxBytes: CODE2.bundleMaxBytes,
     outputMaxBytes: CODE2.outputMaxBytes,
     capFactor: CODE2.capFactor,
+    solvedFloor: CODE2.solvedFloor,
     cpuFactor: CODE2.cpuFactor,
     cpuMinMs: CODE2.cpuMinMs,
     cpuMaxMs: CODE2.cpuMaxMs,
@@ -96,8 +101,8 @@ export interface Outcome2 {
   detail: string | null;
 }
 
-export const caseValue = (status: Case2Status, moves: number | null, refMoves: number) =>
-  status === 'solved' ? 0.9 + 0.1 * Math.min(1, refMoves / Math.max(1, moves ?? 0)) : 0;
+export const caseValue = (status: Case2Status, moves: number | null, parMoves: number) =>
+  status === 'solved' ? CODE2.solvedFloor + (1 - CODE2.solvedFloor) * Math.min(1, parMoves / Math.max(1, moves ?? 0)) : 0;
 
 type Played = { ok: true; end: Uint8Array; count: number } | { ok: false; status: Case2Status; detail: string };
 
@@ -116,14 +121,14 @@ export function play(n: number, state: string, run: Run2, cpuLimit: number): Pla
   return { ok: true, end: applyMoves(stateFromString(state, n), n, moves), count: moveCost(moves) };
 }
 
-/** Grades one stage case: the program's answer for `input`, against our reference's moves and CPU time. */
-export function gradeStage(stage: Stage, n: number, input: string, run: Run2, refMoves: number, refCpuMs: number): Outcome2 {
+/** Grades one stage case: the program's answer for `input`; our reference's moves and CPU time set the limits, par the value. */
+export function gradeStage(stage: Stage, n: number, input: string, run: Run2, refMoves: number, refCpuMs: number, parMoves = refMoves): Outcome2 {
   const p = play(n, input, run, cpuLimitMs(refCpuMs));
   const cpu = Math.round(run.cpu_ms);
   if (!p.ok) return { status: p.status, moves: null, cpu_ms: cpu, value: 0, detail: p.detail };
   if (!stageDone(stage, p.end, n)) return { status: 'unsolved', moves: p.count, cpu_ms: cpu, value: 0, detail: `the ${stage} goal isn't met after these moves` };
   if (p.count > moveCap(refMoves)) return { status: 'over_cap', moves: p.count, cpu_ms: cpu, value: 0, detail: `${p.count} moves, over the cap of ${moveCap(refMoves)}` };
-  return { status: 'solved', moves: p.count, cpu_ms: cpu, value: caseValue('solved', p.count, refMoves), detail: null };
+  return { status: 'solved', moves: p.count, cpu_ms: cpu, value: caseValue('solved', p.count, parMoves), detail: null };
 }
 
 /**
@@ -134,12 +139,13 @@ export function gradeStage(stage: Stage, n: number, input: string, run: Run2, re
  * cap is twice our reference's three stages together; each program has its
  * own stage's CPU limit. `states` are the inputs the programs got, in order.
  */
-export function gradeChain(n: number, scrambled: string, runs: Run2[], refMoves: number[], refCpuMs: number[]): Outcome2 & { states: string[] } {
+export function gradeChain(n: number, scrambled: string, runs: Run2[], refMoves: number[], refCpuMs: number[], parMoves?: number): Outcome2 & { states: string[] } {
   let state = scrambled;
   let total = 0;
   let cpu = 0;
   const states: string[] = [];
   const ref = refMoves.reduce((a, b) => a + b, 0);
+  const par = parMoves ?? ref;
   for (let i = 0; i < STAGES.length; i++) {
     const run = runs[i];
     if (!run) return { status: 'crash', moves: null, cpu_ms: cpu, value: 0, detail: `${STAGES[i]} did not run`, states };
@@ -152,7 +158,7 @@ export function gradeChain(n: number, scrambled: string, runs: Run2[], refMoves:
     state = stateToString(p.end);
   }
   if (total > moveCap(ref)) return { status: 'over_cap', moves: total, cpu_ms: cpu, value: 0, detail: `${total} moves, over the cap of ${moveCap(ref)}`, states };
-  return { status: 'solved', moves: total, cpu_ms: cpu, value: caseValue('solved', total, ref), detail: null, states };
+  return { status: 'solved', moves: total, cpu_ms: cpu, value: caseValue('solved', total, par), detail: null, states };
 }
 
 export interface PartScore {
