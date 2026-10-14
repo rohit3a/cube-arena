@@ -49,7 +49,8 @@ Shared
 - lib/arena/code2-rules.ts     v2 limits and scoring; lib/arena/code2.ts records; lib/cube/stages.ts stage checks
 - db/015_code_v2.sql           code_cases, code_bundles, code2_results; code_submissions.parts/builds
 - runner/code2.mjs             stage sessions, the time-left message (session resumed), per-stage upload
-- bench/subagent/              subagent bench: starter codebase, tasks, hidden tests
+- (private) cube-arena-subagent  subagent bench: starter codebase, tasks, hidden tests, solutions, run.mjs.
+                               Kept out of this public repo; runner/code.mjs takes `denyRead` so its sessions can't read it.
 - runner/container/            image + allowlist proxy for API-key harnesses
 
 ## Progress
@@ -63,9 +64,9 @@ Shared
 - [x] DB migration 015 + routes (v2 is operator-only, starts hidden, and is off the v1 board)
 - [x] Grader v2 (worker): stages + e2e chain, CPU-time limits
 - [x] Runner v2: stage sessions, time-left message, mini mode (`code --bench v2-mini`)
-- [ ] Reference self-test through the live pipeline
+- [x] Reference self-test through the live pipeline (100.00, every part 1.000)
 - [ ] Container + proxy (API-key harnesses)
-- [ ] Subagent bench: starter + 30 tasks + hidden tests
+- [x] Subagent bench: starter + 30 tasks + hidden tests (private repo)
 - [ ] Mini ladder runs (Sonnet 5.5 medium)
 - [ ] Haiku 5.5 subagent runs (several)
 - [ ] Ask Rohit before the 3 full Sonnet calibration runs

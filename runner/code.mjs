@@ -57,6 +57,19 @@ const CLAUDE_SETTINGS = {
   disableClaudeAiConnectors: true,
 };
 
+/** CLAUDE_SETTINGS with more paths kept from the model (an operator's own benches: their answers). */
+function claudeSettings(denyRead = []) {
+  if (!denyRead.length) return CLAUDE_SETTINGS;
+  const deny = [...PRIVATE, ...denyRead];
+  // In permission rules an absolute path takes a leading // (a single / is relative to the settings file).
+  const rule = (p) => (p.startsWith('/') ? `/${p}` : p);
+  return {
+    ...CLAUDE_SETTINGS,
+    sandbox: { ...CLAUDE_SETTINGS.sandbox, filesystem: { denyRead: deny } },
+    permissions: { deny: ['WebFetch', 'WebSearch', ...deny.map((p) => `Read(${rule(p)}/**)`), ...deny.map((p) => `Read(${rule(p)})`)] },
+  };
+}
+
 /**
  * Why Claude Code's sandbox can't run commands here, or null. On Linux it
  * needs bubblewrap and socat, and user namespaces inside user namespaces,
@@ -208,7 +221,7 @@ function claudeCommand(s) {
   // memories from this machine.
   const args = ['-p', s.prompt, '--model', s.model, '--tools', CLAUDE_TOOLS.join(',')];
   if (s.effort) args.push('--effort', s.effort);
-  args.push('--permission-mode', 'dontAsk', '--permission-prompts', 'none', '--settings', JSON.stringify(CLAUDE_SETTINGS));
+  args.push('--permission-mode', 'dontAsk', '--permission-prompts', 'none', '--settings', JSON.stringify(claudeSettings(s.denyRead)));
   args.push('--allowedTools', ...CLAUDE_TOOLS, '--disallowedTools', 'WebFetch', 'WebSearch', 'Agent', 'NotebookEdit', 'mcp__*');
   args.push('--strict-mcp-config', '--setting-sources', 'local', '--output-format', 'stream-json', '--verbose');
   // Kept only when the runner may pick the session up again (v2's time-left message).
