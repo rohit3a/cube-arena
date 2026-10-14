@@ -5,10 +5,12 @@
 //
 //   node --env-file=.env.local scripts/code2-par.mjs --set [--replace]   hidden cubes: par from the graded runs (the site keeps them fixed)
 //   node --env-file=.env.local scripts/code2-par.mjs --rescore           value every graded v2 submission again against the pars
-//   ADMIN_ENV_FILE=… node --env-file=.env.local scripts/code2-par.mjs --practice [--top 5]
-//       practice cubes: run the best graded programs of each stage on them, in
-//       the grading sandbox on a core of their own (not the grader's), and
-//       write par_moves into each kit's practice.json; then run code2-kit.mjs.
+//   ADMIN_ENV_FILE=… node --env-file=.env.local scripts/code2-par.mjs --practice [--top 3] [--stage centres]
+//       practice cubes: run the best graded programs of each stage on them (on
+//       every size, a mini program too, until it fails at a size), in the
+//       grading sandbox on a core that isn't the grader's (CODE_GRADER_CPU,
+//       default 2), and write par_moves into each kit's practice.json; then run
+//       code2-kit.mjs.
 
 import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -20,7 +22,8 @@ const { values: opt } = parseArgs({
     replace: { type: 'boolean', default: false },
     rescore: { type: 'boolean', default: false },
     practice: { type: 'boolean', default: false },
-    top: { type: 'string', default: '5' },
+    top: { type: 'string', default: '3' },
+    stage: { type: 'string' },
     url: { type: 'string', default: process.env.CUBE_ARENA_SITE ?? 'https://cube.krnl.studio' },
   },
 });
@@ -59,7 +62,7 @@ if (opt.rescore) {
 
 if (opt.practice) {
   const IMAGE = 'cube-arena-code:v2';
-  const STAGES = ['centres', 'edges', 'finish'];
+  const STAGES = opt.stage ? [opt.stage] : ['centres', 'edges', 'finish'];
   const ROOT = join(process.env.CODE_GRADER_DIR || '/mnt/rog-data/cube-arena-grader', 'par');
   const kit = (bench, stage) => join(REPO, 'public/code-kit', bench, stage, 'practice.json');
   const { adminSql } = await import('./admin-db.mjs');
@@ -71,7 +74,8 @@ if (opt.practice) {
       best[stage] = await sql`
         select id, version, model_id, effort, (parts -> ${stage} ->> 'score')::float as score
         from cube_arena.code_submissions
-        where status = 'graded' and version in ('v2', 'v2-mini') and coalesce(hidden_reason, '') not like 'runner lockdown%'
+        where status = 'graded' and version in ('v2', 'v2-mini')
+          and coalesce(hidden_reason, '') not like 'runner %' and coalesce(hidden_reason, '') not like 'reference %'
           and (parts -> ${stage} ->> 'score') is not null
         order by (parts -> ${stage} ->> 'score')::float desc limit ${Number(opt.top)}`;
     }
@@ -97,19 +101,27 @@ if (opt.practice) {
           log(`${short} ${stage}: build failed, skipped`);
           continue;
         }
-        // A mini program was written for the mini sizes; it runs on those.
-        const cases = practice.cases.filter((c) => s.version === 'v2' || c.n <= 6);
+        // Every size, a mini program's too (any program's moves count), smallest first, until it fails 3 cubes of a size.
+        const cases = [...practice.cases].sort((a, b) => a.n - b.n || a.case - b.case);
+        const failed = new Map();
         let solved = 0;
+        let tried = 0;
+        let stopAt = null;
         for (const c of cases) {
+          stopAt = [...failed].find(([, k]) => k >= 3)?.[0] ?? null;
+          if (stopAt) break;
+          tried += 1;
           const run = await runStage(IMAGE, `par-${short}-${stage}-${c.n}-${c.case}`, limits, folder, { n: c.n, state: c.state, cpuLimitMs: c.cpu_limit_ms });
-          if (run.timed_out || run.exit_code !== 0 || run.truncated || run.cpu_ms > c.cpu_limit_ms) continue;
-          const r = step(c.state, run.stdout, stage);
-          if (!r.ok || !r.done || r.moves > c.cap) continue;
+          const r = run.timed_out || run.exit_code !== 0 || run.truncated || run.cpu_ms > c.cpu_limit_ms ? null : step(c.state, run.stdout, stage);
+          if (!r?.ok || !r.done || r.moves > c.cap) {
+            failed.set(c.n, (failed.get(c.n) ?? 0) + 1);
+            continue;
+          }
           solved += 1;
           const key = `${c.n}:${c.case}`;
           if (!fewest.has(key) || r.moves < fewest.get(key)) fewest.set(key, r.moves);
         }
-        log(`${short} ${stage} (${s.model_id} ${s.effort ?? ''}, ${s.version}): ${solved}/${cases.length} solved`);
+        log(`${short} ${stage} (${s.model_id} ${s.effort ?? ''}, ${s.version}): ${solved}/${tried} solved${stopAt ? `, stopped at ${stopAt}x${stopAt}` : ''}`);
       } finally {
         rmSync(folder, { recursive: true, force: true });
       }
