@@ -524,7 +524,7 @@ function LevelGrid({ test, sides }: { test: TestName; sides: Colored[] }) {
     <>
       <h3 className="cmp-levels-head">
         {test.name}
-        {test.gauntlet && <small> · level 1 is {GAUNTLET.startDepth} moves from solved</small>}
+        {test.gauntlet && <small> · {GAUNTLET.levels} levels</small>}
       </h3>
       <div className="cmp-lv-wrap">
         <table className="cmp-lv-table">

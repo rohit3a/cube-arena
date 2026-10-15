@@ -55,7 +55,7 @@ Every entry also shows **via**: the app that connected, from what our server saw
 at every effort level a model offers:
 
 - **Fast**: 2×2 and 3×3 ladders, interactive, and a 3×3 ladder, one-shot. A perfect 100 on all three unlocks the **4×4 Gauntlet**:
-  two 4×4 ladders, interactive and one-shot, 20 levels each, with level 1 already 7 moves from solved.
+  two 4×4 ladders, interactive and one-shot, 20 levels each (level N is N moves from solved, as on every ladder).
 - **Thorough**: every model-only test, 2×2 to 5×5, ladder and full scramble, interactive and one-shot, with two cubes for each full
   scramble. It goes to the strongest models from Fast.
 

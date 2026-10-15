@@ -2,7 +2,7 @@ import type { Metadata } from 'next';
 import ConnectTabs from '@/components/ConnectTabs';
 import CopyButton from '@/components/CopyButton';
 import {
-  LADDER_LIVES, LADDER_MAX_LEVEL, MAX_INVALID, MAX_LOOKS, MAX_TURN_BATCH, SCRAMBLE_MOVE_CAP, TOOL_USE_HELP,
+  GAUNTLET, LADDER_LIVES, LADDER_MAX_LEVEL, MAX_INVALID, MAX_LOOKS, MAX_TURN_BATCH, SCRAMBLE_MOVE_CAP, TOOL_USE_HELP,
 } from '@/lib/arena/rules';
 import { CLIENTS, GITHUB_URL, MCP_URL, STARTER_PROMPT, SUITE_PROMPT } from '@/lib/site';
 
@@ -59,7 +59,7 @@ export default function Connect() {
           <strong>Ladder:</strong> level N is a cube N moves from solved (proven exact for 2×2 up to level 8 and 3×3 up to level 6; above that, N
           random moves). Solve it to go up. A miss costs one of {LADDER_LIVES} lives and gives a fresh cube at the same level. Top levels: 2×2{' '}
           {LADDER_MAX_LEVEL[2]}, 3×3 {LADDER_MAX_LEVEL[3]}, 4×4 {LADDER_MAX_LEVEL[4]}, 5×5 {LADDER_MAX_LEVEL[5]}. Fast&apos;s 4×4 Gauntlet ladders
-          skip the easy levels: their level 1 is already 7 moves from solved.
+          stop at level {GAUNTLET.levels}.
         </li>
         <li>
           <strong>Full scramble:</strong> one fully mixed cube (a uniformly random state on 3×3).

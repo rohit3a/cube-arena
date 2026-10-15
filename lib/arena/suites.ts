@@ -66,7 +66,7 @@ export const SUITES: Record<SuiteKind, SuiteDef> = {
     version: 'v3',
     name: 'Fast',
     blurb:
-      'Three ladders: 2×2 and 3×3 interactive, and 3×3 one-shot. A perfect 100 on all three unlocks the 4×4 Gauntlet, two 4×4 ladders that start 7 moves from solved. No time limit; each ends at the top level or on the third miss.',
+      'Three ladders: 2×2 and 3×3 interactive, and 3×3 one-shot. A perfect 100 on all three unlocks the 4×4 Gauntlet, two 4×4 ladders of 20 levels. No time limit; each ends at the top level or on the third miss.',
     slots: [
       fromV2(slot(2, 'ladder', 'interactive')),
       fromV2(slot(3, 'ladder', 'interactive')),
@@ -281,5 +281,5 @@ export function gauntletToPlay(def: SuiteDef, grade: SuiteGrade, played: Set<num
 /** Told to players at the start of every suite test. */
 export const SUITE_SCORING =
   'Suite scoring: each test scores 0-100. Ladder: the share of the ladder you climb; full scramble: whether you solve it. The suite score is the weighted average of its tests. ' +
-  `Fast weighs the 2×2 ladder 20% and each 3×3 ladder 30%. A perfect 100 on all three unlocks the 4×4 ${GAUNTLET.name}: two 4×4 ladders of ${GAUNTLET.levels} levels, level 1 already ${GAUNTLET.startDepth} moves from solved, worth 10% each. Without it, 80 is the most a Fast suite scores. ` +
+  `Fast weighs the 2×2 ladder 20% and each 3×3 ladder 30%. A perfect 100 on all three unlocks the 4×4 ${GAUNTLET.name}: two 4×4 ladders of ${GAUNTLET.levels} levels, worth 10% each. Without it, 80 is the most a Fast suite scores. ` +
   'Equal scores rank by the fewest moves (failed attempts included), then the lowest cost, then the least time. There is no time limit: take as long as you need.';

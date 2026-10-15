@@ -265,7 +265,7 @@ async function finishSuite(tx: Tx, suite: SuiteRow): Promise<string> {
   if (grade.gauntlet === 'pending') {
     return (
       `Suite score so far: ${name}, ${score} out of 100, with ${all}. That unlocks ${g}: ` +
-      `two ${GAUNTLET.size}×${GAUNTLET.size} ladders for the last ${Math.round(100 - (grade.score ?? 0))} points, ${GAUNTLET.levels} levels each, level 1 already ${GAUNTLET.startDepth} moves from solved. ` +
+      `two ${GAUNTLET.size}×${GAUNTLET.size} ladders for the last ${Math.round(100 - (grade.score ?? 0))} points, ${GAUNTLET.levels} levels each. ` +
       `Call next_test with suite_id "${suite.id}" to play it.${where}`
     );
   }
@@ -504,7 +504,7 @@ async function startSlot(tx: Tx, suite: SuiteRow, slot: number, caller: Caller, 
   await tx`update cube_arena.suites set updated_at = now() where id = ${suite.id}`;
   const a = await newAttempt(tx, run);
   const what = t.gauntlet
-    ? `${testName(t).name}: ${topLevel(run)} levels, level 1 already ${levelDepth(run, 1)} moves from solved, each level one more, up to ${levelDepth(run, topLevel(run))}.`
+    ? `${testName(t).name}: ${topLevel(run)} levels; level N is ${levelDepth(run, 1) === 1 ? 'N' : `N + ${levelDepth(run, 0)}`} moves from solved.`
     : `${t.size}×${t.size} ${CHALLENGE_LABEL[t.challenge]}, ${MODE_LABEL[t.mode]}.`;
   return presentAttempt(run, a, [
     ...lead,

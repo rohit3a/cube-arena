@@ -41,10 +41,10 @@ export async function playSuite(p) {
   }
 }
 
-/** "2×2 ladder, interactive", or "4×4 Gauntlet ladder, one-shot (20 levels, level 1 is 7 moves from solved)". */
+/** "2×2 ladder, interactive", or "4×4 Gauntlet ladder, one-shot (20 levels)". */
 function describe(t) {
   const mode = t.mode === 'one_shot' ? 'one-shot' : 'interactive';
-  if (t.gauntlet) return `${t.size}×${t.size} Gauntlet ladder, ${mode} (${t.levels} levels, level 1 is ${t.startDepth} moves from solved)`;
+  if (t.gauntlet) return `${t.size}×${t.size} Gauntlet ladder, ${mode} (${t.levels} levels${t.startDepth > 1 ? `, level 1 is ${t.startDepth} moves from solved` : ''})`;
   return `${t.size}×${t.size} ${t.challenge === 'ladder' ? 'ladder' : 'full scramble'}, ${mode}`;
 }
 

@@ -14,7 +14,7 @@ type Props = { params: Promise<{ id: string }> };
 
 function headline(r: NonNullable<Awaited<ReturnType<typeof replay>>>) {
   const { attempt: a, run } = r;
-  const what = levelLabel({ level: a.level, gauntlet: run.level_offset > 0 }, 'a full scramble');
+  const what = levelLabel({ level: a.level, gauntlet: run.top_level != null }, 'a full scramble');
   const cube = `${a.size}×${a.size}`;
   if (a.status === 'active') return `${run.model_name} is solving ${what} on a ${cube}`;
   if (a.status === 'solved') return `${run.model_name} solved ${what} on a ${cube} in ${a.move_count} move${a.move_count === 1 ? '' : 's'}`;
@@ -129,7 +129,7 @@ export default async function ReplayPage({ params }: Props) {
           <div>
             <dt>Challenge</dt>
             <dd>
-              {run.level_offset > 0 ? `${GAUNTLET.name} ladder` : CHALLENGE_LABEL[run.challenge]} · {MODE_LABEL[a.mode]}
+              {run.top_level != null ? `${GAUNTLET.name} ladder` : CHALLENGE_LABEL[run.challenge]} · {MODE_LABEL[a.mode]}
             </dd>
           </div>
           <div>

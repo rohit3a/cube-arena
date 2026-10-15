@@ -28,8 +28,8 @@ describe('suites', () => {
     expect(SUITES.fast.slots.map((s) => !!s.gauntlet)).toEqual([false, false, false, true, true]);
     const g = suiteTests(SUITES.fast).filter((t) => t.gauntlet);
     expect(g.map((t) => [t.size, t.mode, t.levels, t.startDepth])).toEqual([
-      [4, 'interactive', 20, 7],
-      [4, 'one_shot', 20, 7],
+      [4, 'interactive', 20, 1],
+      [4, 'one_shot', 20, 1],
     ]);
     expect(testName(g[1]).name).toBe('4×4 Gauntlet, one-shot');
     expect(testName(suiteTests(SUITES.fast)[2]).name).toBe('3×3 ladder, one-shot');

@@ -12,18 +12,21 @@ export const LADDER_MAX_LEVEL: Record<Size, number> = { 2: 11, 3: 20, 4: 30, 5: 
 export const LADDER_LIVES = 3;
 /** A ladder run's last level: the size's usual top, unless the run sets its own (the Gauntlet). */
 export const topLevel = (r: { size: Size; top_level?: number | null }) => r.top_level ?? LADDER_MAX_LEVEL[r.size];
-/** Fast's Gauntlet: 4×4 ladders of 20 levels, level 1 already 7 moves from solved (level 7 of a normal ladder). */
-export const GAUNTLET = { name: 'Gauntlet', size: 4 as Size, levels: 20, startDepth: 7 };
+/**
+ * Fast's Gauntlet: 4×4 ladders of 20 levels, level N N moves from solved like any ladder.
+ * (Until 15 Oct 2026 level 1 was already 7 moves from solved; no model got past level 2. Runs from then keep level_offset 6.)
+ */
+export const GAUNTLET = { name: 'Gauntlet', size: 4 as Size, levels: 20, startDepth: 1 };
 /** Where a Fast suite stands with its Gauntlet (suites.ts GauntletState), as a tag. */
 export const GAUNTLET_TAG = { locked: 'Gauntlet locked', pending: '4×4 pending', playing: '4×4 in play', done: '4×4 played' } as const;
 /** How Fast weighs its tests, for the site (suites.ts has the weights). */
 export const FAST_WEIGHTING =
   `The Index weighs the 2×2 ladder 20% and each 3×3 ladder 30%. A perfect 100 on all three unlocks the 4×4 ${GAUNTLET.name}: ` +
-  `two 4×4 ladders, level 1 already ${GAUNTLET.startDepth} moves from solved, worth 10% each. Without it, 80 is the top score.`;
+  `two 4×4 ladders of ${GAUNTLET.levels} levels, worth 10% each. Without it, 80 is the top score.`;
 /** "level 4", "Gauntlet level 4", or `none` for a full scramble. */
 export const levelLabel = (a: { level: number | null; gauntlet?: boolean }, none = 'full scramble') =>
   a.level ? `${a.gauntlet ? `${GAUNTLET.name} level` : 'level'} ${a.level}` : none;
-/** How many moves from solved level N of a ladder run is: N, or more where the run starts higher (the Gauntlet's level 1 is 7). */
+/** How many moves from solved level N of a ladder run is: N, or more where the run starts higher (the old Gauntlet's level 1 was 7). */
 export const levelDepth = (r: { level_offset?: number | null }, level: number) => level + (r.level_offset ?? 0);
 
 /** Most moves a single attempt may use (one-shot list or interactive total). */
