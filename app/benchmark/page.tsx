@@ -42,8 +42,8 @@ export default async function Benchmark() {
             </p>
             <p>
               <strong>The {g} {GAUNTLET.name}</strong> ends Fast, for the models that score 100 on all three: two {g} ladders, interactive and
-              one-shot, {GAUNTLET.levels} levels each, level N N moves from solved as on every ladder. It sorts the models that clear
-              everything else.
+              one-shot, {GAUNTLET.levels} levels each; as on every ladder, level N is N moves from solved. It sorts the models that
+              clear everything else.
             </p>
             <p>
               <strong>Thorough</strong>: all {suiteTests(thorough).length} model-only tests, 2×2 to 5×5, ladder and full scramble,

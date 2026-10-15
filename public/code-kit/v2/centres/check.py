@@ -7,10 +7,12 @@
     python3 check.py --cases 1       only the first cube of each size
     python3 check.py --no-build      skip the build (it already ran)
 
-It prints, for each cube, whether the stage's goal is met, the moves against
-the cap and par, the CPU time against the limit, and the case value; then the mean
-value per size and the stage score (sizes weighted by N), as the grader
-counts them. The grader does the same on 10 hidden cubes per size, made the same way, on
+It prints, for each cube, whether the stage's goal is met, the moves (with the
+best any graded program has done, our reference's and the cap) and the CPU time
+against the limit; then, per size, how many met the goal and the mean moves.
+The score counts the full solve (SPEC.md, Scoring): your three programs chained,
+scramble length / their moves together, so every move here counts, and a cube
+this program fails scores 0. The grader runs 10 hidden cubes per size, made the same way, on
 a Linux machine (Python 3.12, gcc/g++ 12, one CPU core, 2 GB of memory, no
 network), with your folder on its own and read-only while it solves. So does this:
 after the build it runs a copy of your folder alone in a temporary folder, so a
@@ -37,8 +39,6 @@ BUILD_SECS = 600
 # check.py's default: the first 10 cubes of each size, as many as the grader's hidden cubes.
 FIRST = 10
 OUTPUT_MAX = 512 * 1024
-# A solved cube is worth this much; the rest goes by moves against par.
-SOLVED_FLOOR = 0.5
 BUNDLE_MAX = 3_000_000
 BINARY_MAGIC = (b"\x7fELF", b"\xcf\xfa\xed\xfe", b"\xce\xfa\xed\xfe", b"MZ")
 GOAL = {
@@ -105,25 +105,24 @@ def run(args, cwd, stdin, cpu_limit):
 
 
 def grade(stage, n, state, code, out, timed_out, case):
-    """(status, moves, value, detail) as the grader decides them."""
+    """(status, moves, detail) as the grader decides them."""
     if timed_out:
-        return "timeout", None, 0.0, "over the CPU limit of %.1f s" % (case["cpu_limit_ms"] / 1000)
+        return "timeout", None, "over the CPU limit of %.1f s" % (case["cpu_limit_ms"] / 1000)
     if code != 0:
-        return "crash", None, 0.0, "exit code %s" % code
+        return "crash", None, "exit code %s" % code
     if len(out.encode()) > OUTPUT_MAX:
-        return "over_cap", None, 0.0, "the answer is longer than the grader reads (%d bytes)" % OUTPUT_MAX
+        return "over_cap", None, "the answer is longer than the grader reads (%d bytes)" % OUTPUT_MAX
     try:
         end = cube.apply(state, out.strip(), n)
         moves = cube.count(out.strip(), n)
     except (cube.MoveError, ValueError) as e:
-        return "illegal", None, 0.0, str(e)[:200]
+        return "illegal", None, str(e)[:200]
     done, why = GOAL[stage]
     if not done(end):
-        return "unsolved", moves, 0.0, why
+        return "unsolved", moves, why
     if moves > case["cap"]:
-        return "over_cap", moves, 0.0, "%d moves, over the cap of %d" % (moves, case["cap"])
-    par = case.get("par_moves", case["ref_moves"])
-    return "solved", moves, SOLVED_FLOOR + (1 - SOLVED_FLOOR) * min(1.0, par / max(1, moves)), None
+        return "over_cap", moves, "%d moves, over the cap of %d" % (moves, case["cap"])
+    return "solved", moves, None
 
 
 def main():
@@ -183,17 +182,17 @@ def main():
 
 
 def run_cases(stage, alone, cases):
-    """Runs solve.py in `alone` on each cube, a line per cube; returns the case values by size."""
+    """Runs solve.py in `alone` on each cube, a line per cube; returns (case, met the goal, moves) by size."""
     before = snapshot(alone)
     by_size = {}
     for c in cases:
         n = c["n"]
         limit = c["cpu_limit_ms"] / 1000
         code, out, err, cpu, secs, timed_out = run([sys.executable, "solve.py"], alone, "%d\n%s\n" % (n, c["state"]), limit)
-        status, moves, value, detail = grade(stage, n, c["state"], code, out, timed_out, c)
-        by_size.setdefault(n, []).append(value)
-        line = "%2dx%-2d #%d  %-8s %5s moves (cap %4d, par %4d)  %6.2f s CPU (limit %4.1f)  value %.3f" % (
-            n, n, c["case"], status, moves if moves is not None else "-", c["cap"], c.get("par_moves", c["ref_moves"]), cpu, limit, value)
+        status, moves, detail = grade(stage, n, c["state"], code, out, timed_out, c)
+        by_size.setdefault(n, []).append((c, status == "solved", moves))
+        line = "%2dx%-2d #%d  %-8s %5s moves (best so far %4d, ours %4d, cap %4d)  %6.2f s CPU (limit %4.1f)" % (
+            n, n, c["case"], status, moves if moves is not None else "-", c.get("par_moves", c["ref_moves"]), c["ref_moves"], c["cap"], cpu, limit)
         if detail:
             line += "   (%s)" % detail
         print(line, flush=True)
@@ -210,15 +209,16 @@ def run_cases(stage, alone, cases):
 
 
 def report(stage, folder, by_size):
-    """The mean value per size, the stage score and the folder's size, as the grader counts them."""
-    num = den = 0.0
+    """Per size: how many met the goal within the limits and the mean moves; then the folder's size."""
     for n in sorted(by_size):
-        mean = sum(by_size[n]) / len(by_size[n])
-        num += n * mean
-        den += n
-        print("%2dx%-2d  mean value %.3f  (%d of %d met the goal within the limits)" % (n, n, mean, sum(1 for v in by_size[n] if v > 0), len(by_size[n])))
-    if den:
-        print("stage score %.3f  (sizes weighted by N; 1.000 = every cube within the limits at or under par)" % (num / den))
+        rows = by_size[n]
+        met = [moves for _c, ok, moves in rows if ok]
+        mean = lambda xs: sum(xs) / len(xs)  # noqa: E731
+        best = mean([c.get("par_moves", c["ref_moves"]) for c, _ok, _m in rows])
+        ours = mean([c["ref_moves"] for c, _ok, _m in rows])
+        print("%2dx%-2d  %d of %d met the goal within the limits;  mean moves %s  (best so far %.0f, ours %.0f; scramble length %d)" % (
+            n, n, len(met), len(rows), "%.1f" % mean(met) if met else "-", best, ours, 20 * (n - 2)))
+    print("A cube scores scramble length / the moves of all three programs together (sizes weighted by N), and 0 if any of them fails on it.")
     size = gz_size(folder)
     print("%s/ is %d bytes gzipped (limit %d)%s" % (stage, size, BUNDLE_MAX, "  OVER THE LIMIT" if size > BUNDLE_MAX else ""))
     return 0

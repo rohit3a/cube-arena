@@ -15,15 +15,19 @@ NxN ladder
 - 10 hidden cases per size per stage (70 per stage, 280 in all); one scramble per (size, case) feeds all four.
 - Scramble: 20*(N-2) moves of randomWalk (outer blocks up to half the cube), weight w = N (sum 49).
 - cap = 2 x reference moves; cpu_limit = clamp(5 x reference CPU, 5 s, 60 s).
-- case value = 0 if unsolved / over cap / over CPU, else 0.5 + 0.5*min(1, par/moves).
-  par (per case and part, e2e included) = min(reference moves, fewest moves any graded run used on it),
-  set per case set from the graded runs (scripts/code2-par.mjs --set), then frozen; past runs rescored
-  (--rescore). Practice cubes get a par too, from rerunning the best programs (--practice).
-  2026-10-15: first set from the mini runs; reset once (06:29 UTC) after the full ladder (12 runs: Sol and
-  Astra at medium, high and max, 2-3 each), every v2 run rescored; frozen since. Practice par from the top 3
-  full programs of each stage.
-  (Was 0.9 + 0.1*min(1, ref/moves): our reference is weak on moves, so the move term saturated: Sol scored ~100.)
-- stage score = sum N*mean_N / 49; bench = 100*(centres+edges+finish+e2e)/4.
+- Score = the full solve, as in v1 (since 15 Oct 2026): a cube is worth scramble length / moves, the 20*(N-2)
+  random moves that mixed it (undoing them solves it; the true minimum is at most that and, by counting
+  positions, close to it on the big sizes), no upper limit; 0 if a program fails, runs over its CPU limit
+  (clamp(5 x reference CPU, 5 s, 60 s)) or the three together run over the cap (2 x reference moves).
+  bench = 100 * sum N*mean_N / 49.
+  The stages are a breakdown, not in the score: 0.5 + 0.5*min(1, par/moves) per case, par (per case and stage) =
+  min(reference moves, fewest moves any graded run used on it), set by scripts/code2-par.mjs --set, then frozen
+  (2026-10-15: reset once after the full ladder, 12 runs of Sol and Astra at medium, high and max); practice par
+  in the kits from the top 3 full programs of each stage (--practice).
+  History: until 15 Oct the bench was 100 x the mean of the three stages and end to end, each 0.5 + 0.5*min(1,
+  par/moves) with par from the graded runs. Every graded program was Astra's or worse, so Astra was scored against
+  itself (it set 279 of 280 pars) and got ~95; against the scramble length it gets ~31-39, Sol ~17-20, Sonnet ~10.
+  (Before that, 0.9 + 0.1*min(1, ref/moves): our reference is weak on moves, so Sol scored ~100.)
 - Early stop: > 10% of stage time left -> the same message, up to 5 times a stage (session resumed):
   "You have X min left in this stage. Keep working on <stage>/ until the time is up; it is submitted then."
   A stop with less left, or after the fifth message, submits. (Was: > 25%, once, with "or reply DONE":

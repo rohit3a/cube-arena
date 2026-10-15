@@ -8,7 +8,7 @@
 
 import { createHash } from 'node:crypto';
 import { withDb, transaction } from './db';
-import { BENCHES2, CODE2, type Bench2, type Case2Status, type Part, type PartScore, type Run2, PARTS, benchScore, caseValue, cpuLimitMs, gradeChain, gradeStage, isBench2, limits2, moveCap, partScore } from './code2-rules';
+import { BENCHES2, CODE2, type Bench2, type Case2Status, type Part, type PartScore, type Run2, PARTS, benchScore, cpuLimitMs, gradeChain, gradeStage, isBench2, limits2, moveCap, partScore, partValue, scrambleLength } from './code2-rules';
 import { checkTarGz } from './code';
 import { ArenaError } from './service';
 import { type Stage, STAGES } from '../cube/stages';
@@ -61,7 +61,7 @@ interface CaseRow {
   states: string[];
   ref_moves: number[];
   ref_cpu_ms: number[];
-  /** Par per part: code2_pars, or our reference's moves (end to end: its three stages) where none is set. */
+  /** Par per part: end to end the scramble length (what the score counts); a stage, code2_pars or our reference's moves. */
   par: Record<Part, number>;
 }
 
@@ -82,7 +82,7 @@ async function casesFor(bench: Bench2): Promise<CaseRow[]> {
   return rows.map((c) => ({
     ...c,
     par: Object.fromEntries(
-      PARTS.map((p, i) => [p, set.get(`${p}:${c.size}:${c.case_no}`) ?? (p === 'e2e' ? c.ref_moves.reduce((a, b) => a + b, 0) : c.ref_moves[i])]),
+      PARTS.map((p, i) => [p, p === 'e2e' ? scrambleLength(c.size) : (set.get(`${p}:${c.size}:${c.case_no}`) ?? c.ref_moves[i])]),
     ) as Record<Part, number>,
   }));
 }
@@ -155,7 +155,7 @@ export async function saveResults2(id: string, reports: Report2[]): Promise<numb
     if (!c) throw new ArenaError('bad_case', `no case ${r.n}:${r.case_no} in ${s.version}`);
     if (r.part === 'e2e') {
       const ref = c.ref_moves.reduce((a, b) => a + b, 0);
-      const o = gradeChain(r.n, c.states[0], r.runs, c.ref_moves, c.ref_cpu_ms, c.par.e2e);
+      const o = gradeChain(r.n, c.states[0], r.runs, c.ref_moves, c.ref_cpu_ms);
       // The grader fed each program what the one before left; it must agree with this engine.
       if (o.states.some((st, i) => r.inputs[i] !== st)) throw new ArenaError('chain_mismatch', `the grader's chain for ${r.n}:${r.case_no} differs from the server's`);
       return {
@@ -257,9 +257,9 @@ export async function stageBundles(id: string) {
 // Par
 
 /**
- * Sets each hidden cube's par per part: the fewest moves any graded program
- * has used on it, never more than our reference's (runs whose lockdown broke
- * don't count). Par is then kept fixed, so this refuses to run again unless
+ * Sets each hidden cube's par per stage (the breakdown): the fewest moves any
+ * graded program has used on it, never more than our reference's (runs whose
+ * lockdown broke don't count); end to end, the scramble length. Par is then kept fixed, so this refuses to run again unless
  * `replace`. Returns how many pars are set and how many beat the reference.
  */
 export async function setPars2({ replace = false } = {}): Promise<{ pars: number; below_reference: number }> {
@@ -282,17 +282,19 @@ export async function setPars2({ replace = false } = {}): Promise<{ pars: number
         where c.version = ${CODE2.caseVersion} and c.case_no < ${CODE2.casesPerSize}
       )
       insert into cube_arena.code2_pars (version, size, case_no, part, par_moves, source)
-      select ${CODE2.caseVersion}, ref.size, ref.case_no, ref.part, least(ref.moves, coalesce(b.moves, ref.moves)),
-             case when b.moves < ref.moves then b.submission_id::text else 'reference' end
+      select ${CODE2.caseVersion}, ref.size, ref.case_no, ref.part,
+             -- End to end the par is the scramble length (code2-rules scrambleLength), what the score counts.
+             case when ref.part = 'e2e' then 20 * (ref.size - 2) else least(ref.moves, coalesce(b.moves, ref.moves)) end,
+             case when ref.part = 'e2e' then 'scramble length' when b.moves < ref.moves then b.submission_id::text else 'reference' end
       from ref left join best b on b.part = ref.part and b.size = ref.size and b.case_no = ref.case_no and b.k = 1`;
     const [out] = await tx<{ pars: number; below_reference: number }[]>`
-      select count(*)::int pars, count(*) filter (where source <> 'reference')::int below_reference
+      select count(*)::int pars, count(*) filter (where source not in ('reference', 'scramble length'))::int below_reference
       from cube_arena.code2_pars where version = ${CODE2.caseVersion}`;
     return out;
   });
 }
 
-/** Values a graded v2 submission's cases again against the current pars and adds its score up again. */
+/** Values a graded v2 submission's cases again (full solve: the scramble length; stages: the current pars) and adds its score up again. */
 export async function rescore2(id: string): Promise<{ id: string; before: number; after: number }> {
   const [s] = await withDb((sql) => sql<{ status: string; version: string; score: string }[]>`
     select status, version, score from cube_arena.code_submissions where id = ${id}`);
@@ -304,7 +306,7 @@ export async function rescore2(id: string): Promise<{ id: string; before: number
     from cube_arena.code2_results where submission_id = ${id}`);
   const rows = have.map((r) => {
     const par = cases.get(`${r.size}:${r.case_no}`)?.par[r.part] ?? r.ref_moves;
-    return { ...r, par_moves: par, value: caseValue(r.status, r.moves, par) };
+    return { ...r, par_moves: par, value: partValue(r.part, r.status, r.moves, r.size, par) };
   });
   const sizes = CODE2.benches[bench].sizes as readonly number[];
   const parts = Object.fromEntries(PARTS.map((p) => [p, partScore(rows.filter((r) => r.part === p), sizes)])) as Record<Part, PartScore>;

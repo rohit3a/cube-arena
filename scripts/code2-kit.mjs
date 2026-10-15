@@ -73,9 +73,13 @@ function refTable(bench, stage) {
     const cs = cases.filter((c) => c.n === n);
     const mean = (k) => Math.round(cs.reduce((a, c) => a + c[k], 0) / cs.length);
     const par = Math.round(cs.reduce((a, c) => a + (c.par_moves ?? c.ref_moves), 0) / cs.length);
-    return `| ${n}×${n} | ${n} | ${par} | ${mean('ref_moves')} | ${mean('cap')} | ${(mean('cpu_limit_ms') / 1000).toFixed(0)} s |`;
+    return `| ${n}×${n} | ${n} | ${20 * (n - 2)} | ${par} | ${mean('ref_moves')} | ${mean('cap')} | ${(mean('cpu_limit_ms') / 1000).toFixed(0)} s |`;
   });
-  return ['| Size | Weight | Par (practice mean) | Reference moves | Cap | CPU limit |', '|---|---|---|---|---|---|', ...rows].join('\n');
+  return [
+    '| Size | Weight | Scramble length (whole solve) | Best so far (this stage) | Our reference (this stage) | Cap (this stage) | CPU limit |',
+    '|---|---|---|---|---|---|---|',
+    ...rows,
+  ].join('\n');
 }
 
 function spec(bench, stage) {
@@ -102,9 +106,9 @@ When you finish, \`${stage}/\` is frozen and run on hidden cubes you have never 
 
 ${s.notes}
 
-Meet the goal on every cube, within the move cap and the CPU limit; after
-that, fewer moves score more: half of each cube's value goes by how close you
-come to par (see Scoring).
+Meet the goal on every cube, within the CPU limit: a cube any of the three
+programs fails scores 0. After that, every move you save raises the score
+(see Scoring).
 
 ## Rules
 
@@ -123,8 +127,8 @@ come to par (see Scoring).
 |---|---|
 | \`SPEC.md\` | This file. |
 | \`cube.py\` | The reference N×N cube: the same sticker order, moves, move counting and stage checks as the grader. Copy it into \`${stage}/\` to import it. |
-| \`practice.json\` | 30 practice cubes per size, made like the hidden ones: the input \`state\`${stage === 'centres' ? ' (and the `scramble` that made it)' : ''}, our reference's moves on it (\`ref_moves\`), par (\`par_moves\`), the move \`cap\` and the CPU limit (\`cpu_limit_ms\`). |
-| \`check.py\` | Runs your program on practice cubes exactly as the grader does and prints the stage score: the first 10 per size by default (the grader uses 10 hidden cubes per size), \`--held-out\` for the other 20, \`--all\` for all 30. |
+| \`practice.json\` | 30 practice cubes per size, made like the hidden ones: the input \`state\`${stage === 'centres' ? ' (and the `scramble` that made it)' : ''}, our reference's moves on it (\`ref_moves\`), the fewest moves any program we have graded has used on it (\`par_moves\`), this stage's move \`cap\` and the CPU limit (\`cpu_limit_ms\`). |
+| \`check.py\` | Runs your program on practice cubes exactly as the grader does and prints the moves and how many cubes met the goal: the first 10 per size by default (the grader uses 10 hidden cubes per size), \`--held-out\` for the other 20, \`--all\` for all 30. |
 | \`${stage}/\` | Your program. Only this folder is submitted. |
 
 Run \`python3 check.py\` often (\`--sizes 4,5\` and \`--cases 1\` make it quicker).
@@ -203,31 +207,39 @@ Whole-cube rotations are free.
 
 ## Scoring
 
-Each hidden cube is worth between 0 and 1:
+The score comes from the **whole solve**. On each hidden scrambled cube the
+grader chains the programs from the three sessions: centres on the scrambled
+cube, edges on what that leaves, finish on what edges leaves, each with its
+own stage's CPU limit.
 
-- **0** if, after your moves, the goal isn't met; if the answer isn't moves,
-  the program crashes or exits non-zero; if it uses more CPU time than the
-  cube's limit; or if it uses more moves than the cube's cap.
-- Otherwise **0.5 + 0.5 × min(1, par ÷ your moves)**. **Par** is the fewest
-  moves any program we have graded has used on that cube (never more than our
-  reference program's), fixed for this benchmark. Meeting the goal within the
-  limits is worth 0.5; matching par (or beating it) earns the other 0.5.
-- The **cap** is 2 × ref, where ref is our reference program's move count on
-  that cube. The **CPU limit** is 5 × our reference's CPU time on that cube,
-  at least 5 s and at most 60 s. Our reference is a plain commutator-based
-  solver, well above par; for scale (practice cubes):
+- A cube scores **0** if any of the three fails on it: its goal isn't met, its
+  answer isn't moves, it crashes or exits non-zero, or it uses more CPU time
+  than its limit; or if the three together use more moves than the cap
+  (2 × our reference's three stages together).
+- Otherwise it scores **scramble length ÷ your moves**, the moves of all three
+  programs together. The scramble length is the number of random moves that
+  mixed the cube, 20 × (N − 2): undoing them solves it, so 1 means solving the
+  cube in as few moves as it took to mix it. There is no upper limit: fewer
+  moves than that score more than 1.
+
+The benchmark score is 100 × the mean at each size, weighted by N (weights
+sum to ${weightSum}), over 10 hidden cubes per size: bigger cubes count more.
+
+Every move this program makes adds to that total, so fewer moves here score
+more. ${stage === 'centres' ? 'End to end, the edges program gets whatever your program leaves.' : `End to end, your program runs on what the previous stage's program
+leaves, not on what our reference leaves.`} We also run each program on
+its own, on stage cubes from our reference programs, and report how it did,
+but only the whole solve counts.
+
+For scale (practice cubes, means per size):
 
 ${refTable(bench, stage)}
 
-The stage score is the mean value at each size, weighted by N (weights sum to
-${weightSum}), over 10 hidden cubes per size: bigger cubes count more.
-
-The benchmark score is 100 × the mean of four parts: the three stages, and
-**end to end**, where the grader chains the centres, edges and finish
-programs from the three sessions on each scrambled cube (each program with
-its own stage's CPU limit; the cap is 2 × our reference's three stages
-together, and par is the fewest moves any graded chain has used on that cube). ${stage === 'centres' ? 'End to end, the edges program gets whatever your program leaves.' : `So your program also runs on what the previous stage's program
-leaves, not just on what our reference leaves.`}
+Best so far is the fewest moves any program we have graded has used on the
+cube in this stage. Our reference is a plain commutator-based solver. The cap
+here is this stage's alone (2 × our reference's moves); end to end it applies
+to the three together. The **CPU limit** is 5 × our reference's CPU time on
+that cube, at least 5 s and at most 60 s.
 `;
 }
 

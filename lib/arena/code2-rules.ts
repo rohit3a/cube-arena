@@ -5,13 +5,19 @@
 // next. End to end, the grader chains the model's three programs.
 // Pure (no database), so the grader, the pages and the tests share it.
 //
-// A case is worth 0 when the goal isn't met, the answer runs over the move cap
-// (2 x our reference's moves) or over the CPU limit (5 x our reference's CPU
-// time, 5 to 60 s); otherwise 0.5 + 0.5 x min(1, par / moves), where par is the
-// fewest moves any graded program has used on that cube (never more than our
-// reference's; cube_arena.code2_pars, fixed for the case set). A stage scores
-// the size-weighted mean (weight N); the bench, 100 x the mean of the three
-// stages and end to end.
+// The score is the full solve (end to end), as in v1: a cube is worth
+// scramble length / moves, where the scramble length is the 20 x (N - 2) random
+// moves that mixed it (undoing them solves it, so 1 is that many moves; beating
+// it is worth more than 1), and 0 when a program fails, runs over its CPU limit
+// (5 x our reference's CPU time, 5 to 60 s) or the three together run over the
+// cap (2 x our reference's moves). The bench is 100 x the size-weighted mean
+// (weight N). Since 15 Oct 2026; before, it was 100 x the mean of the three
+// stages and end to end, each against par.
+//
+// The stages are a breakdown, not in the score: each case is worth
+// 0.5 + 0.5 x min(1, par / moves), where par is the fewest moves any graded
+// program has used on that cube (never more than our reference's;
+// cube_arena.code2_pars, fixed for the case set).
 
 import { MoveError, applyMoves, moveCost, parseMoves, stateFromString, stateToString } from '../cube/engine';
 import { type Stage, STAGES, stageDone } from '../cube/stages';
@@ -35,7 +41,7 @@ export const CODE2 = {
   /** Kept of each answer (a longer one is over the cap anyway). */
   outputMaxBytes: 512 * 1024,
   capFactor: 2,
-  /** A solved case is worth at least this; the rest goes by moves against par. */
+  /** Stage breakdown: a solved case is worth at least this; the rest goes by moves against par. */
   solvedFloor: 0.5,
   cpuFactor: 5,
   cpuMinMs: 5_000,
@@ -101,8 +107,17 @@ export interface Outcome2 {
   detail: string | null;
 }
 
+/** A stage case's value (the breakdown): at least solvedFloor once solved, the rest by moves against par. */
 export const caseValue = (status: Case2Status, moves: number | null, parMoves: number) =>
   status === 'solved' ? CODE2.solvedFloor + (1 - CODE2.solvedFloor) * Math.min(1, parMoves / Math.max(1, moves ?? 0)) : 0;
+
+/** A full solve's value, what the score counts: scramble length / moves, no upper limit. */
+export const solveValue = (status: Case2Status, moves: number | null, n: number) =>
+  status === 'solved' ? scrambleLength(n) / Math.max(1, moves ?? 0) : 0;
+
+/** A case's value: the full solve against the scramble length, a stage against its par. */
+export const partValue = (part: Part, status: Case2Status, moves: number | null, n: number, parMoves: number) =>
+  part === 'e2e' ? solveValue(status, moves, n) : caseValue(status, moves, parMoves);
 
 type Played = { ok: true; end: Uint8Array; count: number } | { ok: false; status: Case2Status; detail: string };
 
@@ -137,15 +152,15 @@ export function gradeStage(stage: Stage, n: number, input: string, run: Run2, re
  * that happened: the grader stops at the first program that fails or leaves
  * its stage's goal unmet (the next program's spec promises it that goal). The
  * cap is twice our reference's three stages together; each program has its
- * own stage's CPU limit. `states` are the inputs the programs got, in order.
+ * own stage's CPU limit. Worth scramble length / moves. `states` are the
+ * inputs the programs got, in order.
  */
-export function gradeChain(n: number, scrambled: string, runs: Run2[], refMoves: number[], refCpuMs: number[], parMoves?: number): Outcome2 & { states: string[] } {
+export function gradeChain(n: number, scrambled: string, runs: Run2[], refMoves: number[], refCpuMs: number[]): Outcome2 & { states: string[] } {
   let state = scrambled;
   let total = 0;
   let cpu = 0;
   const states: string[] = [];
   const ref = refMoves.reduce((a, b) => a + b, 0);
-  const par = parMoves ?? ref;
   for (let i = 0; i < STAGES.length; i++) {
     const run = runs[i];
     if (!run) return { status: 'crash', moves: null, cpu_ms: cpu, value: 0, detail: `${STAGES[i]} did not run`, states };
@@ -158,7 +173,7 @@ export function gradeChain(n: number, scrambled: string, runs: Run2[], refMoves:
     state = stateToString(p.end);
   }
   if (total > moveCap(ref)) return { status: 'over_cap', moves: total, cpu_ms: cpu, value: 0, detail: `${total} moves, over the cap of ${moveCap(ref)}`, states };
-  return { status: 'solved', moves: total, cpu_ms: cpu, value: caseValue('solved', total, par), detail: null, states };
+  return { status: 'solved', moves: total, cpu_ms: cpu, value: solveValue('solved', total, n), detail: null, states };
 }
 
 export interface PartScore {
@@ -184,5 +199,5 @@ export function partScore(results: { size: number; status: Case2Status; value: n
   return { score: den ? num / den : 0, solved: results.filter((r) => r.status === 'solved').length, cases: results.length, by_size: by };
 }
 
-/** 100 x the mean of the three stages and end to end. */
-export const benchScore = (parts: Partial<Record<Part, PartScore>>) => (100 * PARTS.reduce((a, p) => a + (parts[p]?.score ?? 0), 0)) / PARTS.length;
+/** 100 x the full solve's score; the stages are a breakdown. */
+export const benchScore = (parts: Partial<Record<Part, PartScore>>) => 100 * (parts.e2e?.score ?? 0);
