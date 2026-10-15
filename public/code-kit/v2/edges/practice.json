@@ -9,7 +9,7 @@
    "ref_moves": 73,
    "cap": 146,
    "cpu_limit_ms": 5000,
-   "par_moves": 30
+   "par_moves": 19
   },
   {
    "n": 4,
@@ -18,7 +18,7 @@
    "ref_moves": 81,
    "cap": 162,
    "cpu_limit_ms": 5000,
-   "par_moves": 42
+   "par_moves": 19
   },
   {
    "n": 4,
@@ -27,7 +27,7 @@
    "ref_moves": 74,
    "cap": 148,
    "cpu_limit_ms": 5000,
-   "par_moves": 34
+   "par_moves": 22
   },
   {
    "n": 4,
@@ -36,7 +36,7 @@
    "ref_moves": 81,
    "cap": 162,
    "cpu_limit_ms": 5000,
-   "par_moves": 33
+   "par_moves": 20
   },
   {
    "n": 4,
@@ -45,7 +45,7 @@
    "ref_moves": 74,
    "cap": 148,
    "cpu_limit_ms": 5000,
-   "par_moves": 36
+   "par_moves": 19
   },
   {
    "n": 4,
@@ -54,7 +54,7 @@
    "ref_moves": 67,
    "cap": 134,
    "cpu_limit_ms": 5000,
-   "par_moves": 48
+   "par_moves": 20
   },
   {
    "n": 4,
@@ -63,7 +63,7 @@
    "ref_moves": 73,
    "cap": 146,
    "cpu_limit_ms": 5000,
-   "par_moves": 42
+   "par_moves": 21
   },
   {
    "n": 4,
@@ -72,7 +72,7 @@
    "ref_moves": 67,
    "cap": 134,
    "cpu_limit_ms": 5000,
-   "par_moves": 30
+   "par_moves": 19
   },
   {
    "n": 4,
@@ -81,7 +81,7 @@
    "ref_moves": 66,
    "cap": 132,
    "cpu_limit_ms": 5000,
-   "par_moves": 38
+   "par_moves": 19
   },
   {
    "n": 4,
@@ -90,7 +90,7 @@
    "ref_moves": 81,
    "cap": 162,
    "cpu_limit_ms": 5000,
-   "par_moves": 34
+   "par_moves": 22
   },
   {
    "n": 4,
@@ -99,7 +99,7 @@
    "ref_moves": 65,
    "cap": 130,
    "cpu_limit_ms": 5000,
-   "par_moves": 30
+   "par_moves": 21
   },
   {
    "n": 4,
@@ -108,7 +108,7 @@
    "ref_moves": 62,
    "cap": 124,
    "cpu_limit_ms": 5000,
-   "par_moves": 40
+   "par_moves": 21
   },
   {
    "n": 4,
@@ -117,7 +117,7 @@
    "ref_moves": 83,
    "cap": 166,
    "cpu_limit_ms": 5000,
-   "par_moves": 32
+   "par_moves": 20
   },
   {
    "n": 4,
@@ -126,7 +126,7 @@
    "ref_moves": 82,
    "cap": 164,
    "cpu_limit_ms": 5000,
-   "par_moves": 42
+   "par_moves": 23
   },
   {
    "n": 4,
@@ -135,7 +135,7 @@
    "ref_moves": 66,
    "cap": 132,
    "cpu_limit_ms": 5000,
-   "par_moves": 40
+   "par_moves": 20
   },
   {
    "n": 4,
@@ -144,7 +144,7 @@
    "ref_moves": 63,
    "cap": 126,
    "cpu_limit_ms": 5000,
-   "par_moves": 30
+   "par_moves": 19
   },
   {
    "n": 4,
@@ -153,7 +153,7 @@
    "ref_moves": 67,
    "cap": 134,
    "cpu_limit_ms": 5000,
-   "par_moves": 34
+   "par_moves": 21
   },
   {
    "n": 4,
@@ -162,7 +162,7 @@
    "ref_moves": 65,
    "cap": 130,
    "cpu_limit_ms": 5000,
-   "par_moves": 36
+   "par_moves": 20
   },
   {
    "n": 4,
@@ -171,7 +171,7 @@
    "ref_moves": 83,
    "cap": 166,
    "cpu_limit_ms": 5000,
-   "par_moves": 36
+   "par_moves": 21
   },
   {
    "n": 4,
@@ -180,7 +180,7 @@
    "ref_moves": 65,
    "cap": 130,
    "cpu_limit_ms": 5000,
-   "par_moves": 36
+   "par_moves": 20
   },
   {
    "n": 4,
@@ -189,7 +189,7 @@
    "ref_moves": 58,
    "cap": 116,
    "cpu_limit_ms": 5000,
-   "par_moves": 28
+   "par_moves": 17
   },
   {
    "n": 4,
@@ -198,7 +198,7 @@
    "ref_moves": 75,
    "cap": 150,
    "cpu_limit_ms": 5000,
-   "par_moves": 30
+   "par_moves": 21
   },
   {
    "n": 4,
@@ -207,7 +207,7 @@
    "ref_moves": 65,
    "cap": 130,
    "cpu_limit_ms": 5000,
-   "par_moves": 42
+   "par_moves": 17
   },
   {
    "n": 4,
@@ -216,7 +216,7 @@
    "ref_moves": 66,
    "cap": 132,
    "cpu_limit_ms": 5000,
-   "par_moves": 42
+   "par_moves": 20
   },
   {
    "n": 4,
@@ -225,7 +225,7 @@
    "ref_moves": 72,
    "cap": 144,
    "cpu_limit_ms": 5000,
-   "par_moves": 36
+   "par_moves": 20
   },
   {
    "n": 4,
@@ -234,7 +234,7 @@
    "ref_moves": 59,
    "cap": 118,
    "cpu_limit_ms": 5000,
-   "par_moves": 42
+   "par_moves": 21
   },
   {
    "n": 4,
@@ -243,7 +243,7 @@
    "ref_moves": 65,
    "cap": 130,
    "cpu_limit_ms": 5000,
-   "par_moves": 36
+   "par_moves": 19
   },
   {
    "n": 4,
@@ -252,7 +252,7 @@
    "ref_moves": 72,
    "cap": 144,
    "cpu_limit_ms": 5000,
-   "par_moves": 30
+   "par_moves": 21
   },
   {
    "n": 4,
@@ -261,7 +261,7 @@
    "ref_moves": 73,
    "cap": 146,
    "cpu_limit_ms": 5000,
-   "par_moves": 36
+   "par_moves": 18
   },
   {
    "n": 4,
@@ -270,7 +270,7 @@
    "ref_moves": 99,
    "cap": 198,
    "cpu_limit_ms": 5000,
-   "par_moves": 34
+   "par_moves": 20
   },
   {
    "n": 5,
@@ -279,7 +279,7 @@
    "ref_moves": 200,
    "cap": 400,
    "cpu_limit_ms": 5000,
-   "par_moves": 95
+   "par_moves": 53
   },
   {
    "n": 5,
@@ -288,7 +288,7 @@
    "ref_moves": 137,
    "cap": 274,
    "cpu_limit_ms": 5000,
-   "par_moves": 76
+   "par_moves": 41
   },
   {
    "n": 5,
@@ -297,7 +297,7 @@
    "ref_moves": 215,
    "cap": 430,
    "cpu_limit_ms": 5000,
-   "par_moves": 85
+   "par_moves": 56
   },
   {
    "n": 5,
@@ -306,7 +306,7 @@
    "ref_moves": 216,
    "cap": 432,
    "cpu_limit_ms": 5000,
-   "par_moves": 103
+   "par_moves": 56
   },
   {
    "n": 5,
@@ -315,7 +315,7 @@
    "ref_moves": 153,
    "cap": 306,
    "cpu_limit_ms": 5000,
-   "par_moves": 77
+   "par_moves": 43
   },
   {
    "n": 5,
@@ -324,7 +324,7 @@
    "ref_moves": 205,
    "cap": 410,
    "cpu_limit_ms": 5000,
-   "par_moves": 103
+   "par_moves": 53
   },
   {
    "n": 5,
@@ -333,7 +333,7 @@
    "ref_moves": 209,
    "cap": 418,
    "cpu_limit_ms": 5000,
-   "par_moves": 87
+   "par_moves": 54
   },
   {
    "n": 5,
@@ -342,7 +342,7 @@
    "ref_moves": 148,
    "cap": 296,
    "cpu_limit_ms": 5000,
-   "par_moves": 86
+   "par_moves": 39
   },
   {
    "n": 5,
@@ -351,7 +351,7 @@
    "ref_moves": 156,
    "cap": 312,
    "cpu_limit_ms": 5000,
-   "par_moves": 70
+   "par_moves": 40
   },
   {
    "n": 5,
@@ -360,7 +360,7 @@
    "ref_moves": 132,
    "cap": 264,
    "cpu_limit_ms": 5000,
-   "par_moves": 72
+   "par_moves": 38
   },
   {
    "n": 5,
@@ -369,7 +369,7 @@
    "ref_moves": 198,
    "cap": 396,
    "cpu_limit_ms": 5000,
-   "par_moves": 87
+   "par_moves": 55
   },
   {
    "n": 5,
@@ -378,7 +378,7 @@
    "ref_moves": 168,
    "cap": 336,
    "cpu_limit_ms": 5000,
-   "par_moves": 90
+   "par_moves": 41
   },
   {
    "n": 5,
@@ -387,7 +387,7 @@
    "ref_moves": 206,
    "cap": 412,
    "cpu_limit_ms": 5000,
-   "par_moves": 94
+   "par_moves": 56
   },
   {
    "n": 5,
@@ -396,7 +396,7 @@
    "ref_moves": 163,
    "cap": 326,
    "cpu_limit_ms": 5000,
-   "par_moves": 76
+   "par_moves": 42
   },
   {
    "n": 5,
@@ -405,7 +405,7 @@
    "ref_moves": 162,
    "cap": 324,
    "cpu_limit_ms": 5000,
-   "par_moves": 90
+   "par_moves": 43
   },
   {
    "n": 5,
@@ -414,7 +414,7 @@
    "ref_moves": 190,
    "cap": 380,
    "cpu_limit_ms": 5000,
-   "par_moves": 102
+   "par_moves": 55
   },
   {
    "n": 5,
@@ -423,7 +423,7 @@
    "ref_moves": 189,
    "cap": 378,
    "cpu_limit_ms": 5000,
-   "par_moves": 93
+   "par_moves": 54
   },
   {
    "n": 5,
@@ -432,7 +432,7 @@
    "ref_moves": 138,
    "cap": 276,
    "cpu_limit_ms": 5000,
-   "par_moves": 79
+   "par_moves": 43
   },
   {
    "n": 5,
@@ -441,7 +441,7 @@
    "ref_moves": 200,
    "cap": 400,
    "cpu_limit_ms": 5000,
-   "par_moves": 90
+   "par_moves": 55
   },
   {
    "n": 5,
@@ -450,7 +450,7 @@
    "ref_moves": 132,
    "cap": 264,
    "cpu_limit_ms": 5000,
-   "par_moves": 76
+   "par_moves": 41
   },
   {
    "n": 5,
@@ -459,7 +459,7 @@
    "ref_moves": 199,
    "cap": 398,
    "cpu_limit_ms": 5000,
-   "par_moves": 96
+   "par_moves": 51
   },
   {
    "n": 5,
@@ -468,7 +468,7 @@
    "ref_moves": 147,
    "cap": 294,
    "cpu_limit_ms": 5000,
-   "par_moves": 83
+   "par_moves": 41
   },
   {
    "n": 5,
@@ -477,7 +477,7 @@
    "ref_moves": 205,
    "cap": 410,
    "cpu_limit_ms": 5000,
-   "par_moves": 106
+   "par_moves": 54
   },
   {
    "n": 5,
@@ -486,7 +486,7 @@
    "ref_moves": 187,
    "cap": 374,
    "cpu_limit_ms": 5000,
-   "par_moves": 102
+   "par_moves": 51
   },
   {
    "n": 5,
@@ -495,7 +495,7 @@
    "ref_moves": 206,
    "cap": 412,
    "cpu_limit_ms": 5000,
-   "par_moves": 109
+   "par_moves": 59
   },
   {
    "n": 5,
@@ -504,7 +504,7 @@
    "ref_moves": 198,
    "cap": 396,
    "cpu_limit_ms": 5000,
-   "par_moves": 71
+   "par_moves": 48
   },
   {
    "n": 5,
@@ -513,7 +513,7 @@
    "ref_moves": 175,
    "cap": 350,
    "cpu_limit_ms": 5000,
-   "par_moves": 86
+   "par_moves": 52
   },
   {
    "n": 5,
@@ -522,7 +522,7 @@
    "ref_moves": 205,
    "cap": 410,
    "cpu_limit_ms": 5000,
-   "par_moves": 99
+   "par_moves": 52
   },
   {
    "n": 5,
@@ -531,7 +531,7 @@
    "ref_moves": 161,
    "cap": 322,
    "cpu_limit_ms": 5000,
-   "par_moves": 86
+   "par_moves": 40
   },
   {
    "n": 5,
@@ -540,7 +540,7 @@
    "ref_moves": 200,
    "cap": 400,
    "cpu_limit_ms": 5000,
-   "par_moves": 87
+   "par_moves": 47
   },
   {
    "n": 6,
@@ -549,7 +549,7 @@
    "ref_moves": 268,
    "cap": 536,
    "cpu_limit_ms": 5000,
-   "par_moves": 149
+   "par_moves": 76
   },
   {
    "n": 6,
@@ -558,7 +558,7 @@
    "ref_moves": 283,
    "cap": 566,
    "cpu_limit_ms": 5000,
-   "par_moves": 137
+   "par_moves": 70
   },
   {
    "n": 6,
@@ -567,7 +567,7 @@
    "ref_moves": 269,
    "cap": 538,
    "cpu_limit_ms": 5000,
-   "par_moves": 125
+   "par_moves": 71
   },
   {
    "n": 6,
@@ -576,7 +576,7 @@
    "ref_moves": 209,
    "cap": 418,
    "cpu_limit_ms": 5000,
-   "par_moves": 120
+   "par_moves": 59
   },
   {
    "n": 6,
@@ -585,7 +585,7 @@
    "ref_moves": 205,
    "cap": 410,
    "cpu_limit_ms": 5000,
-   "par_moves": 124
+   "par_moves": 58
   },
   {
    "n": 6,
@@ -594,7 +594,7 @@
    "ref_moves": 282,
    "cap": 564,
    "cpu_limit_ms": 5000,
-   "par_moves": 148
+   "par_moves": 75
   },
   {
    "n": 6,
@@ -603,7 +603,7 @@
    "ref_moves": 219,
    "cap": 438,
    "cpu_limit_ms": 5000,
-   "par_moves": 135
+   "par_moves": 60
   },
   {
    "n": 6,
@@ -612,7 +612,7 @@
    "ref_moves": 207,
    "cap": 414,
    "cpu_limit_ms": 5000,
-   "par_moves": 132
+   "par_moves": 60
   },
   {
    "n": 6,
@@ -621,7 +621,7 @@
    "ref_moves": 256,
    "cap": 512,
    "cpu_limit_ms": 5000,
-   "par_moves": 127
+   "par_moves": 70
   },
   {
    "n": 6,
@@ -630,7 +630,7 @@
    "ref_moves": 225,
    "cap": 450,
    "cpu_limit_ms": 5000,
-   "par_moves": 132
+   "par_moves": 63
   },
   {
    "n": 6,
@@ -639,7 +639,7 @@
    "ref_moves": 236,
    "cap": 472,
    "cpu_limit_ms": 5000,
-   "par_moves": 137
+   "par_moves": 65
   },
   {
    "n": 6,
@@ -648,7 +648,7 @@
    "ref_moves": 204,
    "cap": 408,
    "cpu_limit_ms": 5000,
-   "par_moves": 116
+   "par_moves": 59
   },
   {
    "n": 6,
@@ -657,7 +657,7 @@
    "ref_moves": 217,
    "cap": 434,
    "cpu_limit_ms": 5000,
-   "par_moves": 122
+   "par_moves": 63
   },
   {
    "n": 6,
@@ -666,7 +666,7 @@
    "ref_moves": 243,
    "cap": 486,
    "cpu_limit_ms": 5000,
-   "par_moves": 124
+   "par_moves": 64
   },
   {
    "n": 6,
@@ -675,7 +675,7 @@
    "ref_moves": 212,
    "cap": 424,
    "cpu_limit_ms": 5000,
-   "par_moves": 113
+   "par_moves": 60
   },
   {
    "n": 6,
@@ -684,7 +684,7 @@
    "ref_moves": 278,
    "cap": 556,
    "cpu_limit_ms": 5000,
-   "par_moves": 151
+   "par_moves": 74
   },
   {
    "n": 6,
@@ -693,7 +693,7 @@
    "ref_moves": 257,
    "cap": 514,
    "cpu_limit_ms": 5000,
-   "par_moves": 136
+   "par_moves": 70
   },
   {
    "n": 6,
@@ -702,7 +702,7 @@
    "ref_moves": 291,
    "cap": 582,
    "cpu_limit_ms": 5000,
-   "par_moves": 145
+   "par_moves": 73
   },
   {
    "n": 6,
@@ -711,7 +711,7 @@
    "ref_moves": 226,
    "cap": 452,
    "cpu_limit_ms": 5000,
-   "par_moves": 118
+   "par_moves": 59
   },
   {
    "n": 6,
@@ -720,7 +720,7 @@
    "ref_moves": 262,
    "cap": 524,
    "cpu_limit_ms": 5000,
-   "par_moves": 125
+   "par_moves": 71
   },
   {
    "n": 6,
@@ -729,7 +729,7 @@
    "ref_moves": 238,
    "cap": 476,
    "cpu_limit_ms": 5000,
-   "par_moves": 133
+   "par_moves": 67
   },
   {
    "n": 6,
@@ -738,7 +738,7 @@
    "ref_moves": 223,
    "cap": 446,
    "cpu_limit_ms": 5000,
-   "par_moves": 110
+   "par_moves": 61
   },
   {
    "n": 6,
@@ -747,7 +747,7 @@
    "ref_moves": 299,
    "cap": 598,
    "cpu_limit_ms": 5000,
-   "par_moves": 139
+   "par_moves": 72
   },
   {
    "n": 6,
@@ -756,7 +756,7 @@
    "ref_moves": 258,
    "cap": 516,
    "cpu_limit_ms": 5000,
-   "par_moves": 152
+   "par_moves": 73
   },
   {
    "n": 6,
@@ -765,7 +765,7 @@
    "ref_moves": 263,
    "cap": 526,
    "cpu_limit_ms": 5000,
-   "par_moves": 135
+   "par_moves": 72
   },
   {
    "n": 6,
@@ -774,7 +774,7 @@
    "ref_moves": 184,
    "cap": 368,
    "cpu_limit_ms": 5000,
-   "par_moves": 118
+   "par_moves": 62
   },
   {
    "n": 6,
@@ -783,7 +783,7 @@
    "ref_moves": 289,
    "cap": 578,
    "cpu_limit_ms": 5000,
-   "par_moves": 159
+   "par_moves": 75
   },
   {
    "n": 6,
@@ -792,7 +792,7 @@
    "ref_moves": 229,
    "cap": 458,
    "cpu_limit_ms": 5000,
-   "par_moves": 138
+   "par_moves": 60
   },
   {
    "n": 6,
@@ -801,7 +801,7 @@
    "ref_moves": 205,
    "cap": 410,
    "cpu_limit_ms": 5000,
-   "par_moves": 138
+   "par_moves": 63
   },
   {
    "n": 6,
@@ -810,7 +810,7 @@
    "ref_moves": 228,
    "cap": 456,
    "cpu_limit_ms": 5000,
-   "par_moves": 124
+   "par_moves": 65
   },
   {
    "n": 7,
@@ -819,7 +819,7 @@
    "ref_moves": 343,
    "cap": 686,
    "cpu_limit_ms": 5000,
-   "par_moves": 240
+   "par_moves": 94
   },
   {
    "n": 7,
@@ -828,7 +828,7 @@
    "ref_moves": 337,
    "cap": 674,
    "cpu_limit_ms": 5000,
-   "par_moves": 241
+   "par_moves": 85
   },
   {
    "n": 7,
@@ -837,7 +837,7 @@
    "ref_moves": 361,
    "cap": 722,
    "cpu_limit_ms": 5000,
-   "par_moves": 236
+   "par_moves": 93
   },
   {
    "n": 7,
@@ -846,7 +846,7 @@
    "ref_moves": 356,
    "cap": 712,
    "cpu_limit_ms": 5000,
-   "par_moves": 218
+   "par_moves": 98
   },
   {
    "n": 7,
@@ -855,7 +855,7 @@
    "ref_moves": 363,
    "cap": 726,
    "cpu_limit_ms": 5000,
-   "par_moves": 243
+   "par_moves": 93
   },
   {
    "n": 7,
@@ -864,7 +864,7 @@
    "ref_moves": 440,
    "cap": 880,
    "cpu_limit_ms": 5000,
-   "par_moves": 222
+   "par_moves": 88
   },
   {
    "n": 7,
@@ -873,7 +873,7 @@
    "ref_moves": 372,
    "cap": 744,
    "cpu_limit_ms": 5000,
-   "par_moves": 248
+   "par_moves": 103
   },
   {
    "n": 7,
@@ -882,7 +882,7 @@
    "ref_moves": 306,
    "cap": 612,
    "cpu_limit_ms": 5000,
-   "par_moves": 226
+   "par_moves": 84
   },
   {
    "n": 7,
@@ -891,7 +891,7 @@
    "ref_moves": 373,
    "cap": 746,
    "cpu_limit_ms": 5000,
-   "par_moves": 232
+   "par_moves": 94
   },
   {
    "n": 7,
@@ -900,7 +900,7 @@
    "ref_moves": 386,
    "cap": 772,
    "cpu_limit_ms": 5000,
-   "par_moves": 245
+   "par_moves": 93
   },
   {
    "n": 7,
@@ -909,7 +909,7 @@
    "ref_moves": 361,
    "cap": 722,
    "cpu_limit_ms": 5000,
-   "par_moves": 247
+   "par_moves": 96
   },
   {
    "n": 7,
@@ -918,7 +918,7 @@
    "ref_moves": 396,
    "cap": 792,
    "cpu_limit_ms": 5000,
-   "par_moves": 231
+   "par_moves": 91
   },
   {
    "n": 7,
@@ -927,7 +927,7 @@
    "ref_moves": 352,
    "cap": 704,
    "cpu_limit_ms": 5000,
-   "par_moves": 230
+   "par_moves": 89
   },
   {
    "n": 7,
@@ -936,7 +936,7 @@
    "ref_moves": 364,
    "cap": 728,
    "cpu_limit_ms": 5000,
-   "par_moves": 242
+   "par_moves": 96
   },
   {
    "n": 7,
@@ -945,7 +945,7 @@
    "ref_moves": 440,
    "cap": 880,
    "cpu_limit_ms": 5000,
-   "par_moves": 248
+   "par_moves": 89
   },
   {
    "n": 7,
@@ -954,7 +954,7 @@
    "ref_moves": 478,
    "cap": 956,
    "cpu_limit_ms": 5000,
-   "par_moves": 254
+   "par_moves": 99
   },
   {
    "n": 7,
@@ -963,7 +963,7 @@
    "ref_moves": 299,
    "cap": 598,
    "cpu_limit_ms": 5000,
-   "par_moves": 206
+   "par_moves": 80
   },
   {
    "n": 7,
@@ -972,7 +972,7 @@
    "ref_moves": 271,
    "cap": 542,
    "cpu_limit_ms": 5000,
-   "par_moves": 205
+   "par_moves": 79
   },
   {
    "n": 7,
@@ -981,7 +981,7 @@
    "ref_moves": 433,
    "cap": 866,
    "cpu_limit_ms": 5000,
-   "par_moves": 252
+   "par_moves": 86
   },
   {
    "n": 7,
@@ -990,7 +990,7 @@
    "ref_moves": 299,
    "cap": 598,
    "cpu_limit_ms": 5000,
-   "par_moves": 226
+   "par_moves": 84
   },
   {
    "n": 7,
@@ -999,7 +999,7 @@
    "ref_moves": 335,
    "cap": 670,
    "cpu_limit_ms": 5000,
-   "par_moves": 227
+   "par_moves": 93
   },
   {
    "n": 7,
@@ -1008,7 +1008,7 @@
    "ref_moves": 368,
    "cap": 736,
    "cpu_limit_ms": 5000,
-   "par_moves": 250
+   "par_moves": 94
   },
   {
    "n": 7,
@@ -1017,7 +1017,7 @@
    "ref_moves": 324,
    "cap": 648,
    "cpu_limit_ms": 5000,
-   "par_moves": 227
+   "par_moves": 87
   },
   {
    "n": 7,
@@ -1026,7 +1026,7 @@
    "ref_moves": 372,
    "cap": 744,
    "cpu_limit_ms": 5000,
-   "par_moves": 249
+   "par_moves": 100
   },
   {
    "n": 7,
@@ -1035,7 +1035,7 @@
    "ref_moves": 372,
    "cap": 744,
    "cpu_limit_ms": 5000,
-   "par_moves": 261
+   "par_moves": 102
   },
   {
    "n": 7,
@@ -1044,7 +1044,7 @@
    "ref_moves": 434,
    "cap": 868,
    "cpu_limit_ms": 5000,
-   "par_moves": 239
+   "par_moves": 87
   },
   {
    "n": 7,
@@ -1053,7 +1053,7 @@
    "ref_moves": 274,
    "cap": 548,
    "cpu_limit_ms": 5000,
-   "par_moves": 207
+   "par_moves": 81
   },
   {
    "n": 7,
@@ -1062,7 +1062,7 @@
    "ref_moves": 309,
    "cap": 618,
    "cpu_limit_ms": 5000,
-   "par_moves": 223
+   "par_moves": 78
   },
   {
    "n": 7,
@@ -1071,7 +1071,7 @@
    "ref_moves": 346,
    "cap": 692,
    "cpu_limit_ms": 5000,
-   "par_moves": 225
+   "par_moves": 93
   },
   {
    "n": 7,
@@ -1080,7 +1080,7 @@
    "ref_moves": 255,
    "cap": 510,
    "cpu_limit_ms": 5000,
-   "par_moves": 195
+   "par_moves": 73
   },
   {
    "n": 8,
@@ -1089,7 +1089,7 @@
    "ref_moves": 419,
    "cap": 838,
    "cpu_limit_ms": 5000,
-   "par_moves": 342
+   "par_moves": 112
   },
   {
    "n": 8,
@@ -1098,7 +1098,7 @@
    "ref_moves": 385,
    "cap": 770,
    "cpu_limit_ms": 5000,
-   "par_moves": 293
+   "par_moves": 115
   },
   {
    "n": 8,
@@ -1107,7 +1107,7 @@
    "ref_moves": 415,
    "cap": 830,
    "cpu_limit_ms": 5000,
-   "par_moves": 307
+   "par_moves": 114
   },
   {
    "n": 8,
@@ -1116,7 +1116,7 @@
    "ref_moves": 386,
    "cap": 772,
    "cpu_limit_ms": 5000,
-   "par_moves": 313
+   "par_moves": 106
   },
   {
    "n": 8,
@@ -1125,7 +1125,7 @@
    "ref_moves": 449,
    "cap": 898,
    "cpu_limit_ms": 5000,
-   "par_moves": 330
+   "par_moves": 116
   },
   {
    "n": 8,
@@ -1134,7 +1134,7 @@
    "ref_moves": 419,
    "cap": 838,
    "cpu_limit_ms": 5000,
-   "par_moves": 328
+   "par_moves": 112
   },
   {
    "n": 8,
@@ -1143,7 +1143,7 @@
    "ref_moves": 432,
    "cap": 864,
    "cpu_limit_ms": 5000,
-   "par_moves": 319
+   "par_moves": 110
   },
   {
    "n": 8,
@@ -1152,7 +1152,7 @@
    "ref_moves": 298,
    "cap": 596,
    "cpu_limit_ms": 5000,
-   "par_moves": 234
+   "par_moves": 91
   },
   {
    "n": 8,
@@ -1161,7 +1161,7 @@
    "ref_moves": 318,
    "cap": 636,
    "cpu_limit_ms": 5000,
-   "par_moves": 241
+   "par_moves": 93
   },
   {
    "n": 8,
@@ -1170,7 +1170,7 @@
    "ref_moves": 404,
    "cap": 808,
    "cpu_limit_ms": 5000,
-   "par_moves": 312
+   "par_moves": 107
   },
   {
    "n": 8,
@@ -1179,7 +1179,7 @@
    "ref_moves": 439,
    "cap": 878,
    "cpu_limit_ms": 5000,
-   "par_moves": 308
+   "par_moves": 115
   },
   {
    "n": 8,
@@ -1188,7 +1188,7 @@
    "ref_moves": 371,
    "cap": 742,
    "cpu_limit_ms": 5000,
-   "par_moves": 305
+   "par_moves": 112
   },
   {
    "n": 8,
@@ -1197,7 +1197,7 @@
    "ref_moves": 391,
    "cap": 782,
    "cpu_limit_ms": 5000,
-   "par_moves": 287
+   "par_moves": 112
   },
   {
    "n": 8,
@@ -1206,7 +1206,7 @@
    "ref_moves": 418,
    "cap": 836,
    "cpu_limit_ms": 6205,
-   "par_moves": 334
+   "par_moves": 115
   },
   {
    "n": 8,
@@ -1215,7 +1215,7 @@
    "ref_moves": 329,
    "cap": 658,
    "cpu_limit_ms": 10185,
-   "par_moves": 243
+   "par_moves": 101
   },
   {
    "n": 8,
@@ -1224,7 +1224,7 @@
    "ref_moves": 439,
    "cap": 878,
    "cpu_limit_ms": 5000,
-   "par_moves": 309
+   "par_moves": 110
   },
   {
    "n": 8,
@@ -1233,7 +1233,7 @@
    "ref_moves": 456,
    "cap": 912,
    "cpu_limit_ms": 5000,
-   "par_moves": 333
+   "par_moves": 117
   },
   {
    "n": 8,
@@ -1242,7 +1242,7 @@
    "ref_moves": 417,
    "cap": 834,
    "cpu_limit_ms": 5000,
-   "par_moves": 300
+   "par_moves": 114
   },
   {
    "n": 8,
@@ -1251,7 +1251,7 @@
    "ref_moves": 447,
    "cap": 894,
    "cpu_limit_ms": 7900,
-   "par_moves": 318
+   "par_moves": 106
   },
   {
    "n": 8,
@@ -1260,7 +1260,7 @@
    "ref_moves": 324,
    "cap": 648,
    "cpu_limit_ms": 9135,
-   "par_moves": 256
+   "par_moves": 94
   },
   {
    "n": 8,
@@ -1269,7 +1269,7 @@
    "ref_moves": 371,
    "cap": 742,
    "cpu_limit_ms": 9380,
-   "par_moves": 252
+   "par_moves": 101
   },
   {
    "n": 8,
@@ -1278,7 +1278,7 @@
    "ref_moves": 433,
    "cap": 866,
    "cpu_limit_ms": 6440,
-   "par_moves": 296
+   "par_moves": 108
   },
   {
    "n": 8,
@@ -1287,7 +1287,7 @@
    "ref_moves": 412,
    "cap": 824,
    "cpu_limit_ms": 5000,
-   "par_moves": 308
+   "par_moves": 114
   },
   {
    "n": 8,
@@ -1296,7 +1296,7 @@
    "ref_moves": 436,
    "cap": 872,
    "cpu_limit_ms": 5000,
-   "par_moves": 309
+   "par_moves": 111
   },
   {
    "n": 8,
@@ -1305,7 +1305,7 @@
    "ref_moves": 421,
    "cap": 842,
    "cpu_limit_ms": 5000,
-   "par_moves": 329
+   "par_moves": 118
   },
   {
    "n": 8,
@@ -1314,7 +1314,7 @@
    "ref_moves": 430,
    "cap": 860,
    "cpu_limit_ms": 5000,
-   "par_moves": 313
+   "par_moves": 110
   },
   {
    "n": 8,
@@ -1323,7 +1323,7 @@
    "ref_moves": 416,
    "cap": 832,
    "cpu_limit_ms": 5000,
-   "par_moves": 317
+   "par_moves": 114
   },
   {
    "n": 8,
@@ -1332,7 +1332,7 @@
    "ref_moves": 443,
    "cap": 886,
    "cpu_limit_ms": 5000,
-   "par_moves": 302
+   "par_moves": 111
   },
   {
    "n": 8,
@@ -1341,7 +1341,7 @@
    "ref_moves": 330,
    "cap": 660,
    "cpu_limit_ms": 5000,
-   "par_moves": 261
+   "par_moves": 104
   },
   {
    "n": 8,
@@ -1350,7 +1350,7 @@
    "ref_moves": 402,
    "cap": 804,
    "cpu_limit_ms": 5000,
-   "par_moves": 312
+   "par_moves": 116
   },
   {
    "n": 9,
@@ -1359,7 +1359,7 @@
    "ref_moves": 560,
    "cap": 1120,
    "cpu_limit_ms": 5000,
-   "par_moves": 361
+   "par_moves": 131
   },
   {
    "n": 9,
@@ -1368,7 +1368,7 @@
    "ref_moves": 598,
    "cap": 1196,
    "cpu_limit_ms": 15070,
-   "par_moves": 363
+   "par_moves": 137
   },
   {
    "n": 9,
@@ -1377,7 +1377,7 @@
    "ref_moves": 520,
    "cap": 1040,
    "cpu_limit_ms": 7080,
-   "par_moves": 382
+   "par_moves": 145
   },
   {
    "n": 9,
@@ -1386,7 +1386,7 @@
    "ref_moves": 621,
    "cap": 1242,
    "cpu_limit_ms": 5000,
-   "par_moves": 380
+   "par_moves": 138
   },
   {
    "n": 9,
@@ -1395,7 +1395,7 @@
    "ref_moves": 634,
    "cap": 1268,
    "cpu_limit_ms": 5000,
-   "par_moves": 381
+   "par_moves": 131
   },
   {
    "n": 9,
@@ -1404,7 +1404,7 @@
    "ref_moves": 609,
    "cap": 1218,
    "cpu_limit_ms": 5000,
-   "par_moves": 368
+   "par_moves": 141
   },
   {
    "n": 9,
@@ -1413,7 +1413,7 @@
    "ref_moves": 549,
    "cap": 1098,
    "cpu_limit_ms": 5000,
-   "par_moves": 344
+   "par_moves": 138
   },
   {
    "n": 9,
@@ -1422,7 +1422,7 @@
    "ref_moves": 585,
    "cap": 1170,
    "cpu_limit_ms": 5000,
-   "par_moves": 364
+   "par_moves": 129
   },
   {
    "n": 9,
@@ -1431,7 +1431,7 @@
    "ref_moves": 607,
    "cap": 1214,
    "cpu_limit_ms": 16375,
-   "par_moves": 368
+   "par_moves": 140
   },
   {
    "n": 9,
@@ -1440,7 +1440,7 @@
    "ref_moves": 605,
    "cap": 1210,
    "cpu_limit_ms": 5000,
-   "par_moves": 378
+   "par_moves": 139
   },
   {
    "n": 9,
@@ -1449,7 +1449,7 @@
    "ref_moves": 451,
    "cap": 902,
    "cpu_limit_ms": 7930,
-   "par_moves": 312
+   "par_moves": 110
   },
   {
    "n": 9,
@@ -1458,7 +1458,7 @@
    "ref_moves": 507,
    "cap": 1014,
    "cpu_limit_ms": 5000,
-   "par_moves": 352
+   "par_moves": 130
   },
   {
    "n": 9,
@@ -1467,7 +1467,7 @@
    "ref_moves": 643,
    "cap": 1286,
    "cpu_limit_ms": 5000,
-   "par_moves": 412
+   "par_moves": 140
   },
   {
    "n": 9,
@@ -1476,7 +1476,7 @@
    "ref_moves": 579,
    "cap": 1158,
    "cpu_limit_ms": 5250,
-   "par_moves": 347
+   "par_moves": 129
   },
   {
    "n": 9,
@@ -1485,7 +1485,7 @@
    "ref_moves": 438,
    "cap": 876,
    "cpu_limit_ms": 5000,
-   "par_moves": 337
+   "par_moves": 129
   },
   {
    "n": 9,
@@ -1494,7 +1494,7 @@
    "ref_moves": 524,
    "cap": 1048,
    "cpu_limit_ms": 8495,
-   "par_moves": 341
+   "par_moves": 131
   },
   {
    "n": 9,
@@ -1503,7 +1503,7 @@
    "ref_moves": 416,
    "cap": 832,
    "cpu_limit_ms": 5000,
-   "par_moves": 338
+   "par_moves": 121
   },
   {
    "n": 9,
@@ -1512,7 +1512,7 @@
    "ref_moves": 520,
    "cap": 1040,
    "cpu_limit_ms": 5000,
-   "par_moves": 330
+   "par_moves": 137
   },
   {
    "n": 9,
@@ -1521,7 +1521,7 @@
    "ref_moves": 427,
    "cap": 854,
    "cpu_limit_ms": 5000,
-   "par_moves": 358
+   "par_moves": 122
   },
   {
    "n": 9,
@@ -1530,7 +1530,7 @@
    "ref_moves": 584,
    "cap": 1168,
    "cpu_limit_ms": 5000,
-   "par_moves": 374
+   "par_moves": 131
   },
   {
    "n": 9,
@@ -1539,7 +1539,7 @@
    "ref_moves": 612,
    "cap": 1224,
    "cpu_limit_ms": 5000,
-   "par_moves": 362
+   "par_moves": 137
   },
   {
    "n": 9,
@@ -1548,7 +1548,7 @@
    "ref_moves": 513,
    "cap": 1026,
    "cpu_limit_ms": 5085,
-   "par_moves": 330
+   "par_moves": 132
   },
   {
    "n": 9,
@@ -1557,7 +1557,7 @@
    "ref_moves": 541,
    "cap": 1082,
    "cpu_limit_ms": 14915,
-   "par_moves": 364
+   "par_moves": 148
   },
   {
    "n": 9,
@@ -1566,7 +1566,7 @@
    "ref_moves": 660,
    "cap": 1320,
    "cpu_limit_ms": 9160,
-   "par_moves": 397
+   "par_moves": 124
   },
   {
    "n": 9,
@@ -1575,7 +1575,7 @@
    "ref_moves": 485,
    "cap": 970,
    "cpu_limit_ms": 5000,
-   "par_moves": 346
+   "par_moves": 135
   },
   {
    "n": 9,
@@ -1584,7 +1584,7 @@
    "ref_moves": 419,
    "cap": 838,
    "cpu_limit_ms": 6385,
-   "par_moves": 339
+   "par_moves": 116
   },
   {
    "n": 9,
@@ -1593,7 +1593,7 @@
    "ref_moves": 527,
    "cap": 1054,
    "cpu_limit_ms": 5000,
-   "par_moves": 351
+   "par_moves": 140
   },
   {
    "n": 9,
@@ -1602,7 +1602,7 @@
    "ref_moves": 705,
    "cap": 1410,
    "cpu_limit_ms": 5000,
-   "par_moves": 400
+   "par_moves": 135
   },
   {
    "n": 9,
@@ -1611,7 +1611,7 @@
    "ref_moves": 495,
    "cap": 990,
    "cpu_limit_ms": 16565,
-   "par_moves": 358
+   "par_moves": 136
   },
   {
    "n": 9,
@@ -1620,7 +1620,7 @@
    "ref_moves": 491,
    "cap": 982,
    "cpu_limit_ms": 5000,
-   "par_moves": 340
+   "par_moves": 127
   },
   {
    "n": 10,
@@ -1629,7 +1629,7 @@
    "ref_moves": 559,
    "cap": 1118,
    "cpu_limit_ms": 14240,
-   "par_moves": 445
+   "par_moves": 142
   },
   {
    "n": 10,
@@ -1638,7 +1638,7 @@
    "ref_moves": 543,
    "cap": 1086,
    "cpu_limit_ms": 6190,
-   "par_moves": 425
+   "par_moves": 147
   },
   {
    "n": 10,
@@ -1647,7 +1647,7 @@
    "ref_moves": 555,
    "cap": 1110,
    "cpu_limit_ms": 5870,
-   "par_moves": 434
+   "par_moves": 156
   },
   {
    "n": 10,
@@ -1656,7 +1656,7 @@
    "ref_moves": 467,
    "cap": 934,
    "cpu_limit_ms": 6120,
-   "par_moves": 359
+   "par_moves": 148
   },
   {
    "n": 10,
@@ -1665,7 +1665,7 @@
    "ref_moves": 595,
    "cap": 1190,
    "cpu_limit_ms": 20660,
-   "par_moves": 436
+   "par_moves": 160
   },
   {
    "n": 10,
@@ -1674,7 +1674,7 @@
    "ref_moves": 539,
    "cap": 1078,
    "cpu_limit_ms": 5000,
-   "par_moves": 421
+   "par_moves": 147
   },
   {
    "n": 10,
@@ -1683,7 +1683,7 @@
    "ref_moves": 680,
    "cap": 1360,
    "cpu_limit_ms": 5710,
-   "par_moves": 428
+   "par_moves": 168
   },
   {
    "n": 10,
@@ -1692,7 +1692,7 @@
    "ref_moves": 672,
    "cap": 1344,
    "cpu_limit_ms": 8005,
-   "par_moves": 423
+   "par_moves": 159
   },
   {
    "n": 10,
@@ -1701,7 +1701,7 @@
    "ref_moves": 530,
    "cap": 1060,
    "cpu_limit_ms": 5000,
-   "par_moves": 424
+   "par_moves": 151
   },
   {
    "n": 10,
@@ -1710,7 +1710,7 @@
    "ref_moves": 555,
    "cap": 1110,
    "cpu_limit_ms": 5000,
-   "par_moves": 457
+   "par_moves": 149
   },
   {
    "n": 10,
@@ -1719,7 +1719,7 @@
    "ref_moves": 642,
    "cap": 1284,
    "cpu_limit_ms": 5000,
-   "par_moves": 446
+   "par_moves": 165
   },
   {
    "n": 10,
@@ -1728,7 +1728,7 @@
    "ref_moves": 593,
    "cap": 1186,
    "cpu_limit_ms": 10065,
-   "par_moves": 419
+   "par_moves": 149
   },
   {
    "n": 10,
@@ -1737,7 +1737,7 @@
    "ref_moves": 576,
    "cap": 1152,
    "cpu_limit_ms": 6250,
-   "par_moves": 404
+   "par_moves": 145
   },
   {
    "n": 10,
@@ -1746,7 +1746,7 @@
    "ref_moves": 415,
    "cap": 830,
    "cpu_limit_ms": 6765,
-   "par_moves": 369
+   "par_moves": 143
   },
   {
    "n": 10,
@@ -1755,7 +1755,7 @@
    "ref_moves": 603,
    "cap": 1206,
    "cpu_limit_ms": 5350,
-   "par_moves": 410
+   "par_moves": 153
   },
   {
    "n": 10,
@@ -1764,7 +1764,7 @@
    "ref_moves": 500,
    "cap": 1000,
    "cpu_limit_ms": 7845,
-   "par_moves": 348
+   "par_moves": 142
   },
   {
    "n": 10,
@@ -1773,7 +1773,7 @@
    "ref_moves": 524,
    "cap": 1048,
    "cpu_limit_ms": 5230,
-   "par_moves": 359
+   "par_moves": 138
   },
   {
    "n": 10,
@@ -1782,7 +1782,7 @@
    "ref_moves": 526,
    "cap": 1052,
    "cpu_limit_ms": 5000,
-   "par_moves": 412
+   "par_moves": 155
   },
   {
    "n": 10,
@@ -1791,7 +1791,7 @@
    "ref_moves": 580,
    "cap": 1160,
    "cpu_limit_ms": 5000,
-   "par_moves": 423
+   "par_moves": 151
   },
   {
    "n": 10,
@@ -1800,7 +1800,7 @@
    "ref_moves": 585,
    "cap": 1170,
    "cpu_limit_ms": 5450,
-   "par_moves": 415
+   "par_moves": 165
   },
   {
    "n": 10,
@@ -1809,7 +1809,7 @@
    "ref_moves": 508,
    "cap": 1016,
    "cpu_limit_ms": 5000,
-   "par_moves": 441
+   "par_moves": 154
   },
   {
    "n": 10,
@@ -1818,7 +1818,7 @@
    "ref_moves": 606,
    "cap": 1212,
    "cpu_limit_ms": 5000,
-   "par_moves": 419
+   "par_moves": 169
   },
   {
    "n": 10,
@@ -1827,7 +1827,7 @@
    "ref_moves": 645,
    "cap": 1290,
    "cpu_limit_ms": 5000,
-   "par_moves": 424
+   "par_moves": 165
   },
   {
    "n": 10,
@@ -1836,7 +1836,7 @@
    "ref_moves": 549,
    "cap": 1098,
    "cpu_limit_ms": 5000,
-   "par_moves": 420
+   "par_moves": 150
   },
   {
    "n": 10,
@@ -1845,7 +1845,7 @@
    "ref_moves": 495,
    "cap": 990,
    "cpu_limit_ms": 5000,
-   "par_moves": 354
+   "par_moves": 149
   },
   {
    "n": 10,
@@ -1854,7 +1854,7 @@
    "ref_moves": 501,
    "cap": 1002,
    "cpu_limit_ms": 5000,
-   "par_moves": 353
+   "par_moves": 147
   },
   {
    "n": 10,
@@ -1863,7 +1863,7 @@
    "ref_moves": 587,
    "cap": 1174,
    "cpu_limit_ms": 5000,
-   "par_moves": 419
+   "par_moves": 151
   },
   {
    "n": 10,
@@ -1872,7 +1872,7 @@
    "ref_moves": 653,
    "cap": 1306,
    "cpu_limit_ms": 5000,
-   "par_moves": 442
+   "par_moves": 160
   },
   {
    "n": 10,
@@ -1881,7 +1881,7 @@
    "ref_moves": 672,
    "cap": 1344,
    "cpu_limit_ms": 5000,
-   "par_moves": 445
+   "par_moves": 156
   },
   {
    "n": 10,
@@ -1890,7 +1890,7 @@
    "ref_moves": 600,
    "cap": 1200,
    "cpu_limit_ms": 14955,
-   "par_moves": 424
+   "par_moves": 149
   }
  ]
 }

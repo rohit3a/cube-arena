@@ -19,7 +19,9 @@ NxN ladder
   par (per case and part, e2e included) = min(reference moves, fewest moves any graded run used on it),
   set per case set from the graded runs (scripts/code2-par.mjs --set), then frozen; past runs rescored
   (--rescore). Practice cubes get a par too, from rerunning the best programs (--practice).
-  2026-10-15: first set from the mini runs; reset once after the full ladder (Sol/Astra medium..max), then frozen.
+  2026-10-15: first set from the mini runs; reset once (06:29 UTC) after the full ladder (12 runs: Sol and
+  Astra at medium, high and max, 2-3 each), every v2 run rescored; frozen since. Practice par from the top 3
+  full programs of each stage.
   (Was 0.9 + 0.1*min(1, ref/moves): our reference is weak on moves, so the move term saturated: Sol scored ~100.)
 - stage score = sum N*mean_N / 49; bench = 100*(centres+edges+finish+e2e)/4.
 - Early stop: > 10% of stage time left -> the same message, up to 5 times a stage (session resumed):

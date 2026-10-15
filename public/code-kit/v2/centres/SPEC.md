@@ -139,13 +139,13 @@ Each hidden cube is worth between 0 and 1:
 
 | Size | Weight | Par (practice mean) | Reference moves | Cap | CPU limit |
 |---|---|---|---|---|---|
-| 4×4 | 4 | 30 | 92 | 184 | 5 s |
-| 5×5 | 5 | 88 | 184 | 369 | 5 s |
-| 6×6 | 6 | 181 | 314 | 628 | 5 s |
-| 7×7 | 7 | 353 | 456 | 912 | 5 s |
-| 8×8 | 8 | 531 | 635 | 1270 | 5 s |
-| 9×9 | 9 | 642 | 838 | 1676 | 5 s |
-| 10×10 | 10 | 891 | 1036 | 2072 | 5 s |
+| 4×4 | 4 | 12 | 92 | 184 | 5 s |
+| 5×5 | 5 | 40 | 184 | 369 | 5 s |
+| 6×6 | 6 | 84 | 314 | 628 | 5 s |
+| 7×7 | 7 | 142 | 456 | 912 | 5 s |
+| 8×8 | 8 | 216 | 635 | 1270 | 5 s |
+| 9×9 | 9 | 307 | 838 | 1676 | 5 s |
+| 10×10 | 10 | 422 | 1036 | 2072 | 5 s |
 
 The stage score is the mean value at each size, weighted by N (weights sum to
 49), over 10 hidden cubes per size: bigger cubes count more.
