@@ -241,7 +241,7 @@ async function levelDetail(ids: string[]): Promise<Map<string, AttemptRow[]>> {
   const rows = await withDb(
     (sql) => sql<AttemptRow[]>`
       select r.suite_id, r.suite_slot as slot, a.id as attempt, a.level, a.status, a.move_count as moves,
-             extract(epoch from (coalesce(a.finished_at, now()) - a.created_at))::int as secs
+             (extract(epoch from (coalesce(a.finished_at, now()) - a.created_at)) - a.paused_secs)::int as secs
       from cube_arena.attempts a join cube_arena.runs r on r.id = a.run_id
       where r.suite_id = any(${sql.array(ok)}::uuid[]) and not r.hidden
       order by r.suite_slot, a.seq`,

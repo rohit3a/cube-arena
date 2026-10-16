@@ -114,7 +114,7 @@ async function allBoardsQuery(): Promise<BoardSection[]> {
         ) b on true
         left join lateral (
           select sum(a.move_count)::int as moves,
-                 extract(epoch from max(coalesce(a.finished_at, now())) - min(a.created_at))::float as secs
+                 extract(epoch from max(coalesce(a.finished_at, now())) - min(a.created_at))::float - sum(a.paused_secs) as secs
           from cube_arena.attempts a where a.run_id = r.id
         ) t on true
         -- Gauntlet ladders (their own top level; the old ones also started 7 moves from solved) stay on the Index.
@@ -133,10 +133,10 @@ async function allBoardsQuery(): Promise<BoardSection[]> {
              count(*) filter (where a.status = 'solved')::int as solved,
              (percentile_cont(0.5) within group (order by a.move_count) filter (where a.status = 'solved'))::float as median_moves,
              (percentile_cont(0.5) within group (order by (r.usage->>'cost_usd')::float) filter (where a.status = 'solved'))::float as median_cost,
-             (percentile_cont(0.5) within group (order by extract(epoch from a.finished_at - a.created_at))
+             (percentile_cont(0.5) within group (order by extract(epoch from a.finished_at - a.created_at) - a.paused_secs)
                filter (where a.status = 'solved'))::float as median_secs,
              max(r.updated_at) as last,
-             (array_agg(a.id order by a.move_count, (r.usage->>'cost_usd')::float nulls last, a.finished_at - a.created_at)
+             (array_agg(a.id order by a.move_count, (r.usage->>'cost_usd')::float nulls last, extract(epoch from a.finished_at - a.created_at) - a.paused_secs)
                filter (where a.status = 'solved'))[1] as best_attempt,
              coalesce((array_agg(r.client order by a.move_count) filter (where a.status = 'solved'))[1], max(r.client)) as client
       from cube_arena.runs r join cube_arena.attempts a on a.run_id = r.id

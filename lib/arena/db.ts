@@ -204,6 +204,8 @@ export interface AttemptRow {
   invalid: number;
   status: 'active' | 'solved' | 'failed' | 'gave_up' | 'timeout' | 'stopped' | 'invalid';
   detail: string | null;
+  /** Seconds the operator held the runner's session paused; never counted as the model's time. */
+  paused_secs: number;
   /** Unused since suites v2 (no clocks); older attempts have one. */
   deadline_at: Date | null;
   finished_at: Date | null;

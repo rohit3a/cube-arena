@@ -65,9 +65,10 @@ function crumbs(r: NonNullable<Awaited<ReturnType<typeof replay>>>): Crumb[] {
   ];
 }
 
-function duration(from: Date, to: Date | null) {
+/** Time on the attempt, less any pause (the operator froze the runner's session). */
+function duration(from: Date, to: Date | null, paused = 0) {
   if (!to) return '–';
-  const s = Math.round((new Date(to).getTime() - new Date(from).getTime()) / 1000);
+  const s = Math.round((new Date(to).getTime() - new Date(from).getTime()) / 1000) - paused;
   return s < 120 ? `${s}s` : `${Math.floor(s / 60)}m ${s % 60}s`;
 }
 
@@ -199,7 +200,7 @@ export default async function ReplayPage({ params }: Props) {
             </div>
             <div>
               <dt>Time</dt>
-              <dd>{duration(a.created_at, a.finished_at)}</dd>
+              <dd>{duration(a.created_at, a.finished_at, a.paused_secs)}</dd>
             </div>
           </dl>
 

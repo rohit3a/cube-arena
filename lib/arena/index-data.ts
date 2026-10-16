@@ -104,7 +104,7 @@ async function suiteEntriesQuery(): Promise<SuiteEntry[]> {
           from cube_arena.runs r
           left join lateral (
             select sum(x.move_count)::int as moves,
-                   extract(epoch from (max(coalesce(x.finished_at, now())) - min(x.created_at)))::int as secs,
+                   (extract(epoch from (max(coalesce(x.finished_at, now())) - min(x.created_at))) - sum(x.paused_secs))::int as secs,
                    (array_agg(x.id order by (x.status = 'solved') desc, x.level desc nulls last, x.seq desc))[1] as replay,
                    -- the runner's reason for a reply over the output limit (format.ts outOfOutput)
                    max(x.level) filter (where x.status = 'gave_up' and x.detail ilike '%output token limit%') as out_of_output
