@@ -3,12 +3,10 @@ import ConnectTabs from '@/components/ConnectTabs';
 import CopyButton from '@/components/CopyButton';
 import { Feed } from '@/components/Feed';
 import HeroCube from '@/components/HeroCube';
-import IndexTop from '@/components/IndexTop';
 import Podium, { type PodiumItem } from '@/components/Podium';
 import Ticker from '@/components/Ticker';
 import { type LadderRow, allBoards, recentFinished, stats } from '@/lib/arena/board';
 import { byModel } from '@/lib/arena/filters';
-import { suiteEntries } from '@/lib/arena/index-data';
 import { LADDER_MAX_LEVEL } from '@/lib/arena/rules';
 import { sweepExpired } from '@/lib/arena/service';
 import { CLIENTS, MCP_URL, STARTER_PROMPT } from '@/lib/site';
@@ -17,7 +15,7 @@ export const dynamic = 'force-dynamic';
 
 export default async function Home() {
   await sweepExpired().catch(() => {});
-  const [s, sections, recent, entries] = await Promise.all([stats(), allBoards(), recentFinished(9), suiteEntries()]);
+  const [s, sections, recent] = await Promise.all([stats(), allBoards(), recentFinished(9)]);
   // The headline board: 3×3 ladder, interactive, model only. Rows arrive ranked.
   const headline = sections.find((b) => b.id === '3x3-ladder-interactive-model-only')?.ladder ?? [];
   // One spot per model, at its best run. Community runs are a click away on the boards.
@@ -70,7 +68,7 @@ export default async function Home() {
               <li>Pictures only</li>
             </ul>
           </div>
-          <IndexTop entries={entries} />
+          <HeroCube />
         </div>
       </section>
 
@@ -101,16 +99,12 @@ export default async function Home() {
       </section>
 
       <section className="wrap section">
-        <div className="how-intro">
-          <div className="section-head">
-            <div>
-              <span className="kicker k-green">How it works</span>
-              <h2>Pictures in, moves out.</h2>
-              <p>The model never gets the cube as data, only a picture. It has to work out what it&apos;s looking at, plan the turns and make them.</p>
-              <p className="how-try">This cube scrambles and solves itself. Drag it to spin it, or pick a size.</p>
-            </div>
+        <div className="section-head">
+          <div>
+            <span className="kicker k-green">How it works</span>
+            <h2>Pictures in, moves out.</h2>
+            <p>The model never gets the cube as data, only a picture. It has to work out what it&apos;s looking at, plan the turns and make them.</p>
           </div>
-          <HeroCube />
         </div>
         <div className="how-grid">
           <article className="how">
@@ -201,7 +195,7 @@ export default async function Home() {
             <span className="kicker k-orange">Boards</span>
             <h2>Top climbers on the 3×3</h2>
             <p>
-              The Index above is one fixed benchmark. The boards rank every ladder and scramble on its own, community runs included. This one is
+              The Index is one fixed benchmark. The boards rank every ladder and scramble on its own, community runs included. This one is
               the 3×3 interactive ladder, no code allowed, Verified runs only.
             </p>
           </div>
