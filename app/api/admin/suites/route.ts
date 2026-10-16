@@ -6,13 +6,15 @@
 //   POST /api/admin/suites {kind, model_name, model, model_id, effort, agent}   operator only: any name
 //   POST /api/admin/suites {id, finish: true}       close it (hidden if a test is missing or stopped)
 //   POST /api/admin/suites {id, alive: true}        heartbeat: the runner is still playing it (every few minutes)
+//   POST /api/admin/suites {id, lost: {from, to}}   operator only: a session lost through no fault of the model, from its
+//                                                   start to the next one's; left out of the waiting cube's time
 // Hiding a suite goes through /api/admin/runs with the suite id.
 import { getSuite, listSuites } from '@/lib/arena/admin';
 import { type Auth, authFrom, deny } from '@/lib/arena/auth';
 import { type Harness, HARNESSES, catalogModel, labelOf } from '@/lib/arena/catalog';
 import { claimFor } from '@/lib/arena/claims';
 import type { SuiteRow } from '@/lib/arena/db';
-import { closeSuite, createSuite, heartbeat } from '@/lib/arena/service';
+import { addLostTime, closeSuite, createSuite, heartbeat } from '@/lib/arena/service';
 import { SUITES, SUITE_KINDS, type SuiteKind } from '@/lib/arena/suites';
 import { MIN_SUITE_RUNNER, RUNNER_INSTALL, runnerAtLeast } from '@/lib/site';
 
@@ -58,6 +60,16 @@ export async function POST(req: Request) {
     const suite = await getSuite(str(body.id) ?? '');
     if (!suite || !owns(auth, suite)) return noSuite();
     return Response.json({ alive: await heartbeat(suite.id) });
+  }
+
+  if (body.lost && typeof body.lost === 'object') {
+    if (auth.role !== 'operator') return deny(badCode);
+    const suite = await getSuite(str(body.id) ?? '');
+    if (!suite) return noSuite();
+    const { from, to } = body.lost as { from?: unknown; to?: unknown };
+    const [f, t] = [new Date(String(from)), new Date(String(to))];
+    if (Number.isNaN(f.getTime()) || Number.isNaN(t.getTime())) return bad('lost needs from and to as ISO times');
+    return Response.json({ lost: await addLostTime(suite.id, f, t) });
   }
 
   if (body.finish === true) {

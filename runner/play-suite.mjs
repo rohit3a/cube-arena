@@ -86,8 +86,16 @@ async function playSlots(p, slots, label) {
     const what = describe(t);
     console.log(`\n=== ${label} ${k + 1}/${slots.length}: ${what} ===`);
     let waited = 0;
+    // When a session is lost through no fault of the model, its time and the wait are left out of the cube's time.
+    let lostFrom = null;
     for (let tries = 0; ; tries++) {
-      const stamp = new Date().toISOString().replace(/[:.]/g, '-');
+      const started = new Date();
+      if (lostFrom)
+        await call('/api/admin/suites', { id: suite.id, lost: { from: lostFrom.toISOString(), to: started.toISOString() } })
+          .then((x) => x.lost && console.log(`  ${Math.round(x.lost.secs / 60)} min left out of the cube's time (not the model's doing)`))
+          .catch((e) => console.log(`  (could not leave the lost time out: ${e.message})`));
+      lostFrom = null;
+      const stamp = started.toISOString().replace(/[:.]/g, '-');
       const prompt =
         `Let's play Cube Arena. First call get_rules. Then call next_test with suite_id "${suite.id}": it ${tries ? 'picks your test back up where the cube was left' : 'starts your test'} ` +
         `(${label === 'test' ? 'test' : `${label} test`} ${k + 1} of ${slots.length}: ${what}, no time limit). Solve each cube from the pictures only, in as few moves as you can. ` +
@@ -122,6 +130,7 @@ async function playSlots(p, slots, label) {
         return { breach: null, result: null, suite, stopped: r.retry };
       }
       console.log(`  not the model's doing (${r.retry}). Trying this test again in ${wait} min; the cube waits where it is.`);
+      lostFrom = started;
       await new Promise((res) => setTimeout(res, wait * 60_000));
       waited += wait;
     }

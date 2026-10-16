@@ -23,6 +23,8 @@ export interface SuiteRunInfo {
   /** Every move made in the run, failed attempts included. */
   moves: number;
   secs: number;
+  /** Time left out of `secs` that wasn't the model's doing: a pause of ours, sessions lost to API errors. */
+  paused_secs: number;
   /** The attempt to show for this run: its best solve, else its last try. */
   replay: string | null;
   via: string;
@@ -66,6 +68,8 @@ export interface SuiteEntry {
   solved: number;
   moves_per_solve: number | null;
   secs: number;
+  /** Time left out of `secs` that wasn't the model's doing: a pause of ours, sessions lost to API errors. */
+  paused_secs: number;
   input_tokens: number | null;
   output_tokens: number | null;
   cost_usd: number | null;
@@ -99,12 +103,13 @@ async function suiteEntriesQuery(): Promise<SuiteEntry[]> {
           select json_agg(json_build_object(
             'slot', r.suite_slot, 'run_id', r.id, 'status', r.status, 'end_reason', r.end_reason,
             'best_level', r.best_level, 'top_level', r.top_level, 'solves', r.solves, 'usage', r.usage, 'client', r.client,
-            'moves', coalesce(a.moves, 0), 'secs', coalesce(a.secs, 0), 'replay', a.replay, 'out_of_output', a.out_of_output
+            'moves', coalesce(a.moves, 0), 'secs', coalesce(a.secs, 0), 'paused_secs', coalesce(a.paused_secs, 0), 'replay', a.replay, 'out_of_output', a.out_of_output
           ) order by r.suite_slot)
           from cube_arena.runs r
           left join lateral (
             select sum(x.move_count)::int as moves,
                    (extract(epoch from (max(coalesce(x.finished_at, now())) - min(x.created_at))) - sum(x.paused_secs))::int as secs,
+                   sum(x.paused_secs)::int as paused_secs,
                    (array_agg(x.id order by (x.status = 'solved') desc, x.level desc nulls last, x.seq desc))[1] as replay,
                    -- the runner's reason for a reply over the output limit (format.ts outOfOutput)
                    max(x.level) filter (where x.status = 'gave_up' and x.detail ilike '%output token limit%') as out_of_output
@@ -172,6 +177,7 @@ async function suiteEntriesQuery(): Promise<SuiteEntry[]> {
         solved,
         moves_per_solve: solved > 0 ? moves / solved : null,
         secs: s.runs.reduce((a, r) => a + r.secs, 0),
+        paused_secs: s.runs.reduce((a, r) => a + (r.paused_secs ?? 0), 0),
         input_tokens: tokens('input_tokens'),
         output_tokens: tokens('output_tokens'),
         cost_usd: s.runs.length ? cost : null,

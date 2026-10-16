@@ -9,7 +9,7 @@ import { modelHref } from '@/lib/arena/catalog';
 import { clientLabel } from '@/lib/arena/clients';
 import { CHALLENGE_LABEL, GAUNTLET, MODE_LABEL, TOOL_USE_LABEL, levelDepth, levelLabel } from '@/lib/arena/rules';
 import { testName } from '@/lib/arena/suites';
-import { OUT_OF_OUTPUT, OUT_OF_OUTPUT_WHY, outOfOutput } from '@/lib/arena/format';
+import { OUT_OF_OUTPUT, OUT_OF_OUTPUT_WHY, fmtDuration, outOfOutput } from '@/lib/arena/format';
 import { latestWriteup, liveValues } from '@/lib/arena/writeups';
 
 export const dynamic = 'force-dynamic';
@@ -206,7 +206,14 @@ export default async function ReplayPage({ params }: Props) {
             </div>
             <div>
               <dt>Time</dt>
-              <dd>{duration(a.created_at, a.finished_at, a.paused_secs)}</dd>
+              <dd>
+                {duration(a.created_at, a.finished_at, a.paused_secs)}
+                {a.paused_secs > 0 && (
+                  <small className="muted" title="A pause of ours, or sessions lost to API errors" style={{ display: 'block', fontSize: '0.78rem' }}>
+                    leaves out {fmtDuration(a.paused_secs)}, not the model&apos;s doing
+                  </small>
+                )}
+              </dd>
             </div>
           </dl>
 

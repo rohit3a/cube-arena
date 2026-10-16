@@ -739,6 +739,26 @@ export async function heartbeat(suiteId: string): Promise<boolean> {
   });
 }
 
+/**
+ * Operator only: a session ended through no fault of the model (an API error, a safeguard flag) and a fresh one picked
+ * the cube up. The time from `from` (the lost session's start) to `to` (the next one's start) is added to the waiting
+ * cube's paused time, which every time shown leaves out. Returns the cube and the seconds added, or null with no cube
+ * waiting.
+ */
+export async function addLostTime(suiteId: string, from: Date, to: Date): Promise<{ attempt: string; secs: number } | null> {
+  if (!UUID.test(suiteId) || !(to > from)) return null;
+  return transaction(async (tx) => {
+    const [a] = await tx<{ id: string; created_at: Date }[]>`
+      select a.id, a.created_at from cube_arena.attempts a join cube_arena.runs r on r.id = a.run_id
+      where r.suite_id = ${suiteId} and a.status = 'active' order by a.created_at desc limit 1 for update of a`;
+    if (!a) return null;
+    const start = Math.max(from.getTime(), new Date(a.created_at).getTime());
+    const secs = Math.min(24 * 3600, Math.max(0, Math.round((to.getTime() - start) / 1000)));
+    if (secs) await tx`update cube_arena.attempts set paused_secs = paused_secs + ${secs} where id = ${a.id}`;
+    return { attempt: a.id, secs };
+  });
+}
+
 /** Operator only: closes a suite now (hidden if a test is missing). Returns its result line, or null if there is no such suite. */
 export async function closeSuite(id: string): Promise<string | null> {
   if (!UUID.test(id)) return null;

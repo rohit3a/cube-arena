@@ -34,6 +34,7 @@ const entry = (o: Partial<SuiteEntry> & { at: string }): SuiteEntry => {
     solved: 0,
     moves_per_solve: null,
     secs: 600,
+    paused_secs: 0,
     input_tokens: 1000,
     output_tokens: 100,
     cost_usd: null,

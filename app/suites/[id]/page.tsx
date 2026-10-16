@@ -84,6 +84,7 @@ export default async function SuitePage(props: { params: Promise<{ id: string }>
         <div className="kpi">
           <span>Time</span>
           <strong>{fmtDuration(e.secs)}</strong>
+          {e.paused_secs > 0 && <em title="A pause of ours, or sessions lost to API errors">{fmtDuration(e.paused_secs)} left out, not the model's doing</em>}
         </div>
         <div className="kpi">
           <span>Tokens</span>

@@ -67,6 +67,7 @@ export function demoEntries(): SuiteEntry[] {
           solved,
           moves_per_solve: solved ? moves / solved : null,
           secs: 600 + i * 420 + ((n * 97) % 600),
+          paused_secs: 0,
           input_tokens: 200_000 * (i + 1),
           output_tokens: 9_000 * (i + 1) ** 2,
           cost_usd: (slug.includes('opus') || slug.includes('astra') ? 0.9 : slug.includes('luna') || slug.includes('haiku') ? 0.03 : 0.25) * (i + 1),

@@ -278,7 +278,7 @@ export async function suiteFacts(id: string): Promise<SuiteFacts | null> {
     const name = testName(slot).name;
     if (sessions > 1) notes.push(`${name}: played over ${sessions} sessions. A session ended by an API error or by us is not the model's doing; the next one picked the same cube up where it was.`);
     for (const a of mine.filter((x) => x.paused_secs > 0)) {
-      notes.push(`${name}, level ${a.level}: we paused the run for ${Math.round(a.paused_secs / 60)} min. That time is left out of every time shown, and the model lost nothing by it.`);
+      notes.push(`${name}, level ${a.level}: ${Math.round(a.paused_secs / 60)} min of this cube's time was not the model's doing (a pause of ours, or sessions lost to API errors). It is left out of every time shown, and the model lost nothing by it.`);
     }
     const u = r.usage as Record<string, number> | null;
     return {
