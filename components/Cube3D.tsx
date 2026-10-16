@@ -60,9 +60,10 @@ function Model({ n, initial, controller }: { n: number; initial: CubeState; cont
     const pivot = new THREE.Group();
     root.add(pivot);
     const cubies = new Map<string, { group: THREE.Group; home: THREE.Vector3; coord: [number, number, number] }>();
-    const body = new THREE.MeshStandardMaterial({ color: '#0b0b0e', roughness: 0.55, metalness: 0.05 });
+    // Unlit: every sticker shows its exact colour from any angle, with no shading or highlights.
+    const body = new THREE.MeshBasicMaterial({ color: '#0b0b0e' });
     const box = new THREE.BoxGeometry(0.97, 0.97, 0.97);
-    const mats: THREE.MeshStandardMaterial[] = [];
+    const mats: THREE.MeshBasicMaterial[] = [];
     for (const s of stickers(n)) {
       const key = s.pos.join(',');
       let c = cubies.get(key);
@@ -75,7 +76,7 @@ function Model({ n, initial, controller }: { n: number; initial: CubeState; cont
         c = { group, home, coord: [...s.pos] as [number, number, number] };
         cubies.set(key, c);
       }
-      const mat = new THREE.MeshStandardMaterial({ color: STICKER_COLOUR.U, roughness: 0.32, side: THREE.FrontSide });
+      const mat = new THREE.MeshBasicMaterial({ color: STICKER_COLOUR.U, side: THREE.FrontSide });
       const mesh = new THREE.Mesh(STICKER, mat);
       const normal = new THREE.Vector3(...s.normal);
       mesh.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), normal);
@@ -184,9 +185,6 @@ export default function Cube3D({
   return (
     <div className={className}>
       <Canvas flat camera={{ position: [cam.x, cam.y, cam.z], fov: 32 }} dpr={[1, 2]} gl={{ antialias: true, alpha: true }}>
-        <ambientLight intensity={2.3} />
-        <directionalLight position={[5, 8, 6]} intensity={2.2} />
-        <directionalLight position={[-6, -4, -5]} intensity={0.9} />
         <Model key={n} n={n} initial={start} controller={controller ?? fallback} />
         <OrbitControls enablePan={false} enableZoom={false} autoRotate={autoRotate} autoRotateSpeed={0.9} />
       </Canvas>
