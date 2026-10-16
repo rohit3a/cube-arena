@@ -2,6 +2,7 @@
 // transcripts), plus the few calls an invitee's runner may make on its own
 // suites. Reached through app/api/admin/*.
 
+import { gunzipSync, gzipSync } from 'node:zlib';
 import { catalogModel, listCost } from './catalog';
 import { clientLabel } from './clients';
 import { type SuiteRow, type Usage, UUID, transaction, withDb } from './db';
@@ -214,13 +215,26 @@ export async function revokeInvite(id: string, hideSuites: boolean): Promise<num
 
 export const TRANSCRIPT_MAX_BYTES = 512 * 1024;
 
+/**
+ * Saves one session's digest. A test picked up again after an API error is played over more than one session:
+ * each later session is added to the run's digest as `sessions` (the earliest first), never written over it.
+ */
 export async function saveTranscript(runId: string, gz: Buffer): Promise<boolean> {
   if (!UUID.test(runId)) return false;
-  const rows = await withDb((sql) => sql`
-    insert into cube_arena.transcripts (run_id, bytes, gz) values (${runId}, ${gz.length}, ${gz})
-    on conflict (run_id) do update set gz = excluded.gz, bytes = excluded.bytes, created_at = now()
-    returning run_id`);
-  return rows.length > 0;
+  return transaction(async (tx) => {
+    const [had] = await tx<{ gz: Buffer }[]>`select gz from cube_arena.transcripts where run_id = ${runId} for update`;
+    let body = gz;
+    if (had) {
+      const old = JSON.parse(gunzipSync(had.gz).toString('utf8'));
+      const sessions = Array.isArray(old.sessions) ? old.sessions : [old];
+      body = gzipSync(JSON.stringify({ sessions: [...sessions, JSON.parse(gunzipSync(gz).toString('utf8'))] }));
+    }
+    const rows = await tx`
+      insert into cube_arena.transcripts (run_id, bytes, gz) values (${runId}, ${body.length}, ${body})
+      on conflict (run_id) do update set gz = excluded.gz, bytes = excluded.bytes, created_at = now()
+      returning run_id`;
+    return rows.length > 0;
+  });
 }
 
 export async function getTranscript(runId: string): Promise<Buffer | null> {

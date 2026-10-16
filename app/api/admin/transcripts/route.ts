@@ -1,5 +1,6 @@
 // Audit transcripts: a gzipped JSON digest of one test session (what the model
-// said and every tool call, no pictures).
+// said and every tool call, no pictures). A test played over more than one session (picked up after an API
+// error) keeps them all: { sessions: [first, second, …] }.
 //   POST /api/admin/transcripts?run_id=…   body: the gzip bytes. Operator, or the invitee whose suite it is.
 //   GET  /api/admin/transcripts?run_id=…   the digest as JSON. Operator only.
 import { gunzipSync } from 'node:zlib';
