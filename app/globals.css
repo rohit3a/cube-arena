@@ -860,67 +860,138 @@ kbd {
   margin-top: 20px;
 }
 
-/* The Index card in the hero: the top models on Fast, as bars. */
-.ix-top {
-  width: 100%;
-  max-width: 520px;
-  justify-self: end;
-  padding: 22px 20px 18px;
-  box-shadow: var(--shadow-lg);
+/* ---------- Home: the benchmarks ---------- */
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
 }
 
-.ix-top-head {
-  padding-inline: 8px;
-  margin-bottom: 12px;
+.ixb {
+  padding: 22px 22px 18px;
 }
 
-.ix-top-head h2 {
-  font-size: 1.4rem;
+.ixb-top {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px 20px;
+  padding: 0 8px 14px;
 }
 
-.ix-top-head p {
-  margin-top: 4px;
-  font-family: var(--font-mono);
+.ixb-suite,
+.ixb-running {
+  margin: 0;
+  font-size: 0.9rem;
+  color: var(--text-2);
+}
+
+.ixb-suite b {
+  color: var(--text);
+}
+
+.ixb-makers {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
   font-size: 0.8rem;
+  color: var(--text-2);
+}
+
+.ixb-makers li {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.ixb-makers i {
+  width: 11px;
+  height: 11px;
+  border: 1.5px solid var(--line);
+  border-radius: 3px;
+}
+
+.ixb-running {
+  flex-basis: 100%;
+}
+
+.ixb-running .live-dot {
+  display: inline-block;
+  margin-right: 4px;
+  vertical-align: 1px;
+}
+
+.ixb-head,
+.ixb-row {
+  display: grid;
+  grid-template-columns: 32px minmax(0, 1.5fr) minmax(150px, 1fr) auto 84px 64px;
+  align-items: center;
+  column-gap: 16px;
+}
+
+.ixb-head {
+  padding: 10px 10px;
+  border-top: var(--bw) solid var(--line);
+  border-bottom: var(--bw) solid var(--line);
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
   color: var(--text-3);
 }
 
-.ix-top-list {
+.ixb-head .ixb-tests > span {
   display: grid;
-  gap: 2px;
+  justify-items: center;
+  line-height: 1.25;
+  text-align: center;
+  text-transform: none;
+}
+
+.ixb-head .ixb-tests b {
+  color: var(--text-2);
+}
+
+.ixb-head .ixb-tests i,
+.ixb-head .ixb-tests em {
+  font-family: var(--font-body);
+  font-size: 0.7rem;
+  font-style: normal;
+  font-weight: 500;
+}
+
+.ixb-list {
   margin: 0;
   padding: 0;
   list-style: none;
 }
 
-.ix-top-row {
-  display: grid;
-  grid-template-columns: 30px minmax(0, 1fr) auto;
-  grid-template-areas:
-    'rank name score'
-    'rank bar bar';
-  align-items: center;
-  column-gap: 12px;
-  row-gap: 6px;
-  padding: 7px 8px;
-  border-radius: 12px;
-  color: var(--text);
-  text-decoration: none;
+.ixb-row {
+  padding: 12px 10px;
+  border-bottom: 1.5px dashed var(--rule);
 }
 
-.ix-top-row:hover {
+.ixb-row:last-child {
+  border-bottom: 0;
+}
+
+.ixb-row:hover {
   background: var(--hover);
 }
 
-.ix-top-row:hover b {
-  text-decoration: underline;
-  text-decoration-color: var(--orange);
-  text-decoration-thickness: 2px;
-  text-underline-offset: 3px;
-}
-
-.ix-top-rank {
-  grid-area: rank;
+.ixb-rank {
   display: grid;
   place-items: center;
   width: 30px;
@@ -933,32 +1004,49 @@ kbd {
   font-weight: 800;
 }
 
-.ix-top-list li:first-child .ix-top-rank {
+.ixb-list > li:first-child .ixb-rank,
+.bench-list > li:first-child .ixb-rank {
   background: var(--yellow);
   color: var(--on-color);
 }
 
-.ix-top-name {
-  grid-area: name;
+.ixb-model {
   min-width: 0;
-  overflow: hidden;
-  white-space: nowrap;
-  text-overflow: ellipsis;
 }
 
-.ix-top-name b {
+.ixb-name {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--text);
   font-weight: 700;
+  text-decoration: none;
 }
 
-.ix-top-name small {
-  margin-left: 7px;
+.ixb-name:hover {
+  text-decoration: underline;
+  text-decoration-color: var(--orange);
+  text-decoration-thickness: 2px;
+  text-underline-offset: 3px;
+}
+
+.ixb-effort,
+.ixb-tag {
+  white-space: nowrap;
+}
+
+.ixb-effort {
+  margin-left: 4px;
+  padding: 1px 7px;
+  border-radius: 6px;
+  background: var(--bg-2);
   font-family: var(--font-mono);
-  font-size: 0.76rem;
-  color: var(--text-3);
+  font-size: 0.74rem;
+  color: var(--text-2);
 }
 
-.ix-top-name em {
-  margin-left: 7px;
+.ixb-tag {
+  margin-left: 6px;
   padding: 1px 6px;
   border: 1.5px dashed var(--text-3);
   border-radius: 6px;
@@ -968,88 +1056,263 @@ kbd {
   color: var(--text-2);
 }
 
-.ix-top-score {
-  grid-area: score;
-  font-family: var(--font-mono);
-  font-weight: 800;
+.ixb-others {
+  display: block;
+  margin-top: 3px;
+  font-size: 0.8rem;
+  color: var(--text-3);
 }
 
-.ix-top-bar {
-  grid-area: bar;
+.ixb-others a {
+  color: var(--text-2);
+  text-decoration-color: var(--rule);
+  text-decoration-thickness: 1.5px;
+}
+
+.ixb-others a:hover {
+  color: var(--text);
+  text-decoration-color: var(--orange);
+}
+
+.ixb-score {
+  display: grid;
+  grid-template-columns: 3.4ch minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
+}
+
+.ixb-score b {
+  font-family: var(--font-mono);
+  font-size: 1.1rem;
+  font-weight: 800;
+  text-align: right;
+}
+
+.ixb-bar {
+  position: relative;
   display: block;
-  height: 12px;
-  overflow: hidden;
+  height: 14px;
   border: var(--bw) solid var(--line);
   border-radius: 7px;
   background: var(--bg-2);
 }
 
-.ix-top-bar i {
+.ixb-bar i {
   display: block;
   height: 100%;
+  border-radius: 5px 0 0 5px;
   border-right: var(--bw) solid var(--line);
 }
 
-.ix-top-foot {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px 16px;
-  margin-top: 14px;
-  padding: 14px 8px 0;
-  border-top: 1.5px dashed var(--rule);
-}
-
-.ix-top-makers {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px 14px;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-  font-size: 0.8rem;
-  color: var(--text-2);
-}
-
-.ix-top-makers li {
-  display: inline-flex;
-  align-items: center;
+.ixb-tests {
+  display: grid;
+  grid-template-columns: repeat(5, 60px);
   gap: 6px;
 }
 
-.ix-top-makers i {
-  width: 11px;
-  height: 11px;
-  border: 1.5px solid var(--line);
-  border-radius: 3px;
+.ixb-tile {
+  position: relative;
+  display: grid;
+  place-items: center;
+  height: 34px;
+  border: var(--bw) solid var(--line);
+  border-radius: 9px;
+  background: var(--bg-2);
+  font-family: var(--font-mono);
+  font-size: 0.86rem;
+  font-weight: 800;
 }
 
-.ix-top-more {
+a.ixb-tile {
+  text-decoration: none;
+  transition: transform 0.15s var(--spring);
+}
+
+a.ixb-tile:hover {
+  transform: translate(-1px, -2px);
+  box-shadow: var(--shadow-sm);
+}
+
+.ixb-tile.locked,
+.ixb-tile.open {
+  border-style: dashed;
+  border-color: var(--text-3);
+  background: transparent;
+  color: var(--text-3);
+  font-weight: 600;
+}
+
+.ixb-tile.open {
+  color: var(--warn);
+}
+
+.ixb-lab,
+.ixb-key {
+  display: none;
+}
+
+.ixb-oo {
+  position: absolute;
+  top: 1px;
+  right: 4px;
+  font-size: 0.7rem;
+}
+
+.ixb-num {
+  font-family: var(--font-mono);
+  font-size: 0.9rem;
+  text-align: right;
+}
+
+.ixb-head .ixb-num {
+  font-size: 0.68rem;
+}
+
+/* Shown on phones, where the column headers are gone; read out everywhere. */
+.ixb-k {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+}
+
+.ixb-foot {
+  margin-top: 6px;
+  padding: 14px 10px 0;
+  border-top: var(--bw) solid var(--line);
+  font-size: 0.84rem;
+  color: var(--text-3);
+}
+
+.ixb-foot p {
+  margin: 0;
+}
+
+.ixb-foot .ix-waiting {
+  margin-top: 8px;
+}
+
+.ixb-empty {
+  padding: 30px 10px;
+  color: var(--text-3);
+}
+
+.bench-pair {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: stretch;
+  gap: 26px;
+}
+
+.bench-card {
+  display: flex;
+  flex-direction: column;
+}
+
+.bench-card .kicker {
+  align-self: flex-start;
+}
+
+.bench-card h3 {
+  margin-top: 12px;
+  font-size: 1.55rem;
+  font-weight: 800;
+}
+
+.bench-blurb {
+  margin: 8px 0 16px;
+  font-size: 0.95rem;
+  color: var(--text-2);
+}
+
+.bench-list {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.bench-list li {
+  display: grid;
+  grid-template-columns: 30px minmax(0, 1fr) auto;
+  grid-template-areas:
+    'rank name score'
+    'rank bar bar';
+  align-items: center;
+  column-gap: 12px;
+  row-gap: 6px;
+  padding: 6px 0;
+}
+
+.bench-list .ixb-rank {
+  grid-area: rank;
+}
+
+.bench-name {
+  grid-area: name;
+  min-width: 0;
   font-weight: 700;
 }
 
-.ix-top-empty {
-  padding: 30px 8px;
+.bench-name a {
+  color: var(--text);
+  text-decoration: none;
+}
+
+.bench-name a:hover {
+  text-decoration: underline;
+  text-decoration-color: var(--orange);
+}
+
+.bench-sub {
+  margin-left: 8px;
+  font-size: 0.78rem;
+  font-weight: 500;
   color: var(--text-3);
 }
 
-/* How it works: the self-solving cube beside the intro. */
-.how-intro {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 340px);
-  align-items: center;
-  gap: 24px 40px;
-  margin-bottom: 30px;
+.bench-score {
+  grid-area: score;
+  font-family: var(--font-mono);
+  font-weight: 800;
 }
 
-.how-intro .section-head {
-  margin-bottom: 0;
-}
-
-.how-intro .how-try {
-  font-size: 0.95rem;
+.bench-score small {
+  font-size: 0.75rem;
+  font-weight: 600;
   color: var(--text-3);
+}
+
+.bench-sub a {
+  color: var(--text-2);
+  text-decoration-color: var(--rule);
+}
+
+.bench-list .ixb-bar {
+  grid-area: bar;
+  height: 12px;
+}
+
+.bench-more {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 6px 16px;
+  margin: auto 0 0;
+  padding-top: 16px;
+  font-size: 0.88rem;
+  color: var(--text-3);
+}
+
+.bench-more > a {
+  font-weight: 700;
+}
+
+.bench-card .podium {
+  margin-top: auto;
 }
 
 .seg {
@@ -2960,6 +3223,90 @@ tr.sub-row .model-cell > strong {
 
 /* ---------- Responsive ---------- */
 
+@media (max-width: 1000px) {
+  .ixb-head {
+    display: none;
+  }
+
+  .ixb-list {
+    border-top: var(--bw) solid var(--line);
+  }
+
+  .ixb-row {
+    grid-template-columns: 30px minmax(0, 1fr) auto auto;
+    grid-template-areas:
+      'rank model model model'
+      'rank score score score'
+      'rank tests tests tests'
+      'rank moves cost .';
+    row-gap: 10px;
+    padding: 14px 4px;
+  }
+
+  .ixb-rank {
+    grid-area: rank;
+    align-self: start;
+  }
+
+  .ixb-model {
+    grid-area: model;
+  }
+
+  .ixb-score {
+    grid-area: score;
+  }
+
+  .ixb-tests {
+    grid-area: tests;
+    grid-template-columns: repeat(5, minmax(0, 64px));
+  }
+
+  .ixb-key {
+    display: block;
+    flex-basis: 100%;
+    margin: 0;
+    font-size: 0.8rem;
+    color: var(--text-3);
+  }
+
+  .ixb-tile {
+    height: 44px;
+    align-content: center;
+    gap: 1px;
+  }
+
+  .ixb-lab {
+    display: block;
+    overflow: hidden;
+    max-width: 100%;
+    white-space: nowrap;
+    font-size: 0.6rem;
+    font-weight: 600;
+    opacity: 0.8;
+  }
+
+  .ixb-moves {
+    grid-area: moves;
+    text-align: left;
+  }
+
+  .ixb-cost {
+    grid-area: cost;
+    text-align: left;
+  }
+
+  .ixb-k {
+    position: static;
+    width: auto;
+    height: auto;
+    overflow: visible;
+    clip: auto;
+    font-family: var(--font-body);
+    font-size: 0.78rem;
+    color: var(--text-3);
+  }
+}
+
 @media (max-width: 920px) {
   .hero,
   .connect,
@@ -2976,17 +3323,8 @@ tr.sub-row .model-cell > strong {
     max-width: 400px;
   }
 
-  .ix-top {
-    justify-self: stretch;
-    max-width: none;
-  }
-
-  .how-intro {
+  .bench-pair {
     grid-template-columns: minmax(0, 1fr);
-  }
-
-  .how-intro .hero-cube {
-    max-width: 320px;
   }
 
   .how-grid {

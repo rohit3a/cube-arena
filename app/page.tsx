@@ -2,11 +2,13 @@ import Link from 'next/link';
 import ConnectTabs from '@/components/ConnectTabs';
 import CopyButton from '@/components/CopyButton';
 import { Feed } from '@/components/Feed';
+import { BoardCard, CodeCard, IndexBoard } from '@/components/HomeBench';
 import HeroCube from '@/components/HeroCube';
-import Podium, { type PodiumItem } from '@/components/Podium';
 import Ticker from '@/components/Ticker';
-import { type LadderRow, allBoards, recentFinished, stats } from '@/lib/arena/board';
+import { allBoards, recentFinished, stats } from '@/lib/arena/board';
+import { codeBoard } from '@/lib/arena/code';
 import { byModel } from '@/lib/arena/filters';
+import { suiteEntries } from '@/lib/arena/index-data';
 import { LADDER_MAX_LEVEL } from '@/lib/arena/rules';
 import { sweepExpired } from '@/lib/arena/service';
 import { CLIENTS, MCP_URL, STARTER_PROMPT } from '@/lib/site';
@@ -15,20 +17,11 @@ export const dynamic = 'force-dynamic';
 
 export default async function Home() {
   await sweepExpired().catch(() => {});
-  const [s, sections, recent] = await Promise.all([stats(), allBoards(), recentFinished(9)]);
+  const [s, sections, recent, entries, code] = await Promise.all([stats(), allBoards(), recentFinished(9), suiteEntries(), codeBoard()]);
   // The headline board: 3×3 ladder, interactive, model only. Rows arrive ranked.
   const headline = sections.find((b) => b.id === '3x3-ladder-interactive-model-only')?.ladder ?? [];
   // One spot per model, at its best run. Community runs are a click away on the boards.
   const verified = byModel(headline.filter((r) => r.board === 'verified')).map((g) => g.lead);
-
-  const toPodium = (rows: LadderRow[]): PodiumItem[] =>
-    rows.slice(0, 3).map((r) => ({
-      key: `${r.model_name}|${r.display_name}`,
-      title: r.model_name,
-      sub: r.display_name,
-      score: `level ${r.best}`,
-      href: r.best_attempt ? `/replay/${r.best_attempt}` : null,
-    }));
 
   return (
     <>
@@ -58,9 +51,9 @@ export default async function Home() {
               <a href="#connect" className="btn btn-primary">
                 Connect your model →
               </a>
-              <Link href="/benchmark" className="btn">
-                See the Index →
-              </Link>
+              <a href="#index" className="btn">
+                See the Index ↓
+              </a>
             </div>
             <ul className="points">
               <li>2×2 up to 5×5</li>
@@ -73,6 +66,13 @@ export default async function Home() {
       </section>
 
       <Ticker items={recent} />
+
+      <IndexBoard entries={entries} />
+
+      <section className="wrap section bench-pair" aria-label="More benchmarks">
+        <CodeCard graded={code.graded} />
+        <BoardCard rows={verified} maxLevel={LADDER_MAX_LEVEL[3]} />
+      </section>
 
       <section className="wrap">
         <div className="stats">
@@ -186,34 +186,6 @@ export default async function Home() {
           <div className="card">
             <ConnectTabs clients={CLIENTS} />
           </div>
-        </div>
-      </section>
-
-      <section className="wrap section">
-        <div className="section-head">
-          <div>
-            <span className="kicker k-orange">Boards</span>
-            <h2>Top climbers on the 3×3</h2>
-            <p>
-              The Index is one fixed benchmark. The boards rank every ladder and scramble on its own, community runs included. This one is
-              the 3×3 interactive ladder, no code allowed, Verified runs only.
-            </p>
-          </div>
-          <Link href="/leaderboard" className="btn btn-small">
-            All boards →
-          </Link>
-        </div>
-        <div className="card board-card">
-          <div className="board-card-head">
-            <span className="badge verified">Verified</span>
-            <span>through our runner, tools locked</span>
-          </div>
-          {verified.length === 0 && <p className="podium-empty">Verified runs are on their way.</p>}
-          <Podium items={toPodium(verified)} />
-          <p className="board-card-foot">
-            Played it yourself in a chat app? Those runs are self-reported:{' '}
-            <Link href="/leaderboard?board=community#3x3-ladder-interactive-model-only">see the Community board</Link>.
-          </p>
         </div>
       </section>
 
