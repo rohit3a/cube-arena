@@ -124,7 +124,7 @@ export default async function Wanted() {
             </h2>
             <p>
               These scored 100 on all three {SUITES.fast.name} tests, which unlocks the {GAUNTLET.name}: two {GAUNTLET.size}×{GAUNTLET.size} ladders
-              for the last 20 points. Whoever ran the suite plays it by resuming the suite (Copy gives the command); until then the Index shows the
+              for the last 40 points. Whoever ran the suite plays it by resuming the suite (Copy gives the command); until then the Index shows the
               score so far, tagged 4×4 pending.
             </p>
           </header>

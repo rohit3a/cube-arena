@@ -88,12 +88,12 @@ describe('suites', () => {
     const done = gradeSuite(SUITES.fast, runs, true);
     expect(done.score).toBeCloseTo(20, 5);
     expect(done.tests.map((t) => t.score)).toEqual([100, 0, 0, 0, 0]);
-    expect(done.tests.map((t) => t.weight)).toEqual([0.2, 0.3, 0.3, 0.1, 0.1]);
+    expect(done.tests.map((t) => t.weight)).toEqual([0.2, 0.2, 0.2, 0.2, 0.2]);
     // 2×2 cleared, 3×3 interactive level 4 of 20, one-shot level 14 of 20.
     runs.set(1, ladder(3, 4, [1, 2, 3, 4]));
     runs.set(2, ladder(3, 14, Array.from({ length: 14 }, (_, i) => i + 1)));
     const g = gradeSuite(SUITES.fast, runs, true);
-    expect(g.score).toBeCloseTo(20 + 0.3 * 20 + 0.3 * 70, 5);
+    expect(g.score).toBeCloseTo(20 + 0.2 * 20 + 0.2 * 70, 5);
     expect(g.gauntlet).toBe('locked');
     expect(gauntletToPlay(SUITES.fast, g, new Set([0, 1, 2]))).toEqual([]);
   });
@@ -109,9 +109,9 @@ describe('suites', () => {
     runs.set(2, cleared(3));
     const pending = gradeSuite(SUITES.fast, runs, true);
     expect(pending.gauntlet).toBe('pending');
-    expect(pending.score).toBeCloseTo(80, 9);
+    expect(pending.score).toBeCloseTo(60, 9);
     expect(gauntletToPlay(SUITES.fast, pending, new Set([0, 1, 2]))).toEqual([3, 4]);
-    // 99.9 is not 100: one level short anywhere keeps it locked, at 75.
+    // 99.9 is not 100: one level short anywhere keeps it locked, at 59.
     runs.set(1, ladder(3, 19, Array.from({ length: 19 }, (_, i) => i + 1)));
     expect(gradeSuite(SUITES.fast, runs, true).gauntlet).toBe('locked');
     runs.set(1, cleared(3));
@@ -126,7 +126,7 @@ describe('suites', () => {
     const done = gradeSuite(SUITES.fast, runs, true);
     expect(done.gauntlet).toBe('done');
     expect(done.tests.map((t) => t.score)).toEqual([100, 100, 100, 50, 100]);
-    expect(done.score).toBeCloseTo(80 + 0.1 * 50 + 0.1 * 100, 9);
+    expect(done.score).toBeCloseTo(60 + 0.2 * 50 + 0.2 * 100, 9);
     expect(gradeSuite(SUITES.thorough, new Map(), true).gauntlet).toBeNull();
   });
 

@@ -230,8 +230,8 @@ export function IndexBoard({ entries }: { entries: SuiteEntry[] }) {
 
         <div className="ixb-foot">
           <p>
-            Each model at its best effort; equal scores rank by fewer moves, then lower cost, then less time. The 2×2 ladder is worth 20%, each
-            3×3 ladder 30%. 100 on all three unlocks the 4×4 Gauntlet, worth the last 20%; until it&apos;s played the score is out of 80.
+            Each model at its best effort; equal scores rank by fewer moves, then lower cost, then less time. Every test counts 20%. 100 on the
+            first three unlocks the 4×4 Gauntlet, worth the last 40%; until it&apos;s played the score is out of 60.
             {anyOut && (
               <>
                 {' '}

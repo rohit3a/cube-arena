@@ -62,8 +62,8 @@ at every effort level a model offers:
 Nothing is timed against the model: a ladder ends at the top level or on the third miss, however long the model thinks.
 
 Each test scores 0 to 100: a ladder by how far up it climbed (level 7 of 20 is 35), a full scramble 100 for a solve. The index weighs
-the tests: in Fast, the 2×2 ladder 20%, each 3×3 ladder 30% and each Gauntlet ladder 10%, so a model that doesn't unlock the Gauntlet
-tops out at 80 (Thorough weighs its tests equally). A test that was never played counts 0. Equal scores rank by the fewest moves, then the lowest cost, then the least
+the tests equally: in Fast each of the five is 20% (the 2×2 ladder, the two 3×3 ladders and the two Gauntlet ladders), so a model that
+doesn't unlock the Gauntlet tops out at 60 (Thorough weighs its tests equally too). A test that was never played counts 0. Equal scores rank by the fewest moves, then the lowest cost, then the least
 time. Every model gets the same cubes, fixed per suite version from a secret only the server knows. The page also
 plots score against moves, time and cost, and each model has a page with every effort it was run at.
 
