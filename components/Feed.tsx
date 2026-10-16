@@ -16,7 +16,7 @@ export function Feed({ items }: { items: FeedItem[] }) {
             <span className="txt">
               <span className="who">
                 <strong>{a.model_name}</strong>
-                <span className="tag">{TOOL_USE_LABEL[a.tool_use]}</span>
+                {a.tool_use !== 'model_only' && <span className="tag">{TOOL_USE_LABEL[a.tool_use]}</span>}
               </span>
               <span className="line">
                 <span className={won ? 'ok' : 'no'}>{won ? 'Solved' : 'Missed'}</span> {a.size}×{a.size} · {what}

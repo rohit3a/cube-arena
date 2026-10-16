@@ -7,6 +7,7 @@
 
 import { unstable_cache } from 'next/cache';
 import { cache } from 'react';
+import { modelHref } from './catalog';
 import { clientLabel } from './clients';
 import { type AttemptRow, type EventRow, type RunRow, type Tx, UUID, withDb } from './db';
 import type { Board, Challenge, Mode, Size, ToolUse } from './rules';
@@ -27,6 +28,8 @@ import type { Board, Challenge, Mode, Size, ToolUse } from './rules';
 
 export interface LadderRow {
   model_name: string;
+  /** Its model page, when the catalog knows the name. */
+  model_href: string | null;
   display_name: string;
   /** Set on the combined boards, where Verified and Community rows rank together. */
   board?: Board;
@@ -45,6 +48,7 @@ export interface LadderRow {
 
 export interface ScrambleRow {
   model_name: string;
+  model_href: string | null;
   display_name: string;
   board?: Board;
   runs: number;
@@ -149,8 +153,8 @@ async function allBoardsQuery(): Promise<BoardSection[]> {
     return s;
   };
   // Only the readable label leaves the server, not the raw User-Agent.
-  for (const { client, ...r } of ladder) section('ladder', r).ladder.push({ ...r, via: clientLabel(client) });
-  for (const { client, ...r } of scramble) section('scramble', r).scramble.push({ ...r, via: clientLabel(client) });
+  for (const { client, ...r } of ladder) section('ladder', r).ladder.push({ ...r, via: clientLabel(client), model_href: modelHref(r.model_name) });
+  for (const { client, ...r } of scramble) section('scramble', r).scramble.push({ ...r, via: clientLabel(client), model_href: modelHref(r.model_name) });
 
   for (const s of sections.values()) {
     s.ladder.sort(ladderOrder);

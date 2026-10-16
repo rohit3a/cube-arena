@@ -8,11 +8,11 @@ export interface PodiumItem {
   href?: string | null;
 }
 
-/** Top three on blocks (2nd, 1st, 3rd). Empty places stay visible as open spots. */
+/** Top three on blocks, shown 2nd, 1st, 3rd but read in rank order. Empty places stay visible as open spots. */
 export default function Podium({ items, floor = false }: { items: PodiumItem[]; floor?: boolean }) {
   return (
     <div className={`podium ${floor ? 'podium-floor' : ''}`}>
-      {[1, 0, 2].map((i) => {
+      {[0, 1, 2].map((i) => {
         const it = items[i];
         const body = (
           <>

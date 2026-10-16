@@ -4,6 +4,8 @@
 // decided in CSS from the same rules as the theme itself, so the server HTML
 // never disagrees with the browser.
 
+import { useEffect, useState } from 'react';
+
 function effective(): 'light' | 'dark' {
   const set = document.documentElement.dataset.theme;
   if (set === 'light' || set === 'dark') return set;
@@ -11,9 +13,20 @@ function effective(): 'light' | 'dark' {
 }
 
 export default function ThemeToggle() {
+  // Only known in the browser: the label says which way the button goes once it is.
+  const [theme, setTheme] = useState<'light' | 'dark' | null>(null);
+  useEffect(() => {
+    const mq = window.matchMedia('(prefers-color-scheme: dark)');
+    const update = () => setTheme(effective());
+    update();
+    mq.addEventListener('change', update);
+    return () => mq.removeEventListener('change', update);
+  }, []);
+
   const flip = () => {
     const next = effective() === 'dark' ? 'light' : 'dark';
     document.documentElement.dataset.theme = next;
+    setTheme(next);
     try {
       localStorage.setItem('theme', next);
     } catch {
@@ -21,7 +34,7 @@ export default function ThemeToggle() {
     }
   };
   return (
-    <button type="button" className="theme-toggle" onClick={flip} aria-label="Switch between light and dark mode">
+    <button type="button" className="theme-toggle" onClick={flip} aria-label={theme ? `Switch to ${theme === 'dark' ? 'light' : 'dark'} mode` : 'Switch between light and dark mode'}>
       <svg className="moon" viewBox="0 0 24 24" width="18" height="18" aria-hidden>
         <path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5Z" fill="currentColor" />
       </svg>

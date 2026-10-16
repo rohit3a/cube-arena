@@ -4,6 +4,7 @@
 // model is called the same thing whoever runs it.
 
 import data from '../../data/catalog.json';
+import { splitLabel } from './makers';
 
 export type Harness = 'claude-code' | 'codex' | 'cursor' | 'muse' | 'openrouter';
 export const HARNESSES: Harness[] = ['claude-code', 'codex', 'cursor', 'muse', 'openrouter'];
@@ -34,6 +35,12 @@ const byName = new Map(CATALOG.map((m) => [m.name.toLowerCase(), m]));
 
 /** A model's top effort, found by id or else by name; null when it has no effort setting or isn't in the catalog. */
 export const topEffort = (id: string, name: string): string | null => (byId.get(id) ?? byName.get(name.toLowerCase()))?.efforts.at(-1) ?? null;
+
+/** The model page a board label links to ("GPT-6-Astra (max)" → /models/gpt-6-astra); null for a name the catalog doesn't know. */
+export const modelHref = (label: string): string | null => {
+  const m = byName.get(splitLabel(label).model.toLowerCase());
+  return m ? `/models/${m.id}` : null;
+};
 
 /**
  * What tokens cost at the model's list price, for harnesses that count tokens

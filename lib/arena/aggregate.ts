@@ -3,6 +3,8 @@
 // there were. Safe to import from client components.
 
 import type { SuiteEntry } from './index-data';
+import { type Waiting, fullEffort, suiteOrder } from './ranking';
+import type { SuiteKind } from './suites';
 
 const mean = (xs: number[]) => xs.reduce((a, b) => a + b, 0) / xs.length;
 /** Averaged suites show the Gauntlet as the least far along of those that unlocked it: a play still to come wins. */
@@ -53,3 +55,21 @@ export function averageByLabel(entries: SuiteEntry[]): SuiteEntry[] {
 
 /** Where a result links: its suite, or the model page when it averages several. */
 export const resultHref = (e: SuiteEntry) => (e.n > 1 ? `/models/${e.slug}#${e.kind}` : `/suites/${e.id}`);
+
+/**
+ * What the Index ranks for one suite version: Verified, finished, one result per model and effort
+ * (averaged), and a model only once it has a result at its top effort.
+ */
+export function indexPool(entries: SuiteEntry[], kind: SuiteKind, version: string): { ranked: SuiteEntry[]; waiting: Waiting[] } {
+  return fullEffort(averageByLabel(entries.filter((e) => e.kind === kind && e.version === version && e.status === 'finished' && e.board === 'verified')));
+}
+
+/** Each model once, at its best result, in Index order. */
+export function bestPerModel(entries: SuiteEntry[]): SuiteEntry[] {
+  const best = new Map<string, SuiteEntry>();
+  for (const e of entries) {
+    const b = best.get(e.model);
+    if (!b || suiteOrder(e, b) < 0) best.set(e.model, e);
+  }
+  return [...best.values()].sort(suiteOrder);
+}

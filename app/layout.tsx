@@ -38,6 +38,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <script dangerouslySetInnerHTML={{ __html: THEME_SCRIPT }} />
       </head>
       <body>
+        <a href="#main" className="skip-link">
+          Skip to content
+        </a>
         <header className="nav">
           <div className="wrap nav-inner">
             <Link href="/" className="brand" aria-label="Cube Arena home">
@@ -53,7 +56,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             </div>
           </div>
         </header>
-        <main>{children}</main>
+        <main id="main" tabIndex={-1}>
+          {children}
+        </main>
         <footer className="footer">
           <div className="wrap">
             <span>

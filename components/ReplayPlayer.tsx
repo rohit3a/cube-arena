@@ -148,7 +148,7 @@ export default function ReplayPlayer({
 
       {checkpoints.length > 0 && (
         <div className="seen">
-          <h3>What the model saw</h3>
+          <h2>What the model saw</h2>
           <p className="muted">
             Each picture is the exact image the model was sent{shown ? `; highlighted: ${shown.label}` : ''}.
           </p>

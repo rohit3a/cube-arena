@@ -6,10 +6,10 @@ import { BarChart, LineChart, ScatterChart, type Series } from '@/components/cha
 import Exportable from '@/components/Exportable';
 import WaitingNote from '@/components/WaitingNote';
 import { OUT_OF_OUTPUT, OUT_OF_OUTPUT_WHY, fmtCost, fmtDuration, fmtScore, fmtTokens, heat } from '@/lib/arena/format';
-import { averageByLabel, resultHref } from '@/lib/arena/aggregate';
+import { bestPerModel, indexPool, resultHref } from '@/lib/arena/aggregate';
 import type { SuiteEntry } from '@/lib/arena/index-data';
 import { EFFORT_ORDER } from '@/lib/arena/makers';
-import { fullEffort, suiteOrder } from '@/lib/arena/ranking';
+import { suiteOrder } from '@/lib/arena/ranking';
 import { runningLabel } from '@/lib/arena/running';
 import { FAST_WEIGHTING, GAUNTLET, GAUNTLET_TAG } from '@/lib/arena/rules';
 import type { SuiteKind } from '@/lib/arena/suites';
@@ -67,24 +67,15 @@ export default function IndexExplorer({ entries, suites, running }: { entries: S
 
   // One result per model and effort, this suite version: the average when it was run more than once.
   // A model counts once it has a result at its top effort.
-  const { ranked: pool, waiting } = useMemo(
-    () => fullEffort(averageByLabel(entries.filter((e) => e.kind === kind && e.version === suite.version && e.status === 'finished' && e.board === 'verified'))),
-    [entries, kind, suite.version],
-  );
+  const { ranked: pool, waiting } = useMemo(() => indexPool(entries, kind, suite.version), [entries, kind, suite.version]);
 
   const models = useMemo(() => [...new Set(pool.map((e) => e.model))].sort(), [pool]);
   const shown = pool.filter((e) => !hidden.has(e.model));
 
   const rows = useMemo(() => {
     let out: SuiteEntry[];
-    if (effort === 'best') {
-      const best = new Map<string, SuiteEntry>();
-      for (const e of shown) {
-        const b = best.get(e.model);
-        if (!b || suiteOrder(e, b) < 0) best.set(e.model, e);
-      }
-      out = [...best.values()];
-    } else if (effort === 'all') out = shown;
+    if (effort === 'best') out = bestPerModel(shown);
+    else if (effort === 'all') out = shown;
     else out = shown.filter((e) => e.effort === effort || e.effort === null);
     return out.sort(suiteOrder);
   }, [shown, effort]);

@@ -110,7 +110,7 @@ export function LadderTable({ rows, maxLevel, compact = false }: { rows: LadderR
               <tr className={rank ? undefined : 'sub-row'}>
                 <td className="rank">{rank}</td>
                 <td className="model-cell">
-                  <strong>{r.model_name}</strong>
+                  <strong>{r.model_href ? <Link href={r.model_href} className="model-link">{r.model_name}</Link> : r.model_name}</strong>
                   <span>
                     {r.display_name} · via {r.via} <BoardBadge board={r.board} />
                   </span>
@@ -175,7 +175,7 @@ export function ScrambleTable({ rows }: { rows: ScrambleRow[] }) {
               <tr className={rank ? undefined : 'sub-row'}>
                 <td className="rank">{rank}</td>
                 <td className="model-cell">
-                  <strong>{r.model_name}</strong>
+                  <strong>{r.model_href ? <Link href={r.model_href} className="model-link">{r.model_name}</Link> : r.model_name}</strong>
                   <span>
                     {r.display_name} · via {r.via} <BoardBadge board={r.board} />
                   </span>

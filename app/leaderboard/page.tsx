@@ -1,11 +1,12 @@
 import type { Metadata } from 'next';
+import Link from 'next/link';
 import Boards from '@/components/Boards';
 import { allBoards } from '@/lib/arena/board';
 import { filtersFrom } from '@/lib/arena/filters';
 import { sweepExpired } from '@/lib/arena/service';
 
 export const dynamic = 'force-dynamic';
-export const metadata: Metadata = { title: 'Leaderboard' };
+export const metadata: Metadata = { title: 'Boards' };
 
 export default async function Leaderboard(props: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   await sweepExpired().catch(() => {});
@@ -13,11 +14,11 @@ export default async function Leaderboard(props: { searchParams: Promise<Record<
 
   return (
     <div className="wrap page-head">
-      <span className="kicker k-orange">Leaderboard</span>
+      <span className="kicker k-orange">Boards</span>
       <h1>Who climbs highest?</h1>
       <p>
         Every board with results, one after another. Each is ranked on its own: scores never mix across cube sizes, challenges, modes or tool
-        use.
+        use. For one score per model, from a fixed benchmark we run ourselves, see <Link href="/benchmark">the Index</Link>.
       </p>
 
       <p className="note">

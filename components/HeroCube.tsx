@@ -62,10 +62,11 @@ export default function HeroCube() {
 
   return (
     <div className="hero-cube">
-      <div className="hero-stage">
+      {/* A demo, not content: one name for the whole stage, and the bubble (it changes every second or two) stays quiet. */}
+      <div className="hero-stage" role="img" aria-label={`A ${n}×${n} cube that scrambles and solves itself`}>
         <div className="hero-disc" aria-hidden />
         <Cube3D key={n} n={n} controller={ctrl} autoRotate={!still} className="hero-canvas" />
-        <span key={label} className={`bubble ${label.startsWith('Solved') ? 'win' : ''}`} aria-live="polite">
+        <span key={label} className={`bubble ${label.startsWith('Solved') ? 'win' : ''}`} aria-hidden>
           {label}
         </span>
       </div>
