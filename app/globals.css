@@ -598,7 +598,7 @@ kbd {
   border-bottom: var(--bw) solid var(--line);
 }
 
-/* Graph paper, fading out from behind the Index card. */
+/* Graph paper, fading out from behind the cube. */
 .hero-band::before {
   content: '';
   position: absolute;
