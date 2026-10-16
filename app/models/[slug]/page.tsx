@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { BarChart } from '@/components/charts';
 import Exportable from '@/components/Exportable';
+import Writeup from '@/components/Writeup';
 import { OUT_OF_OUTPUT, OUT_OF_OUTPUT_WHY, fmtCost, fmtDuration, fmtScore, fmtTokens, heat } from '@/lib/arena/format';
 import { averageByLabel, provisional } from '@/lib/arena/aggregate';
 import { type CatalogModel, catalogModel, harnessLabel } from '@/lib/arena/catalog';
@@ -13,6 +14,7 @@ import { isRunning, runningLabel } from '@/lib/arena/running';
 import { GAUNTLET_TAG } from '@/lib/arena/rules';
 import { SUITES, SUITE_KINDS } from '@/lib/arena/suites';
 import { commandFor } from '@/lib/arena/wanted';
+import { latestWriteup, liveValues, writeupHistory } from '@/lib/arena/writeups';
 
 export const dynamic = 'force-dynamic';
 
@@ -42,6 +44,9 @@ export default async function ModelPage(props: { params: Promise<{ slug: string 
   const invited = es.some((e) => !e.run_by.includes('Cube Arena'));
   const finished = es.filter((e) => e.status === 'finished');
   const best = (kind: string) => finished.filter((e) => e.kind === kind && e.version === SUITES[e.kind].version).sort(suiteOrder)[0];
+  // Our blog about the model: only once we've run it ourselves.
+  const blog = board === 'verified' ? await latestWriteup('blog', slug) : null;
+  const [live, versions] = blog ? await Promise.all([liveValues(), writeupHistory('blog', slug)]) : [new Map<string, string>(), []];
 
   return (
     <div className="wrap page-head">
@@ -80,6 +85,20 @@ export default async function ModelPage(props: { params: Promise<{ slug: string 
           <strong>{es.length}</strong>
         </div>
       </div>
+
+      {blog && (
+        <article className="card wu-card" id="notes">
+          <span className="kicker k-green">
+            Our notes · {new Date(blog.created_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' })}
+          </span>
+          <Writeup body={blog.body} live={live} slug={slug} />
+          {versions.length > 1 && (
+            <p className="faint wu-versions">
+              Rewritten as new results came in. <Link href={`/notes/${slug}`}>Earlier versions</Link>
+            </p>
+          )}
+        </article>
+      )}
 
       {SUITE_KINDS.map((k) => {
         const all = finished.filter((e) => e.kind === k && e.version === SUITES[k].version);

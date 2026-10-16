@@ -2,10 +2,12 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { PersonName } from '@/components/People';
+import Writeup from '@/components/Writeup';
 import { OUT_OF_OUTPUT, OUT_OF_OUTPUT_WHY, fmtCost, fmtDuration, fmtScore, fmtTokens, heat } from '@/lib/arena/format';
 import { suiteEntry, testNames } from '@/lib/arena/index-data';
 import { CHALLENGE_LABEL, GAUNTLET, GAUNTLET_TAG, LADDER_MAX_LEVEL, MODE_LABEL } from '@/lib/arena/rules';
 import { SUITES } from '@/lib/arena/suites';
+import { latestWriteup, latestWriteups, liveValues } from '@/lib/arena/writeups';
 
 export const dynamic = 'force-dynamic';
 
@@ -37,6 +39,7 @@ export default async function SuitePage(props: { params: Promise<{ id: string }>
     return `${g ? `${GAUNTLET.name} test` : 'Test'} ${same.indexOf(i) + 1} of ${same.length}`;
   };
   const tag = e.gauntlet === 'pending' || e.gauntlet === 'playing' ? GAUNTLET_TAG[e.gauntlet] : null;
+  const [review, rounds, live] = await Promise.all([latestWriteup('effort', e.id), latestWriteups('round', e.runs.map((r) => r.run_id)), liveValues()]);
 
   return (
     <div className="wrap page-head">
@@ -93,6 +96,13 @@ export default async function SuitePage(props: { params: Promise<{ id: string }>
           <em>{e.cost_usd === null ? 'not reported' : e.cost_estimated ? 'at list prices' : 'API-equivalent'}</em>
         </div>
       </div>
+
+      {review && (
+        <section className="card wu-card wu-effort" aria-label="Our review">
+          <span className="kicker k-green">Our review</span>
+          <Writeup body={review.body} live={live} />
+        </section>
+      )}
 
       <h2 className="sub-head">Tests</h2>
       <div className="test-grid">
@@ -167,6 +177,11 @@ export default async function SuitePage(props: { params: Promise<{ id: string }>
                   );
                 })}
               </ul>
+              {slots.map(({ i }) => {
+                const r = e.runs.find((x) => x.slot === i);
+                const w = r && rounds.get(r.run_id);
+                return w ? <Writeup key={i} body={w.body} live={live} className="wu-round" /> : null;
+              })}
               <p className="faint test-meta">
                 {CHALLENGE_LABEL[slots[0].s.challenge]}, {MODE_LABEL[slots[0].s.mode].toLowerCase()}
               </p>

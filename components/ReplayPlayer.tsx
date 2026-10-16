@@ -23,8 +23,11 @@ export default function ReplayPlayer({
   moves,
   checkpoints,
   solved,
+  compact = false,
 }: {
   attemptId: string;
+  /** Just the cube, play and a scrubber, for an embed in an article: no speeds, move list or pictures. */
+  compact?: boolean;
   /** Whether the attempt ended solved: the last move gets a stamp and confetti. */
   solved: boolean;
   n: number;
@@ -89,7 +92,7 @@ export default function ReplayPlayer({
   const shown = checkpoints.filter((c) => c.moveCount <= idx).at(-1);
 
   return (
-    <div className="player">
+    <div className={`player${compact ? ' player-compact' : ''}`}>
       <div className="player-stage" ref={stage}>
         <Cube3D n={n} initial={initial} controller={ctrl} className="player-canvas" />
         <div className="player-hud">
@@ -105,25 +108,31 @@ export default function ReplayPlayer({
         <button className="btn btn-small" onClick={() => jump(0)} aria-label="Back to start">
           ⏮
         </button>
-        <button className="btn btn-small" onClick={() => jump(idx - 1)} aria-label="Previous move">
-          ◀
-        </button>
+        {!compact && (
+          <button className="btn btn-small" onClick={() => jump(idx - 1)} aria-label="Previous move">
+            ◀
+          </button>
+        )}
         <button className="btn btn-primary" onClick={togglePlay} disabled={moves.length === 0}>
           {playing ? 'Pause' : idx >= moves.length && moves.length > 0 ? 'Replay' : 'Play'}
         </button>
-        <button className="btn btn-small" onClick={() => jump(idx + 1)} aria-label="Next move">
-          ▶
-        </button>
+        {!compact && (
+          <button className="btn btn-small" onClick={() => jump(idx + 1)} aria-label="Next move">
+            ▶
+          </button>
+        )}
         <button className="btn btn-small" onClick={() => jump(moves.length)} aria-label="Jump to end">
           ⏭
         </button>
-        <div className="chips" role="group" aria-label="Speed">
-          {SPEEDS.map((s) => (
-            <button key={s} className={`chip ${s === speed ? 'on' : ''}`} onClick={() => setSpeed(s)} aria-pressed={s === speed}>
-              {s}×
-            </button>
-          ))}
-        </div>
+        {!compact && (
+          <div className="chips" role="group" aria-label="Speed">
+            {SPEEDS.map((s) => (
+              <button key={s} className={`chip ${s === speed ? 'on' : ''}`} onClick={() => setSpeed(s)} aria-pressed={s === speed}>
+                {s}×
+              </button>
+            ))}
+          </div>
+        )}
       </div>
 
       <input
@@ -136,17 +145,19 @@ export default function ReplayPlayer({
         aria-label="Move position"
       />
 
-      <div className="move-list" aria-label="Moves">
-        {moves.length === 0 && <span className="muted">No moves were made.</span>}
-        {moves.map((m, i) => (
-          <button key={i} className={`mv ${i < idx ? 'done' : ''} ${i === idx - 1 ? 'cur' : ''}`} onClick={() => jump(i + 1)}>
-            {checkpoints.some((c) => c.moveCount === i && i > 0) && <span className="sep" aria-hidden />}
-            {m}
-          </button>
-        ))}
-      </div>
+      {!compact && (
+        <div className="move-list" aria-label="Moves">
+          {moves.length === 0 && <span className="muted">No moves were made.</span>}
+          {moves.map((m, i) => (
+            <button key={i} className={`mv ${i < idx ? 'done' : ''} ${i === idx - 1 ? 'cur' : ''}`} onClick={() => jump(i + 1)}>
+              {checkpoints.some((c) => c.moveCount === i && i > 0) && <span className="sep" aria-hidden />}
+              {m}
+            </button>
+          ))}
+        </div>
+      )}
 
-      {checkpoints.length > 0 && (
+      {!compact && checkpoints.length > 0 && (
         <div className="seen">
           <h2>What the model saw</h2>
           <p className="muted">

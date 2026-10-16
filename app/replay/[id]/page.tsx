@@ -3,12 +3,14 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import MiniFace from '@/components/MiniFace';
 import ReplayPlayer, { type Checkpoint } from '@/components/ReplayPlayer';
+import Writeup from '@/components/Writeup';
 import { replay } from '@/lib/arena/board';
 import { modelHref } from '@/lib/arena/catalog';
 import { clientLabel } from '@/lib/arena/clients';
 import { CHALLENGE_LABEL, GAUNTLET, MODE_LABEL, TOOL_USE_LABEL, levelDepth, levelLabel } from '@/lib/arena/rules';
 import { testName } from '@/lib/arena/suites';
 import { OUT_OF_OUTPUT, OUT_OF_OUTPUT_WHY, outOfOutput } from '@/lib/arena/format';
+import { latestWriteup, liveValues } from '@/lib/arena/writeups';
 
 export const dynamic = 'force-dynamic';
 
@@ -86,6 +88,9 @@ export default async function ReplayPage({ params }: Props) {
   }
 
   const trail = crumbs(r);
+  // Our line about this cube, once it's over.
+  const line = active ? null : await latestWriteup('cube', a.id);
+  const live = line?.body.includes('{{') ? await liveValues() : new Map<string, string>();
   const model = modelHref(run.model_name);
 
   return (
@@ -101,6 +106,7 @@ export default async function ReplayPage({ params }: Props) {
           </ol>
         </nav>
         <h1>{headline(r)}</h1>
+        {line && <Writeup body={line.body} live={live} className="wu-line" />}
       </header>
       <div className="wrap replay">
         <div>
