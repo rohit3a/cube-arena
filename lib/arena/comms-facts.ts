@@ -353,3 +353,48 @@ export async function modelFacts(slug: string): Promise<ModelFacts | null> {
     field: fieldOf(field, kind, version, null, runsBySuite),
   };
 }
+
+export interface WorkSuite {
+  id: string;
+  kind: SuiteKind;
+  version: string;
+  board: 'verified' | 'community';
+  slug: string;
+  model: string;
+  effort: string | null;
+  status: 'active' | 'finished';
+  score: number | null;
+  finished_at: string | null;
+  gauntlet: SuiteEntry['gauntlet'];
+  /** Finished, with no Gauntlet waiting or being played: nothing more will change, so its review can be written. */
+  done: boolean;
+  /** Each run with its finished cubes (attempt ids, in play order). */
+  runs: { run_id: string; slot: number; status: string; attempts: string[] }[];
+}
+
+/** Everything the comms worker may write about: every suite on the site, its runs and their finished cubes. */
+export async function workList(): Promise<WorkSuite[]> {
+  const entries = await suiteEntries();
+  if (!entries.length) return [];
+  const rows = await withDb((sql) => sql<{ run_id: string; id: string }[]>`
+    select a.run_id, a.id from cube_arena.attempts a join cube_arena.runs r on r.id = a.run_id
+    where r.suite_id = any(${sql.array(entries.map((e) => e.id))}::uuid[]) and a.finished_at is not null
+    order by a.run_id, a.seq`);
+  const byRun = new Map<string, string[]>();
+  for (const r of rows) byRun.set(r.run_id, [...(byRun.get(r.run_id) ?? []), r.id]);
+  return entries.map((e) => ({
+    id: e.id,
+    kind: e.kind,
+    version: e.version,
+    board: e.board,
+    slug: e.slug,
+    model: e.model,
+    effort: e.effort,
+    status: e.status,
+    score: e.score,
+    finished_at: e.finished_at,
+    gauntlet: e.gauntlet,
+    done: e.status === 'finished' && (e.gauntlet === null || e.gauntlet === 'locked' || e.gauntlet === 'done'),
+    runs: e.runs.map((r) => ({ run_id: r.run_id, slot: r.slot, status: r.status, attempts: byRun.get(r.run_id) ?? [] })),
+  }));
+}

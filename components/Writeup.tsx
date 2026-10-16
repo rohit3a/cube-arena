@@ -14,7 +14,8 @@ import { SUITES, testName } from '@/lib/arena/suites';
 type Live = Map<string, string>;
 
 function inline(text: string, live: Live): ReactNode[] {
-  return text.split(/(\{\{[^}]*\}\}|`[^`]+`)/g).map((part, i) => {
+  return text.split(/(\{\{[^}]*\}\}|`[^`]+`|\*\*[^*]+\*\*)/g).map((part, i) => {
+    if (part.startsWith('**') && part.endsWith('**') && part.length > 4) return <strong key={i}>{inline(part.slice(2, -2), live)}</strong>;
     if (part.startsWith('{{'))
       return (
         <span key={i} className="live-num">
@@ -150,40 +151,58 @@ export default async function Writeup({
 }) {
   const entries = /<\?chart /.test(body) ? await suiteEntries() : [];
   const blocks: ReactNode[] = [];
-  const paras = body.trim().split(/\n\s*\n/);
-  for (const [i, para] of paras.entries()) {
-    for (const [j, line] of para.split('\n').entries()) {
-      const t = line.trim();
-      const key = `${i}-${j}`;
-      const d = t.match(/^<\?(chart score-by-effort|chart time-by-level ([0-9a-f-]{36}) (\S+)|cube ([0-9a-f-]{36})|replay ([0-9a-f-]{36}))\?>$/);
-      if (d) {
-        if (d[1] === 'chart score-by-effort' && slug) blocks.push(<ScoreByEffort key={key} slug={slug} entries={entries} />);
-        else if (d[2]) blocks.push(<TimeByLevel key={key} suiteId={d[2]} test={d[3]} entries={entries} />);
-        else if (d[4]) blocks.push(<CubeShot key={key} id={d[4]} />);
-        else if (d[5]) blocks.push(<ReplayEmbed key={key} id={d[5]} />);
-      }
-    }
-    const text = para
-      .split('\n')
-      .filter((l) => !/^<\?/.test(l.trim()))
-      .join(' ')
-      .trim();
-    if (!text) continue;
-    const Title = titleAs;
-    const Sub = titleAs === 'h2' ? 'h3' : 'h4';
-    if (text.startsWith('# '))
+  const Title = titleAs;
+  const Sub = titleAs === 'h2' ? 'h3' : 'h4';
+  // Line by line, in the order written: paragraphs, "- " lists, headings and the chart, cube and replay lines.
+  const titled = body.trim().startsWith('# ');
+  let para: string[] = [];
+  let list: string[] = [];
+  let paragraphs = 0;
+  const flush = () => {
+    if (para.length) {
       blocks.push(
-        <Title key={i} className="wu-title">
-          {inline(text.slice(2), live)}
-        </Title>,
-      );
-    else if (text.startsWith('## ')) blocks.push(<Sub key={i}>{inline(text.slice(3), live)}</Sub>);
-    else
-      blocks.push(
-        <p key={i} className={i === 1 && paras[0].startsWith('# ') ? 'wu-standfirst' : undefined}>
-          {inline(text, live)}
+        <p key={blocks.length} className={titled && paragraphs === 0 ? 'wu-standfirst' : undefined}>
+          {inline(para.join(' '), live)}
         </p>,
       );
+      paragraphs++;
+    }
+    if (list.length)
+      blocks.push(
+        <ul key={blocks.length} className="wu-list">
+          {list.map((x, i) => (
+            <li key={i}>{inline(x, live)}</li>
+          ))}
+        </ul>,
+      );
+    para = [];
+    list = [];
+  };
+  for (const line of body.trim().split('\n')) {
+    const t = line.trim();
+    const d = t.match(/^<\?(chart score-by-effort|chart time-by-level ([0-9a-f-]{36}) (\S+)|cube ([0-9a-f-]{36})|replay ([0-9a-f-]{36}))\?>$/);
+    if (!t || d || t.startsWith('#')) flush();
+    if (d) {
+      const key = blocks.length;
+      if (d[1] === 'chart score-by-effort' && slug) blocks.push(<ScoreByEffort key={key} slug={slug} entries={entries} />);
+      else if (d[2]) blocks.push(<TimeByLevel key={key} suiteId={d[2]} test={d[3]} entries={entries} />);
+      else if (d[4]) blocks.push(<CubeShot key={key} id={d[4]} />);
+      else if (d[5]) blocks.push(<ReplayEmbed key={key} id={d[5]} />);
+    } else if (t.startsWith('# '))
+      blocks.push(
+        <Title key={blocks.length} className="wu-title">
+          {inline(t.slice(2), live)}
+        </Title>,
+      );
+    else if (t.startsWith('## ')) blocks.push(<Sub key={blocks.length}>{inline(t.slice(3), live)}</Sub>);
+    else if (t.startsWith('- ')) {
+      if (para.length) flush();
+      list.push(t.slice(2));
+    } else if (t && !t.startsWith('<?')) {
+      if (list.length) flush();
+      para.push(t);
+    }
   }
+  flush();
   return <div className={`writeup ${className}`.trim()}>{blocks}</div>;
 }

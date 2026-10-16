@@ -5457,6 +5457,17 @@ a.lv:hover {
   font-size: 0.85rem;
 }
 
+.writeup .wu-list {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding-left: 1.2em;
+}
+
+.writeup .wu-list li::marker {
+  color: var(--text-3);
+}
+
 .wu-fig > * {
   min-width: 0;
 }
