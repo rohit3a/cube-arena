@@ -21,8 +21,8 @@ export const GAUNTLET = { name: 'Gauntlet', size: 4 as Size, levels: 20, startDe
 export const GAUNTLET_TAG = { locked: 'Gauntlet locked', pending: '4×4 pending', playing: '4×4 in play', done: '4×4 played' } as const;
 /** How Fast weighs its tests, for the site (suites.ts has the weights). */
 export const FAST_WEIGHTING =
-  `Every test counts the same, 20%. A perfect 100 on the 2×2 and both 3×3 ladders unlocks the 4×4 ${GAUNTLET.name}: ` +
-  `two 4×4 ladders of ${GAUNTLET.levels} levels, the last 40%. Without it, 60 is the top score.`;
+  `The Index weighs the 2×2 ladder 20% and each 3×3 ladder 30%. A perfect 100 on all three unlocks the 4×4 ${GAUNTLET.name}: ` +
+  `two 4×4 ladders of ${GAUNTLET.levels} levels, worth 10% each. Without it, 80 is the top score.`;
 /** "level 4", "Gauntlet level 4", or `none` for a full scramble. */
 export const levelLabel = (a: { level: number | null; gauntlet?: boolean }, none = 'full scramble') =>
   a.level ? `${a.gauntlet ? `${GAUNTLET.name} level` : 'level'} ${a.level}` : none;

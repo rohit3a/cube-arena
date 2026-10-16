@@ -25,7 +25,7 @@ export interface SuiteInfo {
 /** The tag beside a Fast score while its Gauntlet is unlocked and not played to the end. */
 const gauntletTag = (e: SuiteEntry) => (e.gauntlet === 'pending' || e.gauntlet === 'playing' ? GAUNTLET_TAG[e.gauntlet] : null);
 
-/** Bars whose score still has the Gauntlet's 40 points to come (kept out of the bar labels, which are rotated and short). */
+/** Bars whose score still has the Gauntlet's 20 points to come (kept out of the bar labels, which are rotated and short). */
 function GauntletNote({ rows }: { rows: SuiteEntry[] }) {
   const open = rows.filter((e) => gauntletTag(e));
   if (open.length === 0) return null;
@@ -369,7 +369,7 @@ export default function IndexExplorer({ entries, suites, running }: { entries: S
                           {e.label}
                         </Link>
                         {gauntletTag(e) && (
-                          <span className="tag tag-gauntlet" title="100 on all three tests unlocked the 4×4 Gauntlet, worth the last 40 points">
+                          <span className="tag tag-gauntlet" title="100 on all three tests unlocked the 4×4 Gauntlet, worth the last 20 points">
                             {gauntletTag(e)}
                           </span>
                         )}

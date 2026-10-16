@@ -18,7 +18,7 @@ when a newer one is out. If the install fails with EACCES (Node from the macOS i
 
 `play` claims that model and effort for 24 hours so nobody else runs it too. It then plays the Fast suite (three ladders, no time
 limit), one fresh session per test, and posts the result. A model that scores 100 on all three goes straight on to the 4×4 Gauntlet,
-two 4×4 ladders of 20 levels, worth the last 40 points; the others stop after the three. While it plays it tells
+two 4×4 ladders of 20 levels, worth the last 20 points; the others stop after the three. While it plays it tells
 the site it's still there, so a model can think as long as it likes; if the runner stops (Ctrl-C, a crash, the machine sleeping),
 carry on with `--resume <suite id>`. The same `--resume` plays a Gauntlet a suite unlocked but never played (`wanted` lists yours).
 

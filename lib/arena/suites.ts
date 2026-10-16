@@ -9,7 +9,7 @@
 // change of weights regrades every result of that version alike.
 //
 // Fast ends with the Gauntlet: two 4×4 ladders that only a model with 100 on
-// every other test gets to play. A model that doesn't qualify tops out at 60.
+// every other test gets to play. A model that doesn't qualify tops out at 80.
 
 import { createHmac } from 'node:crypto';
 import { type Challenge, GAUNTLET, type Mode, SIZES, type Size, topLevel } from './rules';
@@ -74,14 +74,14 @@ export const SUITES: Record<SuiteKind, SuiteDef> = {
       gauntlet('interactive'),
       gauntlet('one_shot'),
     ],
-    // Every test counts the same, 20%. The Gauntlet's two ladders, 40% together, sort the models that clear
-    // everything else; without it, 60 is the most there is. (Until 16 Oct 2026: 20/30/30/10/10, top 80 without it.)
+    // The 2×2 sorts weaker models but every strong one clears it, so it counts for less. The Gauntlet sorts the
+    // models that clear everything else; without it, 80 is the most there is.
     weights: {
       '2x2-ladder-interactive': 20,
-      '3x3-ladder-interactive': 20,
-      '3x3-ladder-one_shot': 20,
-      '4x4-gauntlet-interactive': 20,
-      '4x4-gauntlet-one_shot': 20,
+      '3x3-ladder-interactive': 30,
+      '3x3-ladder-one_shot': 30,
+      '4x4-gauntlet-interactive': 10,
+      '4x4-gauntlet-one_shot': 10,
     },
   },
   thorough: {
@@ -281,5 +281,5 @@ export function gauntletToPlay(def: SuiteDef, grade: SuiteGrade, played: Set<num
 /** Told to players at the start of every suite test. */
 export const SUITE_SCORING =
   'Suite scoring: each test scores 0-100. Ladder: the share of the ladder you climb; full scramble: whether you solve it. The suite score is the weighted average of its tests. ' +
-  `Fast weighs its five tests equally, 20% each: the 2×2 ladder, the two 3×3 ladders and, unlocked by a perfect 100 on those three, the 4×4 ${GAUNTLET.name}'s two 4×4 ladders of ${GAUNTLET.levels} levels. Without it, 60 is the most a Fast suite scores. ` +
+  `Fast weighs the 2×2 ladder 20% and each 3×3 ladder 30%. A perfect 100 on all three unlocks the 4×4 ${GAUNTLET.name}: two 4×4 ladders of ${GAUNTLET.levels} levels, worth 10% each. Without it, 80 is the most a Fast suite scores. ` +
   'Equal scores rank by the fewest moves (failed attempts included), then the lowest cost, then the least time. There is no time limit: take as long as you need.';

@@ -57,9 +57,9 @@ export default async function Benchmark() {
               scores 100 for a solve, 0 for a miss.
             </p>
             <p>
-              In Fast every test counts the same, 20%: the 2×2 ladder, the two 3×3 ladders and the {GAUNTLET.name}&apos;s two ladders, so the
-              {` ${GAUNTLET.name}`} is worth the last 40%. Only a perfect 100 on the other three unlocks it, so without it 60 is the top score. A
-              model that unlocked it but hasn&apos;t played it yet shows its 60, tagged <em>4×4 pending</em>. Equal scores rank by the
+              The index weighs the tests. In Fast, the 2×2 ladder counts 20%, since every strong model clears it, and each 3×3 ladder 30%. The
+              {` ${GAUNTLET.name}`} is worth the last 20%, 10% for each ladder, and only a perfect 100 on the other three unlocks it, so without it 80 is
+              the top score. A model that unlocked it but hasn&apos;t played it yet shows its 80, tagged <em>4×4 pending</em>. Equal scores rank by the
               fewest moves, then the lowest cost, then the least time.
             </p>
             <p>
@@ -98,7 +98,7 @@ export default async function Benchmark() {
               <li>
                 Changing the tests (their cubes, rules or levels) makes a new version; scores only compare within one. Fast v3 added the{' '}
                 {GAUNTLET.name} and kept v2&apos;s three tests with the same cubes, so v2 results carried over. A change of weights only regrades
-                every result of the version alike: since 16 Oct 2026 each Fast test counts 20% (it was 20, 30, 30, 10 and 10).
+                every result of the version alike.
               </li>
               <li>
                 Every cube has a replay. Open any result, or <Link href="/connect">run your own model</Link>.
