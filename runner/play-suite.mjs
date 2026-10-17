@@ -59,14 +59,14 @@ async function playTests(p, call, started) {
   const all = tests.map((t, i) => ({ t, i }));
   const base = all.filter(({ t }) => !t.gauntlet);
   const gauntlet = all.filter(({ t }) => t.gauntlet);
-  const stop = await playSlots(p, base, 'test');
+  const stop = await playSlots(p, base, 'test', call);
   if (stop) return stop;
   let { result, suite: done } = await call('/api/admin/suites', { id: suite.id, finish: true });
   console.log(`\n${result}`);
   const state = done.grade?.gauntlet ?? null;
   if (gauntlet.length && (state === 'pending' || state === 'playing')) {
     console.log(`\n*** 100 on all three: the ${gauntlet[0].t.size}×${gauntlet[0].t.size} Gauntlet is unlocked ***`);
-    const g = await playSlots(p, gauntlet, 'Gauntlet');
+    const g = await playSlots(p, gauntlet, 'Gauntlet', call);
     if (g) return g;
     ({ result, suite: done } = await call('/api/admin/suites', { id: suite.id, finish: true }));
     console.log(`\n${result}`);
@@ -79,7 +79,7 @@ async function playTests(p, call, started) {
 }
 
 /** Plays these slots in order, skipping those already played. Returns null when all are over, else why it stopped. */
-async function playSlots(p, slots, label) {
+async function playSlots(p, slots, label, call) {
   const { suite } = p;
   for (const [k, { t, i }] of slots.entries()) {
     if (p.played.has(i)) continue;
