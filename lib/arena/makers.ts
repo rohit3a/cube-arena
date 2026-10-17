@@ -45,7 +45,7 @@ export const effortRank = (e: string | null) => (e === null ? -1 : EFFORT_ORDER.
  * but no cost (Codex). Claude Code reports its own API-equivalent cost.
  * Sources: published API price lists as of October 2026; update when they change.
  */
-const PRICES: Record<string, { input: number; cached: number; output: number }> = {
+export const PRICES: Record<string, { input: number; cached: number; output: number }> = {
   'gpt-6-astra': { input: 10, cached: 1, output: 50 },
   'gpt-6.1-sol': { input: 2, cached: 0.1, output: 10 },
   'gpt-6-sol': { input: 2, cached: 0.2, output: 10 },

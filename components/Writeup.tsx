@@ -80,12 +80,13 @@ async function TimeByLevel({ suiteId, test, entries }: { suiteId: string; test: 
     <figure className="wu-fig">
       <BarChart
         height={160}
-        format={fmtMin}
+        max={Math.max(1, ...rows.map((a) => a.secs / 60))}
+        format={(min) => fmtMin(min * 60)}
         items={rows.map((a) => ({
           key: a.id,
           label: a.level === null ? `#${a.seq}` : `L${a.level}`,
           sub: a.status === 'solved' ? null : 'miss',
-          value: a.secs,
+          value: a.secs / 60,
           color: a.status === 'solved' ? e.color : 'var(--slate)',
           href: `/replay/${a.id}`,
           hatch: a.status !== 'solved',

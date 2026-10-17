@@ -3,11 +3,12 @@
 // boards (board.ts): dates arrive as strings after the round trip.
 
 import { unstable_cache } from 'next/cache';
-import { catalogCost, harnessLabel, topEffort } from './catalog';
+import { catalogCost, catalogModel, harnessLabel, topEffort } from './catalog';
 import { clientLabel } from './clients';
 import { type Review, type SuiteRow, type Usage, UUID, withDb } from './db';
 import { contributorSlug } from './invites';
-import { estimateCost, makerOf, slugOf, splitLabel } from './makers';
+import { PRICES, estimateCost, makerOf, slugOf, splitLabel } from './makers';
+import type { LevelData } from './aggregate';
 import { gradeSuites } from './suite-data';
 import { type GauntletState, SUITES, type SuiteKind, suiteTests, testName } from './suites';
 
@@ -72,11 +73,20 @@ export interface SuiteEntry {
   secs: number;
   /** Time left out of `secs` that wasn't the model's doing: a pause of ours, sessions lost to API errors. */
   paused_secs: number;
+  /** Everything read, cached reads included (input_tokens), and everything written, reasoning included (output_tokens). */
   input_tokens: number | null;
   output_tokens: number | null;
+  /** Of input_tokens, those read from the cache. */
+  cached_input_tokens: number | null;
+  /** Of output_tokens, those spent reasoning; null when the harness doesn't count them (Cursor). */
+  reasoning_tokens: number | null;
   cost_usd: number | null;
   /** True when the cost comes from token counts at list prices, not from the CLI. */
   cost_estimated: boolean;
+  /** cost_usd split by token type at the model's list prices; null without prices or token counts. */
+  cost_parts: CostParts | null;
+  /** Time on each test, by test id (paused time left out). */
+  test_secs: Record<string, number>;
   runs: SuiteRunInfo[];
   /** Tests started so far, of how many, the Gauntlet aside: "test 2 of 3" while it runs. */
   progress: { started: number; of: number };
@@ -89,6 +99,46 @@ export interface SuiteEntry {
   harness: string | null;
   /** The invitee who ran it, when they chose to show their name (contributors.ts). */
   contributor: { slug: string; name: string; x: string | null } | null;
+}
+
+/**
+ * What a suite's cost went on: uncached input, cache hits, reasoning and the answers written. The shares come from
+ * the model's list prices and are scaled to the cost reported, so they always add up to it. `reasoning` is null when
+ * the harness doesn't count reasoning tokens, and `answer` is then all the output.
+ */
+export interface CostParts {
+  input: number;
+  cached: number;
+  reasoning: number | null;
+  answer: number;
+}
+
+function listPrice(modelId: string | null): { input: number; cached: number; output: number } | null {
+  if (!modelId) return null;
+  const p = PRICES[modelId] ?? catalogModel(modelId)?.price;
+  if (!p || p.input == null || p.output == null) return null;
+  return { input: p.input, cached: p.cached ?? p.input, output: p.output };
+}
+
+function costParts(
+  modelId: string | null,
+  cost: number | null,
+  t: { input: number | null; cached: number | null; output: number | null; reasoning: number | null },
+): CostParts | null {
+  const p = listPrice(modelId);
+  if (!p || cost === null || t.input === null || t.output === null) return null;
+  const cached = Math.min(t.cached ?? 0, t.input);
+  const reasoning = t.reasoning === null ? null : Math.min(t.reasoning, t.output);
+  const raw = {
+    input: (t.input - cached) * p.input,
+    cached: cached * p.cached,
+    reasoning: reasoning === null ? null : reasoning * p.output,
+    answer: (t.output - (reasoning ?? 0)) * p.output,
+  };
+  const sum = raw.input + raw.cached + (raw.reasoning ?? 0) + raw.answer;
+  if (sum <= 0) return null;
+  const k = cost / sum;
+  return { input: raw.input * k, cached: raw.cached * k, reasoning: raw.reasoning === null ? null : raw.reasoning * k, answer: raw.answer * k };
 }
 
 interface Row extends SuiteRow {
@@ -128,10 +178,18 @@ async function suiteEntriesQuery(): Promise<SuiteEntry[]> {
       const { model, effort } = s.model ? { model: s.model, effort: s.effort } : splitLabel(s.model_name);
       const maker = makerOf(model);
       const grade = grades.get(s.id);
-      const tokens = (k: 'input_tokens' | 'output_tokens') => {
+      const tokens = (k: 'input_tokens' | 'output_tokens' | 'cached_input_tokens') => {
         const xs = s.runs.map((r) => r.usage?.[k]).filter((v): v is number => Number.isFinite(v));
         return xs.length ? xs.reduce((a, b) => a + b, 0) : null;
       };
+      // Reasoning only when every run that counted tokens counted it too: a part-count would understate it.
+      const counted = s.runs.filter((r) => Number.isFinite(r.usage?.output_tokens));
+      const reasoning = counted.length && counted.every((r) => Number.isFinite(r.usage?.reasoning_tokens)) ? counted.reduce((a, r) => a + (r.usage?.reasoning_tokens ?? 0), 0) : null;
+      const testSecs: Record<string, number> = {};
+      for (const r of s.runs) {
+        const test = SUITES[s.kind].slots[r.slot]?.test;
+        if (test) testSecs[test] = (testSecs[test] ?? 0) + Math.max(0, r.secs);
+      }
       // Cost: what the CLI reported, else tokens at list prices; null if any run lacks both.
       let cost: number | null = 0;
       let estimated = false;
@@ -183,8 +241,17 @@ async function suiteEntriesQuery(): Promise<SuiteEntry[]> {
         paused_secs: s.runs.reduce((a, r) => a + (r.paused_secs ?? 0), 0),
         input_tokens: tokens('input_tokens'),
         output_tokens: tokens('output_tokens'),
+        cached_input_tokens: tokens('cached_input_tokens'),
+        reasoning_tokens: reasoning,
         cost_usd: s.runs.length ? cost : null,
         cost_estimated: estimated,
+        cost_parts: costParts(s.model_id, s.runs.length ? cost : null, {
+          input: tokens('input_tokens'),
+          cached: tokens('cached_input_tokens'),
+          output: tokens('output_tokens'),
+          reasoning,
+        }),
+        test_secs: testSecs,
         runs: s.runs.map(({ usage: _u, client, ...r }) => ({ ...r, via: clientLabel(client) })),
         progress: {
           started: new Set(s.runs.filter((r) => !SUITES[s.kind].slots[r.slot]?.gauntlet).map((r) => SUITES[s.kind].slots[r.slot]?.test)).size,
@@ -223,6 +290,38 @@ export async function allSuiteEntries(): Promise<SuiteEntry[]> {
 export async function suiteEntry(id: string): Promise<SuiteEntry | null> {
   if (!UUID.test(id)) return null;
   return (await suiteEntries()).find((s) => s.id === id) ?? null;
+}
+
+/**
+ * Ladder cubes level by level, for the Index's level charts: per suite, one point per test and scramble length with
+ * the cubes tried there, how many were solved, the mean moves of the solves and the mean time of a try (paused time
+ * left out). Finished cubes only.
+ */
+export async function levelCurves(suiteIds: string[]): Promise<LevelData> {
+  const ids = suiteIds.filter((id) => UUID.test(id));
+  if (!ids.length) return { tests: [], suites: {} };
+  const rows = await withDb((sql) => sql<{ suite_id: string; kind: SuiteKind; slot: number; depth: number; tries: number; solved: number; moves: number | null; secs: number }[]>`
+    select r.suite_id, s.kind, r.suite_slot as slot, a.level + r.level_offset as depth, count(*)::int as tries,
+           count(*) filter (where a.status = 'solved')::int as solved,
+           avg(a.move_count) filter (where a.status = 'solved')::float as moves,
+           avg(greatest(0, extract(epoch from a.finished_at - a.created_at) - a.paused_secs))::float as secs
+    from cube_arena.attempts a
+    join cube_arena.runs r on r.id = a.run_id
+    join cube_arena.suites s on s.id = r.suite_id
+    where r.suite_id = any(${sql.array(ids)}::uuid[]) and not r.hidden and r.challenge = 'ladder'
+      and a.finished_at is not null and a.level is not null
+    group by r.suite_id, s.kind, r.suite_slot, a.level + r.level_offset
+    order by r.suite_slot, depth`);
+  const tests: string[] = [];
+  const suites: LevelData['suites'] = {};
+  for (const r of rows) {
+    const test = SUITES[r.kind].slots[r.slot]?.test;
+    if (!test) continue;
+    if (!tests.includes(test)) tests.push(test);
+    const round = (v: number) => Math.round(v * 10) / 10;
+    (suites[r.suite_id] ??= []).push([tests.indexOf(test), r.depth, r.tries, r.solved, r.moves === null ? null : round(r.moves), round(r.secs)]);
+  }
+  return { tests, suites };
 }
 
 /** Test ids in a suite, in order, with readable names; `gauntlet` marks Fast's 4×4 Gauntlet tests. */

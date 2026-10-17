@@ -2,11 +2,11 @@
 
 import Link from 'next/link';
 import { useMemo, useState } from 'react';
-import { BarChart, LineChart, ScatterChart, type Series } from '@/components/charts';
+import { BarChart, LevelChart, LineChart, ScatterChart, StackedBarChart, type Series, type StackItem, type StackPart, type XYSeries } from '@/components/charts';
 import Exportable from '@/components/Exportable';
 import WaitingNote from '@/components/WaitingNote';
 import { OUT_OF_OUTPUT, OUT_OF_OUTPUT_WHY, fmtCost, fmtDuration, fmtScore, fmtTokens, heat } from '@/lib/arena/format';
-import { bestPerModel, indexPool, resultHref } from '@/lib/arena/aggregate';
+import { type LevelData, bestPerModel, indexPool, levelsOf, resultHref } from '@/lib/arena/aggregate';
 import type { SuiteEntry } from '@/lib/arena/index-data';
 import { EFFORT_ORDER } from '@/lib/arena/makers';
 import { suiteOrder } from '@/lib/arena/ranking';
@@ -52,17 +52,33 @@ const DASHES = [undefined, '7 5', '2 4'];
 const SECTIONS = [
   ['index', 'Index'],
   ['tests', 'By test'],
-  ['tradeoffs', 'Moves, time, cost'],
+  ['tradeoffs', 'Score vs cost'],
+  ['spend', 'Cost, tokens, time'],
+  ['levels', 'Level by level'],
   ['effort', 'Effort'],
   ['table', 'All results'],
   ['method', 'Method'],
 ] as const;
 
-export default function IndexExplorer({ entries, suites, running }: { entries: SuiteEntry[]; suites: SuiteInfo[]; running: SuiteEntry[] }) {
+export default function IndexExplorer({
+  entries,
+  suites,
+  running,
+  levels,
+}: {
+  entries: SuiteEntry[];
+  suites: SuiteInfo[];
+  running: SuiteEntry[];
+  levels: LevelData;
+}) {
   const [kind, setKind] = useState<SuiteKind>('fast');
   const [effort, setEffort] = useState<EffortMode>('best');
   const [hidden, setHidden] = useState<Set<string>>(new Set());
   const [tradeoff, setTradeoff] = useState<'moves' | 'time' | 'cost'>('moves');
+  const [resource, setResource] = useState<Resource>('cost');
+  const [per, setPer] = useState<Per>('suite');
+  const [levelMetric, setLevelMetric] = useState<'moves' | 'time'>('moves');
+  const [levelTest, setLevelTest] = useState<string | null>(null);
   const suite = suites.find((s) => s.kind === kind) as SuiteInfo;
 
   // One result per model and effort, this suite version: the average when it was run more than once.
@@ -90,7 +106,9 @@ export default function IndexExplorer({ entries, suites, running }: { entries: S
     href: `/models/${e.slug}`,
   }));
 
-  const point = (e: SuiteEntry, x: number | null) => (x === null ? [] : [{ key: e.id, label: e.label, x, y: e.score ?? 0, color: e.color, href: resultHref(e) }]);
+  // Every effort: each model's efforts are joined by a line, so its curve from cheap to dear shows.
+  const point = (e: SuiteEntry, x: number | null) =>
+    x === null ? [] : [{ key: e.id, label: e.label, x, y: e.score ?? 0, color: e.color, href: resultHref(e), group: effort === 'all' ? e.model : undefined }];
   const scatter = {
     moves: {
       points: rows.flatMap((e) => point(e, e.moves_per_solve)),
@@ -115,20 +133,53 @@ export default function IndexExplorer({ entries, suites, running }: { entries: S
     },
   }[tradeoff];
 
+  // A line's colour belongs to its model, given in index order over the whole suite, so hiding models or
+  // changing the effort never repaints the others.
+  const paint = useMemo(() => {
+    const out = new Map<string, { color: string; dash?: string }>();
+    bestPerModel(pool)
+      .sort(suiteOrder)
+      .forEach((e, i) => out.set(e.model, { color: SERIES_COLORS[i % SERIES_COLORS.length], dash: DASHES[Math.floor(i / SERIES_COLORS.length) % DASHES.length] }));
+    return out;
+  }, [pool]);
+
   const series: Series[] = useMemo(() => {
     const byModel = new Map<string, SuiteEntry[]>();
     for (const e of shown) if (e.effort) byModel.set(e.model, [...(byModel.get(e.model) ?? []), e]);
     return [...byModel.entries()]
       .sort((a, b) => suiteOrder([...a[1]].sort(suiteOrder)[0], [...b[1]].sort(suiteOrder)[0]))
-      .map(([model, es], i) => ({
+      .map(([model, es]) => ({
         key: model,
         label: model,
-        color: SERIES_COLORS[i % SERIES_COLORS.length],
-        dash: DASHES[Math.floor(i / SERIES_COLORS.length) % DASHES.length],
+        ...(paint.get(model) ?? { color: SERIES_COLORS[0] }),
         points: es.map((e) => ({ x: e.effort as string, y: e.score ?? 0 })),
         href: `/models/${es[0].slug}`,
       }));
-  }, [shown]);
+  }, [shown, paint]);
+
+  const sizes = useMemo(() => [...new Set(suite.tests.map((t) => sizeOf(t.test)))].sort((a, b) => a - b), [suite]);
+  const spent = useMemo(() => spend(rows, resource, per, sizes, kind), [rows, resource, per, sizes, kind]);
+
+  // Level by level: one line per model (its best effort when every effort is shown), the top few by index.
+  const ladders = useMemo(
+    () => suite.tests.filter((t) => levels.tests.includes(t.test) && pool.some((e) => levelsOf(levels, e, t.test).length > 0)),
+    [suite, levels, pool],
+  );
+  // The first 3×3 ladder unless another is picked: 2×2s are short, and few models reach the bigger cubes.
+  const ladder = ladders.find((t) => t.test === levelTest) ?? ladders.find((t) => sizeOf(t.test) === 3) ?? ladders[0];
+  const lineRows = (effort === 'all' ? bestPerModel(rows).sort(suiteOrder) : rows).slice(0, MAX_LINES);
+  const levelSeries: XYSeries[] = ladder
+    ? lineRows.map((e) => ({
+        key: e.id,
+        label: e.label,
+        ...(paint.get(e.model) ?? { color: SERIES_COLORS[0] }),
+        href: resultHref(e),
+        points: levelsOf(levels, e, ladder.test).flatMap((p) =>
+          levelMetric === 'moves' ? (p.moves === null ? [] : [{ x: p.depth, y: p.moves }]) : [{ x: p.depth, y: p.secs }],
+        ),
+      }))
+    : [];
+  const moreLines = (effort === 'all' ? bestPerModel(rows) : rows).length - lineRows.length;
 
   const toggleModel = (m: string) =>
     setHidden((h) => {
@@ -320,6 +371,116 @@ export default function IndexExplorer({ entries, suites, running }: { entries: S
           )}
         </Exportable>
 
+        <Exportable id="spend" name={`Cube Arena ${suite.name}: ${SPEND_TITLE[resource]}${per === 'solve' ? ' per cube solved' : ' for the whole suite'}`} className="card ix-card">
+          <header className="ix-head">
+            <h2>What it took</h2>
+            <p>{SPEND_BLURB[resource]} {per === 'solve' ? 'Divided by the cubes it solved, so solving more spreads it further.' : 'For the whole suite.'} Least first.</p>
+          </header>
+          <div className="ix-subtabs" data-noexport>
+            <div className="tab-row" role="tablist" aria-label="Measure">
+              {(
+                [
+                  ['cost', 'Cost'],
+                  ['tokens', 'Output tokens'],
+                  ['time', 'Time'],
+                ] as const
+              ).map(([k, name]) => (
+                <button key={k} type="button" role="tab" aria-selected={resource === k} className={`tab ${resource === k ? 'on' : ''}`} onClick={() => setResource(k)}>
+                  {name}
+                </button>
+              ))}
+            </div>
+            <div className="seg" role="group" aria-label="Per">
+              {(
+                [
+                  ['suite', 'Whole suite'],
+                  ['solve', 'Per cube solved'],
+                ] as const
+              ).map(([k, name]) => (
+                <button key={k} type="button" aria-pressed={per === k} onClick={() => setPer(k)}>
+                  {name}
+                </button>
+              ))}
+            </div>
+          </div>
+          <StackedBarChart items={spent.items} parts={spent.parts} format={spent.format} empty={SPEND_EMPTY[resource]} />
+          {(spent.left.length > 0 || spent.foot) && (
+            <p className="ix-foot">
+              {spent.foot}
+              {spent.foot && spent.left.length > 0 && ' '}
+              {spent.left.length > 0 && (
+                <>
+                  Not shown:{' '}
+                  {spent.left.map(({ e, why }, i) => (
+                    <span key={e.id}>
+                      {i > 0 && ', '}
+                      <Link href={resultHref(e)}>{e.label}</Link> ({why})
+                    </span>
+                  ))}
+                  .
+                </>
+              )}
+            </p>
+          )}
+        </Exportable>
+
+        <Exportable
+          id="levels"
+          name={`Cube Arena ${suite.name}: ${levelMetric === 'moves' ? 'moves per solve' : 'time per try'} by level, ${ladder?.name ?? 'ladders'}`}
+          className="card ix-card"
+        >
+          <header className="ix-head">
+            <h2>Level by level</h2>
+            <p>
+              {levelMetric === 'moves'
+                ? 'The moves each solve took at each level of a ladder. Level N is scrambled N moves from solved, so the diagonal is the scramble undone move by move. A line that jumps off it has switched to a method of its own: longer, but it still works when the scramble is too deep to see.'
+                : 'How long a try took at each level of a ladder, on a log scale. Time the model’s API was down is left out.'}
+            </p>
+          </header>
+          <div className="ix-subtabs" data-noexport>
+            <div className="tab-row" role="tablist" aria-label="Measure">
+              {(
+                [
+                  ['moves', 'Moves per solve'],
+                  ['time', 'Time per try'],
+                ] as const
+              ).map(([k, name]) => (
+                <button key={k} type="button" role="tab" aria-selected={levelMetric === k} className={`tab ${levelMetric === k ? 'on' : ''}`} onClick={() => setLevelMetric(k)}>
+                  {name}
+                </button>
+              ))}
+            </div>
+            {ladders.length > 1 && (
+              <label className="toggle on">
+                <span className="toggle-key">Test</span>
+                <span className="toggle-value">{ladder?.name}</span>
+                <select aria-label="Test" value={ladder?.test} onChange={(e) => setLevelTest(e.target.value)}>
+                  {ladders.map((t) => (
+                    <option key={t.test} value={t.test}>
+                      {t.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            )}
+          </div>
+          <LevelChart
+            series={levelSeries}
+            xLabel="Level (moves from solved)"
+            yLabel={levelMetric === 'moves' ? 'Moves per solve' : 'Time per try (log scale)'}
+            format={levelMetric === 'moves' ? (v) => String(Math.round(v)) : span}
+            log={levelMetric === 'time'}
+            ticks={levelMetric === 'time' ? SPAN_TICKS : undefined}
+            diagonal={levelMetric === 'moves' ? 'Scramble length' : undefined}
+            empty={levelMetric === 'moves' ? 'No ladder cube solved yet.' : 'No ladder played yet.'}
+          />
+          {moreLines > 0 && (
+            <p className="ix-foot">
+              The top {MAX_LINES} by index; {moreLines} more under Models above.
+            </p>
+          )}
+        </Exportable>
+
         <Exportable id="effort" name={`Cube Arena ${suite.name} effort`} className="card ix-card">
           <header className="ix-head">
             <h2>Does more effort help?</h2>
@@ -412,6 +573,127 @@ export default function IndexExplorer({ entries, suites, running }: { entries: S
     </div>
   );
 }
+
+type Resource = 'cost' | 'tokens' | 'time';
+type Per = 'suite' | 'solve';
+
+/** How many lines the level chart draws before it gets hard to read. */
+const MAX_LINES = 8;
+
+const sizeOf = (test: string) => Number(test.split('x')[0]);
+
+const SPEND_BLURB: Record<Resource, string> = {
+  cost: 'What the run cost, split into what the tokens were for: thinking, answers (moves and tool calls), fresh input, and input read back from cache.',
+  tokens: 'Tokens the model wrote: its thinking, then its answers (moves and tool calls).',
+  time: 'Wall-clock time the model spent, by cube size. Time its API was down is left out.',
+};
+
+const SPEND_TITLE: Record<Resource, string> = { cost: 'cost', tokens: 'output tokens', time: 'time' };
+
+const SPEND_EMPTY: Record<Resource, string> = {
+  cost: 'No costs yet: they appear once a run reports its tokens.',
+  tokens: 'No token counts yet.',
+  time: 'No finished suites yet.',
+};
+
+const money = (v: number) => (v === 0 ? '$0' : fmtCost(v));
+const round1 = (v: number) => String(Number(v.toFixed(v < 100 ? 1 : 0)));
+/** Seconds, read in the unit that suits them. */
+const span = (secs: number) => (secs < 60 ? `${Math.round(secs)}s` : secs < 3600 ? `${round1(secs / 60)} min` : `${round1(secs / 3600)} h`);
+const SPAN_TICKS = [1, 10, 60, 600, 3600, 36_000];
+
+interface Spend {
+  parts: StackPart[];
+  items: StackItem[];
+  format: (v: number) => string;
+  /** Results left out, and why. */
+  left: { e: SuiteEntry; why: string }[];
+  foot?: string;
+}
+
+/** The stacked bars for one measure: each result split into its parts, least first. */
+function spend(rows: SuiteEntry[], what: Resource, per: Per, sizes: number[], kind: SuiteKind): Spend {
+  const left: Spend['left'] = [];
+  const items: StackItem[] = [];
+  let estimated = false;
+  for (const e of rows) {
+    const d = per === 'solve' ? e.solved : 1;
+    if (!d) {
+      left.push({ e, why: 'no cube solved' });
+      continue;
+    }
+    const base = { key: e.id, label: e.model, sub: e.effort, color: e.color, href: resultHref(e) };
+    const split = (vs: (number | null)[]) => vs.map((v) => (v === null ? null : v / d));
+    if (what === 'cost') {
+      if (e.cost_usd === null) {
+        left.push({ e, why: 'no cost reported' });
+        continue;
+      }
+      estimated ||= e.cost_estimated;
+      const p = e.cost_parts;
+      const notes = [e.cost_estimated && 'Estimated from tokens at list prices.', p && p.reasoning === null && 'Its CLI doesn’t count thinking apart, so it is in answers.']
+        .filter(Boolean)
+        .join(' ');
+      items.push(
+        p
+          ? { ...base, values: split([p.reasoning, p.answer, p.input, p.cached]), note: notes || undefined }
+          : { ...base, values: [], whole: e.cost_usd / d, note: 'Not split: no list prices for this model.' },
+      );
+    } else if (what === 'tokens') {
+      if (e.output_tokens === null) {
+        left.push({ e, why: 'no tokens reported' });
+        continue;
+      }
+      items.push(
+        e.reasoning_tokens === null
+          ? { ...base, values: [], whole: e.output_tokens / d, note: 'Its CLI doesn’t count thinking apart: this is all it wrote.' }
+          : { ...base, values: split([e.reasoning_tokens, Math.max(0, e.output_tokens - e.reasoning_tokens)]) },
+      );
+    } else {
+      const bySize = sizes.map((s) => Object.entries(e.test_secs).reduce((a, [t, v]) => a + (sizeOf(t) === s ? v : 0), 0));
+      items.push(bySize.some((v) => v > 0) ? { ...base, values: split(bySize) } : { ...base, values: [], whole: e.secs / d });
+    }
+  }
+  items.sort((a, b) => total(a) - total(b));
+
+  if (what === 'cost') {
+    return {
+      parts: [
+        { key: 'reasoning', label: 'Thinking' },
+        { key: 'answer', label: 'Answers' },
+        { key: 'input', label: 'Input' },
+        { key: 'cached', label: 'Cached input' },
+      ],
+      items,
+      format: money,
+      left,
+      foot: `Split at each model’s list prices, scaled to what the run cost.${estimated ? ' Some costs are estimated from tokens at list prices.' : ''} Many runs themselves used subscriptions.`,
+    };
+  }
+  if (what === 'tokens') {
+    return {
+      parts: [
+        { key: 'reasoning', label: 'Thinking' },
+        { key: 'answer', label: 'Answers' },
+      ],
+      items,
+      format: (v) => (v === 0 ? '0' : fmtTokens(Math.round(v))),
+      left,
+    };
+  }
+  // Time reads in the unit that suits the longest bar.
+  const longest = Math.max(0, ...items.map(total));
+  const [unit, fmt] = longest >= 2 * 3600 ? [3600, (v: number) => `${round1(v)} h`] : longest >= 120 ? [60, (v: number) => `${round1(v)} min`] : [1, (v: number) => `${Math.round(v)}s`];
+  const scale = (v: number | null) => (v === null ? null : v / unit);
+  return {
+    parts: sizes.map((s) => ({ key: `s${s}`, label: kind === 'fast' && s === GAUNTLET.size ? `${s}×${s} ${GAUNTLET.name}` : `${s}×${s}` })),
+    items: items.map((it) => ({ ...it, values: it.values.map(scale), whole: it.whole === undefined ? undefined : (scale(it.whole) as number) })),
+    format: fmt,
+    left,
+  };
+}
+
+const total = (it: StackItem) => it.whole ?? it.values.reduce<number>((a, v) => a + (v ?? 0), 0);
 
 function Legend({ entries }: { entries: SuiteEntry[] }) {
   const makers = [...new Map(entries.map((e) => [e.maker, e.color])).entries()];

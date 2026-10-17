@@ -3619,6 +3619,11 @@ tr.sub-row .model-cell > strong {
   font-size: 1.55rem;
 }
 
+/* Clear of the card's Image button in the corner. */
+.exportable > .ix-head h2 {
+  padding-right: 84px;
+}
+
 .ix-head p {
   max-width: 46em;
   margin: 6px 0 0;
@@ -3978,6 +3983,139 @@ tr.sub-row .model-cell > strong {
   height: 12px;
   border: 1.5px solid var(--line);
   border-radius: 3px;
+}
+
+/* Hover and focus: invisible hit areas bigger than the marks, a readout box beside the pointer. */
+.chart-box {
+  position: relative;
+}
+
+.chart .hit {
+  fill: transparent;
+}
+
+.chart .bar-g:focus,
+.chart .dot-g:focus {
+  outline: none;
+}
+
+.chart .bar-g:focus-visible .bar,
+.chart .dot-g:focus-visible .dot {
+  stroke: var(--text);
+  stroke-width: 3;
+}
+
+.chart .bar.outline {
+  fill: none;
+}
+
+.chart .part-gap {
+  stroke: var(--card);
+  stroke-width: 2;
+}
+
+.chart .join {
+  fill: none;
+  stroke-width: 2.5;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+  opacity: 0.75;
+}
+
+.chart .line.thin {
+  stroke-width: 2.5;
+}
+
+.chart .crosshair {
+  stroke: var(--text-3);
+  stroke-width: 1;
+}
+
+.chart-tip {
+  position: absolute;
+  z-index: 5;
+  width: max-content;
+  max-width: 240px;
+  padding: 9px 11px;
+  border: var(--bw) solid var(--line);
+  border-radius: 10px;
+  background: var(--card);
+  box-shadow: var(--shadow-sm);
+  font-size: 0.82rem;
+  pointer-events: none;
+}
+
+.chart-tip-title {
+  margin-bottom: 5px;
+  font-weight: 700;
+}
+
+.chart-tip-row {
+  display: grid;
+  grid-template-columns: 14px auto minmax(0, 1fr);
+  gap: 7px;
+  align-items: center;
+  line-height: 1.55;
+}
+
+.chart-tip-row i {
+  width: 14px;
+  height: 3px;
+  border-radius: 2px;
+}
+
+.chart-tip-row i.none {
+  background: none;
+}
+
+.chart-tip-row b {
+  font-family: var(--font-mono);
+  font-weight: 700;
+}
+
+.chart-tip-row span {
+  color: var(--text-2);
+}
+
+.hbars li:has(.hbar-num.wide) {
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+
+.hbar-track.stack {
+  display: flex;
+}
+
+.hbar-part {
+  display: block;
+  height: 100%;
+}
+
+.hbar-part + .hbar-part {
+  border-left: 2px solid var(--card);
+}
+
+.hbar-track.stack .hbar-part:last-of-type {
+  border-right: var(--bw) solid var(--line);
+}
+
+.legend i.line-key {
+  width: 18px;
+  height: 4px;
+  border: 0;
+  border-radius: 2px;
+}
+
+.ix-subtabs {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px 16px;
+  margin-bottom: 18px;
+}
+
+.ix-subtabs .tab-row {
+  margin-bottom: 0;
 }
 
 /* ---------- Index tables ---------- */

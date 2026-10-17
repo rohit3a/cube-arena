@@ -2,7 +2,7 @@
 // people, or again later) count as one result: their average, with how many
 // there were. Safe to import from client components.
 
-import type { SuiteEntry } from './index-data';
+import type { CostParts, SuiteEntry } from './index-data';
 import { type Waiting, fullEffort, suiteOrder } from './ranking';
 import type { SuiteKind } from './suites';
 
@@ -10,6 +10,23 @@ const mean = (xs: number[]) => xs.reduce((a, b) => a + b, 0) / xs.length;
 /** Averaged suites show the Gauntlet as the least far along of those that unlocked it: a play still to come wins. */
 const GAUNTLET_ORDER = ['playing', 'pending', 'done', 'locked'] as const;
 const meanOrNull = (xs: (number | null)[]) => (xs.every((x) => x !== null) && xs.length ? mean(xs as number[]) : null);
+/** Cost parts averaged part by part; null unless every suite has them. */
+function meanParts(ps: (CostParts | null)[]): CostParts | null {
+  if (!ps.length || ps.some((p) => p === null)) return null;
+  const all = ps as CostParts[];
+  return {
+    input: mean(all.map((p) => p.input)),
+    cached: mean(all.map((p) => p.cached)),
+    reasoning: meanOrNull(all.map((p) => p.reasoning)),
+    answer: mean(all.map((p) => p.answer)),
+  };
+}
+/** Per-key means over the suites that have the key (a Gauntlet played by some of them only). */
+function meanByKey(rs: Record<string, number>[]): Record<string, number> {
+  const out: Record<string, number> = {};
+  for (const k of new Set(rs.flatMap((r) => Object.keys(r)))) out[k] = mean(rs.filter((r) => k in r).map((r) => r[k]));
+  return out;
+}
 /** A suite whose 4×4 Gauntlet is still to be played: its score isn't final yet. */
 export const provisional = (e: SuiteEntry) => e.gauntlet === 'pending' || e.gauntlet === 'playing';
 
@@ -43,8 +60,12 @@ export function averageByLabel(entries: SuiteEntry[]): SuiteEntry[] {
       secs: Math.round(mean(es.map((e) => e.secs))),
       input_tokens: meanOrNull(es.map((e) => e.input_tokens)),
       output_tokens: meanOrNull(es.map((e) => e.output_tokens)),
+      cached_input_tokens: meanOrNull(es.map((e) => e.cached_input_tokens)),
+      reasoning_tokens: meanOrNull(es.map((e) => e.reasoning_tokens)),
       cost_usd: costs.length ? mean(costs) : null,
       cost_estimated: es.some((e) => e.cost_estimated),
+      cost_parts: meanParts(es.map((e) => e.cost_parts)),
+      test_secs: meanByKey(es.map((e) => e.test_secs)),
       n: es.length,
       ids: es.map((e) => e.id),
       run_by: [...new Set(es.flatMap((e) => e.run_by))],
@@ -72,4 +93,44 @@ export function bestPerModel(entries: SuiteEntry[]): SuiteEntry[] {
     if (!b || suiteOrder(e, b) < 0) best.set(e.model, e);
   }
   return [...best.values()].sort(suiteOrder);
+}
+
+/**
+ * Ladder cubes level by level (index-data.ts levelCurves): test ids, and per suite its points as
+ * [test index, scramble length, cubes tried, solved, mean moves of the solves or null, mean seconds a try].
+ */
+export interface LevelData {
+  tests: string[];
+  suites: Record<string, [number, number, number, number, number | null, number][]>;
+}
+
+export interface LevelPoint {
+  depth: number;
+  tries: number;
+  solved: number;
+  /** Mean moves of the solved cubes; null when none was solved. */
+  moves: number | null;
+  /** Mean seconds a try took. */
+  secs: number;
+}
+
+/** One result's points on one test, its suites pooled (an averaged result stands for several). */
+export function levelsOf(data: LevelData, e: SuiteEntry, test: string): LevelPoint[] {
+  const t = data.tests.indexOf(test);
+  if (t < 0) return [];
+  const by = new Map<number, { tries: number; solved: number; moveSum: number; secSum: number }>();
+  for (const id of e.ids) {
+    for (const [ti, depth, tries, solved, moves, secs] of data.suites[id] ?? []) {
+      if (ti !== t) continue;
+      const p = by.get(depth) ?? { tries: 0, solved: 0, moveSum: 0, secSum: 0 };
+      p.tries += tries;
+      p.solved += solved;
+      p.moveSum += (moves ?? 0) * solved;
+      p.secSum += secs * tries;
+      by.set(depth, p);
+    }
+  }
+  return [...by.entries()]
+    .sort((a, b) => a[0] - b[0])
+    .map(([depth, p]) => ({ depth, tries: p.tries, solved: p.solved, moves: p.solved ? p.moveSum / p.solved : null, secs: p.secSum / p.tries }));
 }

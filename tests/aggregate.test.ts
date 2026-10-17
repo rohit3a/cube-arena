@@ -15,7 +15,11 @@ const entry = (id: string, score: number, gauntlet: SuiteEntry['gauntlet']) =>
     out_of_output: 0,
     input_tokens: null,
     output_tokens: null,
+    cached_input_tokens: null,
+    reasoning_tokens: null,
     cost_usd: null,
+    cost_parts: null,
+    test_secs: {},
     run_by: [],
     n: 1,
   }) as unknown as SuiteEntry;

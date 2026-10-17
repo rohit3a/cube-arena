@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import IndexExplorer, { type SuiteInfo } from '@/components/IndexExplorer';
-import { suiteEntries, testNames } from '@/lib/arena/index-data';
+import { levelCurves, suiteEntries, testNames } from '@/lib/arena/index-data';
 import { isRunning } from '@/lib/arena/running';
 import { sweepExpired } from '@/lib/arena/service';
 import { GAUNTLET, SUITES, SUITE_KINDS, suiteTests } from '@/lib/arena/suites';
@@ -17,6 +17,7 @@ export default async function Benchmark() {
   const entries = (await suiteEntries()).filter((e) => e.board === 'verified');
   const suites: SuiteInfo[] = SUITE_KINDS.map((k) => ({ kind: k, name: SUITES[k].name, version: SUITES[k].version, blurb: SUITES[k].blurb, tests: testNames(k) }));
   const running = entries.filter(isRunning);
+  const levels = await levelCurves(entries.filter((e) => e.status === 'finished' && e.version === SUITES[e.kind].version).map((e) => e.id));
   const thorough = SUITES.thorough;
   const g = `${GAUNTLET.size}×${GAUNTLET.size}`;
 
@@ -30,7 +31,7 @@ export default async function Benchmark() {
         Missing a model? <Link href="/wanted">Help run it</Link>.
       </p>
 
-      <IndexExplorer entries={entries} suites={suites} running={running} />
+      <IndexExplorer entries={entries} suites={suites} running={running} levels={levels} />
 
       <section id="method" className="method">
         <h2>How the index works</h2>
