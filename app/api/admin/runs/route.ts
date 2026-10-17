@@ -4,7 +4,8 @@
 //   POST /api/admin/runs {id, stop: true, quit?, reason} end an active run now            operator, or the invitee whose suite it is
 //   POST /api/admin/runs {id, reopen: true}      a test ended by a fault of ours picks up where it was   operator
 //   POST /api/admin/runs {id, model_name}        fix a run's model name                       operator
-//   POST /api/admin/runs {id, usage}             record the tokens and cost the runner measured   operator, or its invitee
+//   POST /api/admin/runs {id, usage, lost?}      record the tokens and cost the runner measured   operator, or its invitee
+//                                                (lost: the session ended through no fault of the model; kept out of cost)
 // Hiding a run that belongs to a suite (or passing a suite id) hides the whole suite.
 // scripts/moderate.mjs wraps these. Boards refresh within ~30 s (their cache).
 import { listRuns, rename, setHidden, setUsage, suiteOf } from '@/lib/arena/admin';
@@ -33,6 +34,7 @@ export async function POST(req: Request) {
     reason?: unknown;
     model_name?: unknown;
     usage?: unknown;
+    lost?: unknown;
   } | null;
   const id = typeof body?.id === 'string' ? body.id.trim() : '';
   const reason = typeof body?.reason === 'string' ? body.reason.slice(0, 200) : null;
@@ -52,7 +54,7 @@ export async function POST(req: Request) {
     const usage = Object.fromEntries(
       ['input_tokens', 'cached_input_tokens', 'output_tokens', 'reasoning_tokens', 'cost_usd'].flatMap((k) => (Number.isFinite(u[k]) ? [[k, Number(u[k])]] : [])),
     );
-    return Response.json({ recorded: await setUsage(id, usage) });
+    return Response.json({ recorded: await setUsage(id, usage, body.lost === true) });
   }
   const name = typeof body?.model_name === 'string' ? body.model_name.trim().slice(0, 80) : '';
   const run = name ? await rename(id, name) : await setHidden(id, body?.hidden !== false, reason);

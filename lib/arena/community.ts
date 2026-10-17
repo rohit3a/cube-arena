@@ -5,6 +5,7 @@
 import { createHmac, timingSafeEqual } from 'node:crypto';
 import { SITE_URL } from '../site';
 import { clientLabel } from './clients';
+import { fmtCost, fmtDuration } from './format';
 import { type Review, UUID, transaction, withDb } from './db';
 import { allSuiteEntries } from './index-data';
 import { SUITES, testName } from './suites';
@@ -34,6 +35,8 @@ export interface CommunityItem {
   /** "Fast v3, score 92.5", or the run's test and how far it got. */
   summary: string;
   tests: CommunityTest[];
+  /** Time and cost left out as not the model's doing (sessions its runner said were lost), or null for none. */
+  left_out: string | null;
 }
 
 interface RunLine {
@@ -56,6 +59,8 @@ interface RunLine {
   attempts: number;
   end_reason: string | null;
   replay: string | null;
+  lost_secs: number;
+  lost_cost: number | null;
 }
 
 function result(r: RunLine): string {
@@ -63,6 +68,13 @@ function result(r: RunLine): string {
   const how = r.end_reason ? ` (${r.end_reason.replace(/_/g, ' ')})` : '';
   if (r.challenge === 'scramble') return `solved ${r.solves} of ${r.attempts}${how}`;
   return `best level ${r.best_level}${r.top_level ? ` of ${r.top_level}` : ''}${how}`;
+}
+
+function leftOut(runs: RunLine[]): string | null {
+  const secs = runs.reduce((a, r) => a + r.lost_secs, 0);
+  const cost = runs.reduce((a, r) => a + (r.lost_cost ?? 0), 0);
+  const parts = [secs > 0 && `${fmtDuration(secs)} of time`, cost > 0 && `${fmtCost(cost)} of cost`].filter(Boolean);
+  return parts.length ? parts.join(' and ') : null;
 }
 
 const testOf = (r: RunLine): CommunityTest => ({
@@ -79,7 +91,9 @@ export async function communityItems(since: Date): Promise<CommunityItem[]> {
              greatest(r.updated_at, coalesce((select max(a.finished_at) from cube_arena.attempts a where a.run_id = r.id), r.updated_at)) as updated_at,
              r.size, r.mode, r.challenge, r.top_level, r.best_level, r.solves, r.attempts, r.end_reason,
              (select a.id from cube_arena.attempts a where a.run_id = r.id
-              order by (a.status = 'solved') desc, a.level desc nulls last, a.seq desc limit 1) as replay
+              order by (a.status = 'solved') desc, a.level desc nulls last, a.seq desc limit 1) as replay,
+             (select coalesce(sum(a.paused_secs), 0)::int from cube_arena.attempts a where a.run_id = r.id) as lost_secs,
+             (r.lost_usage->>'cost_usd')::float as lost_cost
       from cube_arena.runs r
       where r.board = 'community' and not r.hidden
         and (r.created_at >= ${since} or (r.suite_id is not null and exists (
@@ -107,6 +121,7 @@ export async function communityItems(since: Date): Promise<CommunityItem[]> {
       updated_at: new Date(last).toISOString(),
       summary: `${def.name} ${e.version}, ${e.score === null ? 'not finished' : `score ${e.score.toFixed(1)}`}${e.gauntlet === 'pending' ? ', Gauntlet unlocked and not played yet' : ''}`,
       tests: mine.map(testOf),
+      left_out: leftOut(mine),
     });
   }
   for (const r of runs) {
@@ -126,6 +141,7 @@ export async function communityItems(since: Date): Promise<CommunityItem[]> {
       updated_at: new Date(r.updated_at).toISOString(),
       summary: `${t.name}: ${t.result}`,
       tests: [t],
+      left_out: leftOut([r]),
     });
   }
   return items.sort((a, b) => b.created_at.localeCompare(a.created_at));

@@ -81,6 +81,12 @@ function Item({ x, actions, decline }: { x: CommunityItem; actions: ReactNode; d
             </dd>
           </div>
         )}
+        {x.left_out && (
+          <div>
+            <dt>Left out</dt>
+            <dd>{x.left_out}, as sessions lost through no fault of the model</dd>
+          </div>
+        )}
         <div>
           <dt>Connected via</dt>
           <dd>{x.via || 'unknown'}</dd>

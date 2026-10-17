@@ -6,8 +6,9 @@
 //   POST /api/admin/suites {kind, model_name, model, model_id, effort, agent}   operator only: any name
 //   POST /api/admin/suites {id, finish: true}       close it (hidden if a test is missing or stopped)
 //   POST /api/admin/suites {id, alive: true}        heartbeat: the runner is still playing it (every few minutes)
-//   POST /api/admin/suites {id, lost: {from, to, slot?}}   operator only: a session lost through no fault of the model, from
-//                                                   its start to the next one's; left out of the waiting cube's time (that test's)
+//   POST /api/admin/suites {id, lost: {from, to, slot?}}   a session lost through no fault of the model, from its start to the
+//                                                   next one's; left out of the waiting cube's time (that test's). An invitee
+//                                                   only on its own suite, since it began; the review page shows it.
 // Hiding a suite goes through /api/admin/runs with the suite id.
 import { getSuite, listSuites } from '@/lib/arena/admin';
 import { type Auth, authFrom, deny } from '@/lib/arena/auth';
@@ -63,13 +64,19 @@ export async function POST(req: Request) {
   }
 
   if (body.lost && typeof body.lost === 'object') {
-    if (auth.role !== 'operator') return deny(badCode);
     const suite = await getSuite(str(body.id) ?? '');
-    if (!suite) return noSuite();
+    if (!suite || !owns(auth, suite)) return noSuite();
     const { from, to, slot } = body.lost as { from?: unknown; to?: unknown; slot?: unknown };
     const [f, t] = [new Date(String(from)), new Date(String(to))];
     if (Number.isNaN(f.getTime()) || Number.isNaN(t.getTime())) return bad('lost needs from and to as ISO times');
-    return Response.json({ lost: await addLostTime(suite.id, f, t, Number.isInteger(slot) ? Number(slot) : undefined) });
+    // An invitee's runner reports its own lost sessions, and only time that has passed since its suite began; the time
+    // goes on the cube still being played, so a finished test can't be changed.
+    if (auth.role === 'invite' && (f < new Date(suite.created_at) || t.getTime() > Date.now() + 60_000)) {
+      return bad('lost time must fall between the suite starting and now');
+    }
+    const lost = await addLostTime(suite.id, f, t, Number.isInteger(slot) ? Number(slot) : undefined);
+    if (lost && auth.role === 'invite') console.log(`lost time by invite ${auth.invite.id}: suite ${suite.id}, ${lost.secs}s on ${lost.attempt}`);
+    return Response.json({ lost });
   }
 
   if (body.finish === true) {

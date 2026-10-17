@@ -24,8 +24,8 @@ type Per = 'suite' | 'solve';
 export const sizeOf = (test: string) => Number(test.split('x')[0]);
 
 const SPEND_BLURB: Record<Resource, string> = {
-  cost: 'What the run cost, split into what the tokens were for: thinking, answers (moves and tool calls), fresh input, and input read back from cache.',
-  tokens: 'Tokens the model wrote: its thinking, then its answers (moves and tool calls).',
+  cost: 'What the run cost, split into what the tokens were for: thinking, answers (moves and tool calls), fresh input, and input read back from cache. Sessions its API cut off are left out.',
+  tokens: 'Tokens the model wrote: its thinking, then its answers (moves and tool calls). Sessions its API cut off are left out.',
   time: 'Wall-clock time the model spent, by cube size. Time its API was down is left out.',
 };
 

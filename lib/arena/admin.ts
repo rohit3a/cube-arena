@@ -86,21 +86,24 @@ export async function setHidden(id: string, hidden: boolean, reason: string | nu
  * Adds one session's tokens and cost to a run (a test picked up again after
  * an API error is played over more than one session). Without a cost (Codex
  * counts only tokens), it is worked out from the suite model's list price.
+ * A session lost through no fault of the model goes to lost_usage instead,
+ * so the run's cost counts only what the test needed.
  */
-export async function setUsage(id: string, usage: Usage): Promise<boolean> {
+export async function setUsage(id: string, usage: Usage, lost = false): Promise<boolean> {
   if (!UUID.test(id)) return false;
   return transaction(async (sql) => {
-    const [run] = await sql<{ usage: Usage | null; model_id: string | null }[]>`
-      select r.usage, s.model_id from cube_arena.runs r left join cube_arena.suites s on s.id = r.suite_id where r.id = ${id} for update of r`;
+    const [run] = await sql<{ usage: Usage | null; lost_usage: Usage | null; model_id: string | null }[]>`
+      select r.usage, r.lost_usage, s.model_id from cube_arena.runs r left join cube_arena.suites s on s.id = r.suite_id where r.id = ${id} for update of r`;
     if (!run) return false;
     let u = usage;
     if (u.cost_usd === undefined) {
       const cost = run.model_id ? listCost(catalogModel(run.model_id), u) : null;
       if (cost !== null) u = { ...u, cost_usd: cost };
     }
-    const total: Record<string, number> = { ...(run.usage as Record<string, number> | null) };
+    const total: Record<string, number> = { ...((lost ? run.lost_usage : run.usage) as Record<string, number> | null) };
     for (const [k, v] of Object.entries(u)) if (Number.isFinite(v)) total[k] = (total[k] ?? 0) + v;
-    await sql`update cube_arena.runs set usage = ${sql.json(total)} where id = ${id}`;
+    if (lost) await sql`update cube_arena.runs set lost_usage = ${sql.json(total)} where id = ${id}`;
+    else await sql`update cube_arena.runs set usage = ${sql.json(total)} where id = ${id}`;
     return true;
   });
 }

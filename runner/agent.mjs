@@ -191,6 +191,8 @@ export async function playSession(s) {
 async function afterSession(s, out) {
   const call = operator(s.url, s.token);
   try {
+    // An API error ends the session even after the model ran over its output limit (a safeguard flag on the reply
+    // that followed, say), so the test is picked up again rather than ended.
     const quit = out.quit && !out.breach && !out.apiError;
     if (out.runId && !out.runOver && !out.breach && !quit) {
       out.retry = out.apiError ?? out.stopReason ?? `the session ended unexpectedly (exit ${out.code})`;
@@ -202,7 +204,8 @@ async function afterSession(s, out) {
     } else if (!out.runId && out.apiError) {
       out.retry = out.apiError;
     }
-    if (out.runId) await call('/api/admin/runs', { id: out.runId, usage: out.usage });
+    // A session lost through no fault of the model is kept out of the run's cost, as its time is.
+    if (out.runId) await call('/api/admin/runs', { id: out.runId, usage: out.usage, lost: !!out.retry });
     if (out.runId && out.breach) {
       await call('/api/admin/runs', { id: out.runId, hidden: true, reason: `runner lockdown: ${out.breach}` });
       console.log('  hidden from the boards');
