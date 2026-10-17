@@ -185,12 +185,20 @@ export interface Stats {
  * its suite fresh however long the model thinks; otherwise a move (or the
  * start) in the last few hours. No clock ends a cube: this only keeps
  * abandoned ones off the live views until the sweep closes them.
+ * A suite is played one test at a time, but a test reopened or left mid-way
+ * keeps its cube open until its turn comes again: of a suite's open cubes,
+ * only the one with the latest move (or start) is being played.
  */
 const playing = (sql: Tx) => sql`(
-  exists (select 1 from cube_arena.runs pr join cube_arena.suites ps on ps.id = pr.suite_id
-          where pr.id = a.run_id and ps.board = 'verified' and (ps.status = 'active' or pr.status = 'active')
-            and ps.updated_at > now() - interval '30 minutes')
-  or coalesce((select e.at from cube_arena.events e where e.attempt_id = a.id order by e.id desc limit 1), a.created_at) > now() - interval '3 hours')`;
+  (exists (select 1 from cube_arena.runs pr join cube_arena.suites ps on ps.id = pr.suite_id
+           where pr.id = a.run_id and ps.board = 'verified' and (ps.status = 'active' or pr.status = 'active')
+             and ps.updated_at > now() - interval '30 minutes')
+   or coalesce((select e.at from cube_arena.events e where e.attempt_id = a.id order by e.id desc limit 1), a.created_at) > now() - interval '3 hours')
+  and not exists (
+    select 1 from cube_arena.runs ar join cube_arena.runs sr on sr.suite_id = ar.suite_id join cube_arena.attempts o on o.run_id = sr.id
+    where ar.id = a.run_id and o.status = 'active' and o.id <> a.id
+      and coalesce((select e.at from cube_arena.events e where e.attempt_id = o.id order by e.id desc limit 1), o.created_at)
+        > coalesce((select e.at from cube_arena.events e where e.attempt_id = a.id order by e.id desc limit 1), a.created_at)))`;
 
 async function statsQuery(): Promise<Stats> {
   const [s] = await withDb((sql) => sql<Stats[]>`
