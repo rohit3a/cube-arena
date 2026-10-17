@@ -1,13 +1,15 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
+import { Fragment } from 'react';
 import { BarChart } from '@/components/charts';
 import Exportable from '@/components/Exportable';
+import { ModelRunCharts } from '@/components/RunCharts';
 import Writeup from '@/components/Writeup';
 import { OUT_OF_OUTPUT, OUT_OF_OUTPUT_WHY, fmtCost, fmtDuration, fmtScore, fmtTokens, heat } from '@/lib/arena/format';
 import { averageByLabel, provisional } from '@/lib/arena/aggregate';
 import { type CatalogModel, catalogModel, harnessLabel } from '@/lib/arena/catalog';
-import { type SuiteEntry, suiteEntries, testNames } from '@/lib/arena/index-data';
+import { type SuiteEntry, levelCurves, suiteEntries, testNames } from '@/lib/arena/index-data';
 import { effortRank } from '@/lib/arena/makers';
 import { suiteOrder } from '@/lib/arena/ranking';
 import { isRunning, runningLabel } from '@/lib/arena/running';
@@ -47,6 +49,8 @@ export default async function ModelPage(props: { params: Promise<{ slug: string 
   // Our blog about the model: only once we've run it ourselves.
   const blog = board === 'verified' ? await latestWriteup('blog', slug) : null;
   const [live, versions] = blog ? await Promise.all([liveValues(), writeupHistory('blog', slug)]) : [new Map<string, string>(), []];
+  // Ladder cubes level by level, for the level charts under each suite.
+  const levels = await levelCurves(finished.filter((e) => e.version === SUITES[e.kind].version).map((e) => e.id));
 
   return (
     <div className="wrap page-head">
@@ -118,111 +122,114 @@ export default async function ModelPage(props: { params: Promise<{ slug: string 
         // Left out of the average until its Gauntlet is played (aggregate.ts).
         const waiting = (e: SuiteEntry): e is SuiteEntry & { gauntlet: 'pending' | 'playing' } => provisional(e) && all.some((x) => x.label === e.label && !provisional(x));
         return (
-          <Exportable key={k} id={k} name={`${model} ${SUITES[k].name} ${SUITES[k].version}`} className="card ix-card">
-            <header className="ix-head">
-              <h2>
-                {SUITES[k].name} {SUITES[k].version}
-                {hasEffort && ' by effort'}
-              </h2>
-              <p>{SUITES[k].blurb}</p>
-            </header>
-            <BarChart
-              height={180}
-              items={rows.map((e) => ({
-                key: e.id,
-                label: e.effort ?? model,
-                sub: e.gauntlet === 'pending' || e.gauntlet === 'playing' ? GAUNTLET_TAG[e.gauntlet] : null,
-                value: e.score,
-                color,
-                href: href(e),
-              }))}
-            />
-            <div className="table-wrap flat">
-              <table className="heat">
-                <thead>
-                  <tr>
-                    <th>{hasEffort ? 'Effort' : 'Model'}</th>
-                    <th className="num">Index</th>
-                    {tests.map((t) => (
-                      <th key={t.test} className="num" title={t.name}>
-                        {k === 'fast' ? t.name : t.short}
-                      </th>
-                    ))}
-                    <th className="num">Moves</th>
-                    <th className="num">Time</th>
-                    <th className="num">Tokens</th>
-                    <th className="num">Cost</th>
-                    <th className="num">Runs</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {rows.map((e) => (
-                    <tr key={e.id}>
-                      <td>
-                        {e.n > 1 ? <a href={href(e)}>{e.effort ?? model}</a> : <Link href={href(e)}>{e.effort ?? model}</Link>}
-                      </td>
-                      <td className="num strong">{fmtScore(e.score)}</td>
-                      {tests.map((t) => {
-                        const g = e.tests.find((x) => x.test === t.test);
-                        const s = g?.score ?? null;
-                        if (t.gauntlet && (e.gauntlet === 'locked' || (e.gauntlet !== 'done' && !g?.played))) {
+          <Fragment key={k}>
+            <Exportable id={k} name={`${model} ${SUITES[k].name} ${SUITES[k].version}`} className="card ix-card">
+              <header className="ix-head">
+                <h2>
+                  {SUITES[k].name} {SUITES[k].version}
+                  {hasEffort && ' by effort'}
+                </h2>
+                <p>{SUITES[k].blurb}</p>
+              </header>
+              <BarChart
+                height={180}
+                items={rows.map((e) => ({
+                  key: e.id,
+                  label: e.effort ?? model,
+                  sub: e.gauntlet === 'pending' || e.gauntlet === 'playing' ? GAUNTLET_TAG[e.gauntlet] : null,
+                  value: e.score,
+                  color,
+                  href: href(e),
+                }))}
+              />
+              <div className="table-wrap flat">
+                <table className="heat">
+                  <thead>
+                    <tr>
+                      <th>{hasEffort ? 'Effort' : 'Model'}</th>
+                      <th className="num">Index</th>
+                      {tests.map((t) => (
+                        <th key={t.test} className="num" title={t.name}>
+                          {k === 'fast' ? t.name : t.short}
+                        </th>
+                      ))}
+                      <th className="num">Moves</th>
+                      <th className="num">Time</th>
+                      <th className="num">Tokens</th>
+                      <th className="num">Cost</th>
+                      <th className="num">Runs</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {rows.map((e) => (
+                      <tr key={e.id}>
+                        <td>
+                          {e.n > 1 ? <a href={href(e)}>{e.effort ?? model}</a> : <Link href={href(e)}>{e.effort ?? model}</Link>}
+                        </td>
+                        <td className="num strong">{fmtScore(e.score)}</td>
+                        {tests.map((t) => {
+                          const g = e.tests.find((x) => x.test === t.test);
+                          const s = g?.score ?? null;
+                          if (t.gauntlet && (e.gauntlet === 'locked' || (e.gauntlet !== 'done' && !g?.played))) {
+                            return (
+                              <td key={t.test} className="num faint" title={e.gauntlet === 'locked' ? 'Locked: it takes 100 on the other three tests' : 'Unlocked, not played yet'}>
+                                {e.gauntlet === 'locked' ? '–' : 'pending'}
+                              </td>
+                            );
+                          }
                           return (
-                            <td key={t.test} className="num faint" title={e.gauntlet === 'locked' ? 'Locked: it takes 100 on the other three tests' : 'Unlocked, not played yet'}>
-                              {e.gauntlet === 'locked' ? '–' : 'pending'}
+                            <td key={t.test} className={`num heat-cell ${heat(s)}`}>
+                              {fmtScore(s)}
+                              {g?.out_of_output && (
+                                <sup className="oo-mark" title={`${OUT_OF_OUTPUT}: ${OUT_OF_OUTPUT_WHY}`}>
+                                  †
+                                </sup>
+                              )}
                             </td>
                           );
-                        }
-                        return (
-                          <td key={t.test} className={`num heat-cell ${heat(s)}`}>
-                            {fmtScore(s)}
-                            {g?.out_of_output && (
-                              <sup className="oo-mark" title={`${OUT_OF_OUTPUT}: ${OUT_OF_OUTPUT_WHY}`}>
-                                †
-                              </sup>
-                            )}
-                          </td>
-                        );
-                      })}
-                      <td className="num">{e.moves}</td>
-                      <td className="num">{fmtDuration(e.secs)}</td>
-                      <td className="num">{fmtTokens(e.output_tokens === null ? null : (e.input_tokens ?? 0) + e.output_tokens)}</td>
-                      <td className="num">{fmtCost(e.cost_usd)}</td>
-                      <td className="num">{e.n}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-            {rows.some((e) => e.out_of_output > 0) && (
-              <p className="ix-foot">
-                † Ran out of output: {OUT_OF_OUTPUT_WHY}, so the test ended on that level. It keeps the levels it had cleared.{' '}
-                <Link href="/benchmark#method">Why</Link>
-              </p>
-            )}
-            <details id={`${k}-runs`} className="runs-list" open={all.length > rows.length}>
-              <summary>
-                Every run ({all.length})
-              </summary>
-              {groups.map((g) => (
-                <ul key={runsId(g[0])} id={runsId(g[0])}>
-                  {g.map((e) => (
-                    <li key={e.id}>
-                      <Link href={`/suites/${e.id}`}>
-                        <strong>{fmtScore(e.score)}</strong>
-                        {e.effort && ` at ${e.effort}`}
-                      </Link>{' '}
-                      <span className="muted">
-                        {waiting(e) && `· ${GAUNTLET_TAG[e.gauntlet]}, not in the average until it's played `}
-                        · run by {e.contributor ? <Link href={`/contributors/${e.contributor.slug}`}>{e.contributor.name}</Link> : e.run_by.join(', ')}
-                        {e.harness ? ` via ${e.harness}` : ''} ·{' '}
-                        <span suppressHydrationWarning>{e.finished_at ? new Date(e.finished_at).toLocaleDateString(undefined, { day: 'numeric', month: 'short' }) : ''}</span>
-                      </span>
-                    </li>
-                  ))}
-                </ul>
-              ))}
-            </details>
-          </Exportable>
+                        })}
+                        <td className="num">{e.moves}</td>
+                        <td className="num">{fmtDuration(e.secs)}</td>
+                        <td className="num">{fmtTokens(e.output_tokens === null ? null : (e.input_tokens ?? 0) + e.output_tokens)}</td>
+                        <td className="num">{fmtCost(e.cost_usd)}</td>
+                        <td className="num">{e.n}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              {rows.some((e) => e.out_of_output > 0) && (
+                <p className="ix-foot">
+                  † Ran out of output: {OUT_OF_OUTPUT_WHY}, so the test ended on that level. It keeps the levels it had cleared.{' '}
+                  <Link href="/benchmark#method">Why</Link>
+                </p>
+              )}
+              <details id={`${k}-runs`} className="runs-list" open={all.length > rows.length}>
+                <summary>
+                  Every run ({all.length})
+                </summary>
+                {groups.map((g) => (
+                  <ul key={runsId(g[0])} id={runsId(g[0])}>
+                    {g.map((e) => (
+                      <li key={e.id}>
+                        <Link href={`/suites/${e.id}`}>
+                          <strong>{fmtScore(e.score)}</strong>
+                          {e.effort && ` at ${e.effort}`}
+                        </Link>{' '}
+                        <span className="muted">
+                          {waiting(e) && `· ${GAUNTLET_TAG[e.gauntlet]}, not in the average until it's played `}
+                          · run by {e.contributor ? <Link href={`/contributors/${e.contributor.slug}`}>{e.contributor.name}</Link> : e.run_by.join(', ')}
+                          {e.harness ? ` via ${e.harness}` : ''} ·{' '}
+                          <span suppressHydrationWarning>{e.finished_at ? new Date(e.finished_at).toLocaleDateString(undefined, { day: 'numeric', month: 'short' }) : ''}</span>
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                ))}
+              </details>
+            </Exportable>
+            <ModelRunCharts kind={k} subject={`${model} ${SUITES[k].name}`} rows={rows} tests={tests} levels={levels} model={model} />
+          </Fragment>
         );
       })}
 

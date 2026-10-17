@@ -4118,6 +4118,12 @@ tr.sub-row .model-cell > strong {
   margin-bottom: 0;
 }
 
+.ix-segs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
 /* ---------- Index tables ---------- */
 
 .table-wrap.flat {

@@ -570,30 +570,80 @@ const totalOf = (it: StackItem) => it.whole ?? it.values.reduce<number>((a, v) =
 /** What a bar draws: its parts, or its whole as the first part. */
 const drawn = (it: StackItem) => (it.whole !== undefined ? [it.whole] : it.values);
 
+const ceil125 = (v: number) => {
+  const e = 10 ** Math.floor(Math.log10(v));
+  return ([1, 2, 5, 10].find((m) => m * e >= v * 0.999) ?? 10) * e;
+};
+const floor125 = (v: number) => {
+  const e = 10 ** Math.floor(Math.log10(v));
+  return ([5, 2, 1].find((m) => m * e <= v * 1.001) ?? 1) * e;
+};
+
+/**
+ * The value axis of stacked bars: its ticks and where a total sits on it (0 at the base, 1 at the top). On a log
+ * scale a bar's height is its total; its parts split that height by their share of it.
+ */
+function stackScale(items: StackItem[], log: boolean): { ticks: number[]; frac: (v: number) => number } {
+  const totals = items.map(totalOf);
+  if (!log) {
+    const ticks = upTicks(Math.max(0, ...totals));
+    const max = ticks[ticks.length - 1] || 1;
+    return { ticks, frac: (v) => Math.max(0, v) / max };
+  }
+  const pos = totals.filter((v) => v > 0);
+  const min = pos.length ? Math.min(...pos) : 1;
+  const max = pos.length ? Math.max(...pos) : 10;
+  let lo: number;
+  let hi: number;
+  let ticks: number[];
+  if (Math.log10(max / min) > 1.5) {
+    // Wide ranges: a tick at each power of ten, and the top unless it would crowd the last one.
+    lo = 10 ** Math.floor(Math.log10(min / 1.5));
+    hi = ceil125(max);
+    ticks = [];
+    for (let v = lo; v <= hi * 1.001; v *= 10) ticks.push(Number(v.toPrecision(6)));
+    if (Math.log10(hi / ticks[ticks.length - 1]) >= 0.5) ticks.push(hi);
+  } else {
+    // The floor sits a step below the smallest bar, so it still has some height.
+    lo = floor125(min / 1.5);
+    hi = Math.max(ceil125(max), lo * 2);
+    ticks = niceTicks(lo, hi, true);
+  }
+  const span = Math.log10(hi / lo) || 1;
+  return { ticks, frac: (v) => (v <= 0 ? 0 : Math.max(0.015, Math.min(1, Math.log10(v / lo) / span))) };
+}
+
 export function StackedBarChart({
   items,
   parts,
   format,
+  axisFormat,
   height = 240,
+  log = false,
   empty,
 }: {
   items: StackItem[];
   parts: StackPart[];
   format: (v: number) => string;
+  /** The axis's numbers, when they read better shorter than the values ("$1" for "$1.00"). */
+  axisFormat?: (v: number) => string;
   height?: number;
+  /** Log scale: bars of very different sizes stay readable; parts show their share of each bar. */
+  log?: boolean;
   empty?: ReactNode;
 }) {
   const [ref, width] = useWidth<HTMLDivElement>();
+  const scale = stackScale(items, log);
   return (
     <div ref={ref} className="chart-wrap">
       {items.length === 0 ? (
         <div className="chart-empty">{empty ?? 'No results yet.'}</div>
       ) : width > 0 && width < 560 ? (
-        <HStack items={items} parts={parts} format={format} />
+        <HStack items={items} parts={parts} format={format} scale={scale} />
       ) : (
-        width > 0 && <VStack items={items} parts={parts} format={format} height={height} width={width} />
+        width > 0 && <VStack items={items} parts={parts} format={format} axisFormat={axisFormat ?? format} height={height} width={width} scale={scale} />
       )}
-      {items.length > 0 && parts.length > 1 && (
+      {items.some((it) => it.whole === undefined) && parts.length > 1 && (
         <ul className="legend">
           {parts.map((p, i) => (
             <li key={p.key}>
@@ -621,7 +671,23 @@ function readout(it: StackItem, parts: StackPart[], format: (v: number) => strin
   return rows;
 }
 
-function VStack({ items, parts, format, height, width }: { items: StackItem[]; parts: StackPart[]; format: (v: number) => string; height: number; width: number }) {
+function VStack({
+  items,
+  parts,
+  format,
+  axisFormat,
+  height,
+  width,
+  scale,
+}: {
+  items: StackItem[];
+  parts: StackPart[];
+  format: (v: number) => string;
+  axisFormat: (v: number) => string;
+  height: number;
+  width: number;
+  scale: ReturnType<typeof stackScale>;
+}) {
   const uid = useId().replace(/:/g, '');
   const [tip, setTip] = useState<TipState | null>(null);
   const rad = (42 * Math.PI) / 180;
@@ -636,9 +702,8 @@ function VStack({ items, parts, format, height, width }: { items: StackItem[]; p
   const top = 22;
   const W = Math.max(width, left + slot * items.length);
   const H = top + height + labelH;
-  const ticks = upTicks(Math.max(0, ...items.map(totalOf)));
-  const max = ticks[ticks.length - 1] || 1;
-  const y = (v: number) => top + height - (height * Math.max(0, v)) / max;
+  const { ticks, frac } = scale;
+  const y = (v: number) => top + height - height * frac(v);
   return (
     <div className="chart-scroll chart-box">
       <svg width={W} height={H} className="chart" role="img" aria-label="Stacked bar chart">
@@ -646,7 +711,7 @@ function VStack({ items, parts, format, height, width }: { items: StackItem[]; p
           <g key={g}>
             <line x1={left - 8} x2={W} y1={y(g)} y2={y(g)} className="grid-line" />
             <text x={left - 14} y={y(g) + 4} className="axis-num" textAnchor="end">
-              {format(g)}
+              {axisFormat(g)}
             </text>
           </g>
         ))}
@@ -655,6 +720,8 @@ function VStack({ items, parts, format, height, width }: { items: StackItem[]; p
           const total = totalOf(it);
           const h = Math.max(top + height - y(total), 2);
           const base = top + height;
+          // Parts split the bar by their share of it (on a log scale too).
+          const at = (v: number) => base - (h * v) / (total || 1);
           let acc = 0;
           const show = () => setTip({ x: cx + bar / 2, y: base - h, title: `${it.label}${it.sub ? ` (${it.sub})` : ''}`, rows: readout(it, parts, format) });
           const body = (
@@ -666,9 +733,9 @@ function VStack({ items, parts, format, height, width }: { items: StackItem[]; p
               <g clipPath={`url(#${uid}-${i})`}>
                 {drawn(it).map((v, k) => {
                   if (v === null || v <= 0) return null;
-                  const y1 = y(acc);
+                  const y1 = at(acc);
                   acc += v;
-                  const y2 = y(acc);
+                  const y2 = at(acc);
                   return <rect key={k} x={cx - bar / 2} y={y2} width={bar} height={Math.max(0, y1 - y2)} fill={it.color} opacity={shadeOf(parts.length, k)} />;
                 })}
                 {(() => {
@@ -676,7 +743,7 @@ function VStack({ items, parts, format, height, width }: { items: StackItem[]; p
                   let a = 0;
                   return drawn(it).slice(0, -1).map((v, k) => {
                     a += v ?? 0;
-                    return v && v > 0 && a < total ? <line key={k} x1={cx - bar / 2} x2={cx + bar / 2} y1={y(a)} y2={y(a)} className="part-gap" /> : null;
+                    return v && v > 0 && a < total ? <line key={k} x1={cx - bar / 2} x2={cx + bar / 2} y1={at(a)} y2={at(a)} className="part-gap" /> : null;
                   });
                 })()}
               </g>
@@ -704,8 +771,7 @@ function VStack({ items, parts, format, height, width }: { items: StackItem[]; p
   );
 }
 
-function HStack({ items, parts, format }: { items: StackItem[]; parts: StackPart[]; format: (v: number) => string }) {
-  const max = Math.max(0, ...items.map(totalOf)) || 1;
+function HStack({ items, parts, format, scale }: { items: StackItem[]; parts: StackPart[]; format: (v: number) => string; scale: ReturnType<typeof stackScale> }) {
   return (
     <ol className="hbars">
       {items.map((it) => {
@@ -716,6 +782,8 @@ function HStack({ items, parts, format }: { items: StackItem[]; parts: StackPart
           </>
         );
         const rows = readout(it, parts, format);
+        const total = totalOf(it);
+        const full = 100 * scale.frac(total);
         return (
           <li key={it.key} title={rows.map((r) => `${r.value} ${r.label}`.trim()).join('\n')}>
             <span className="hbar-label">{it.href ? <Go href={it.href}>{name}</Go> : name}</span>
@@ -725,7 +793,7 @@ function HStack({ items, parts, format }: { items: StackItem[]; parts: StackPart
                   <span
                     key={k}
                     className="hbar-part"
-                    style={{ width: `${(100 * v) / max}%`, background: `color-mix(in oklab, ${it.color} ${Math.round(shadeOf(parts.length, k) * 100)}%, var(--card))` }}
+                    style={{ width: `${(full * v) / (total || 1)}%`, background: `color-mix(in oklab, ${it.color} ${Math.round(shadeOf(parts.length, k) * 100)}%, var(--card))` }}
                   />
                 ) : null,
               )}
@@ -938,7 +1006,7 @@ function Levels({
       <ul className="legend">
         {series.map((s) => (
           <li key={s.key}>
-            <i className="line-key" style={{ background: s.color }} />
+            <i className="line-key" style={{ background: s.dash ? `repeating-linear-gradient(90deg, ${s.color} 0 7px, transparent 7px 11px)` : s.color }} />
             {s.label}
           </li>
         ))}
