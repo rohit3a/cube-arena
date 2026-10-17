@@ -4875,72 +4875,6 @@ table.wanted td.cmd {
   cursor: progress;
 }
 
-.export-pop {
-  position: absolute;
-  top: calc(100% + 6px);
-  right: 0;
-  display: flex;
-  flex-direction: column;
-  min-width: 236px;
-  padding: 6px;
-  border: var(--bw) solid var(--line);
-  border-radius: 12px;
-  background: var(--card);
-  box-shadow: var(--shadow);
-}
-
-.export-pop button {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 8px 10px;
-  border: 0;
-  border-radius: 8px;
-  background: none;
-  color: var(--text);
-  text-align: left;
-  cursor: pointer;
-}
-
-.export-pop button:hover,
-.export-pop button:focus-visible {
-  background: var(--yellow-t);
-}
-
-.export-pop strong {
-  display: block;
-  font-size: 0.88rem;
-}
-
-.export-pop small {
-  display: block;
-  color: var(--text-3);
-  font-family: var(--font-mono);
-  font-size: 0.68rem;
-}
-
-/* A little outline of each image's shape. */
-.export-shape {
-  flex: none;
-  width: 22px;
-  height: 22px;
-  display: grid;
-  place-items: center;
-}
-
-.export-shape::before {
-  content: '';
-  border: 2px solid currentColor;
-  border-radius: 3px;
-}
-
-.export-shape-x::before { width: 22px; height: 13px; }
-.export-shape-square::before { width: 17px; height: 17px; }
-.export-shape-portrait::before { width: 15px; height: 19px; }
-.export-shape-story::before { width: 12px; height: 21px; }
-.export-shape-full::before { width: 19px; height: 15px; border-style: dashed; }
-.export-shape-best::before { width: 18px; height: 18px; border-radius: 50%; }
-
 /* The share image: built off screen, rendered, removed. */
 .share-holder {
   position: fixed;
@@ -4952,17 +4886,19 @@ table.wanted td.cmd {
 .share-frame {
   /* Soft hairlines instead of the site's hard outlines and offset shadows. */
   --line: color-mix(in srgb, var(--text) 14%, transparent);
+  --share-pad: 36px;
   display: flex;
   flex-direction: column;
-  gap: 12px;
-  padding: 26px 32px 30px;
+  /* The frame is the card's width plus the same margin on every side. */
+  box-sizing: content-box;
+  padding: var(--share-pad);
   color: var(--text);
   background-color: var(--bg);
   background-image:
     radial-gradient(120% 80% at 100% 0%, color-mix(in srgb, var(--yellow) 10%, transparent), transparent 60%),
     radial-gradient(circle, var(--rule) 1.2px, transparent 1.4px);
   background-size: 100% 100%, 22px 22px;
-  box-sizing: border-box;
+  background-position: 0 0, 11px 11px;
   overflow: hidden;
 }
 
@@ -4971,7 +4907,6 @@ table.wanted td.cmd {
   align-items: center;
   justify-content: space-between;
   gap: 16px;
-  flex: none;
 }
 
 .share-brand {
@@ -5007,15 +4942,12 @@ table.wanted td.cmd {
 }
 
 .share-title {
-  flex: none;
+  margin: 18px 0 20px;
   font-family: var(--font-display);
-  font-size: 1.35rem;
+  font-size: 1.45rem;
   font-weight: 800;
   line-height: 1.15;
   letter-spacing: -0.02em;
-}
-
-.share-title {
   text-wrap: balance;
 }
 
@@ -5023,44 +4955,20 @@ table.wanted td.cmd {
   white-space: nowrap;
 }
 
-.share-scaler * {
+/* Inside the frame: no scrollbars, no hard shadows. */
+.share-stage * {
   scrollbar-width: none;
-}
-
-.share-stage {
-  flex: 1;
-  min-height: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.share-full .share-stage {
-  display: block;
-}
-
-.share-sizer {
-  flex: none;
-}
-
-.share-scaler {
-  transform-origin: 0 0;
-}
-
-/* Inside the frame: no hard shadows; the card floats on a soft one. */
-.share-scaler * {
   box-shadow: none !important;
 }
 
-.share-scaler .exportable[data-exporting].card,
-.share-scaler .exportable[data-exporting].share-boxed,
-.share-scaler .exportable[data-exporting] .card {
+.share-stage .exportable[data-exporting].card,
+.share-stage .exportable[data-exporting].share-boxed,
+.share-stage .exportable[data-exporting] .card {
   border-width: 1px;
   border-radius: 18px;
-  box-shadow: 0 24px 60px -18px rgba(0, 0, 0, 0.5) !important;
 }
 
-.share-scaler .exportable[data-exporting].share-boxed {
+.share-stage .exportable[data-exporting].share-boxed {
   padding: 20px;
   border: 1px solid var(--line);
   background: var(--card);
