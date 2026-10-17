@@ -49,6 +49,7 @@ export function demoEntries(): SuiteEntry[] {
           kind,
           version: SUITES[kind].version,
           board: 'verified',
+          review: null,
           label: `${model} (${effort})`,
           model,
           slug,

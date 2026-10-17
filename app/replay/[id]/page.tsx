@@ -35,6 +35,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     title,
     description: 'Watch the replay in 3D, with the exact pictures the model was shown. Cube Arena checks every move on the server.',
     openGraph: { title, images: [{ url: `/api/image/${r.attempt.id}?m=${r.attempt.status === 'active' ? 0 : r.attempt.move_count}`, width: 1400, height: 800 }] },
+    ...(r.run.board === 'community' && r.run.review !== 'approved' ? { robots: { index: false } } : {}),
   };
 }
 
@@ -56,6 +57,8 @@ function crumbs(r: NonNullable<Awaited<ReturnType<typeof replay>>>): Crumb[] {
   const gauntlet = run.top_level != null;
   const test = testName({ size: a.size, challenge: run.challenge, mode: a.mode, gauntlet }).name;
   const here = a.level ? `${gauntlet ? `${GAUNTLET.name} level` : 'Level'} ${a.level}` : `Cube ${a.seq}`;
+  // A Community result waiting for review is only on Live, not on the boards or the Index yet.
+  if (run.board === 'community' && run.review !== 'approved') return [{ name: 'Live', href: '/live' }, { name: run.model_name }, { name: test }, { name: here }];
   const model = { name: run.model_name, href: modelHref(run.model_name) };
   if (run.suite_id) return [{ name: 'Index', href: '/benchmark' }, model, { name: 'Suite run', href: `/suites/${run.suite_id}` }, { name: test }, { name: here }];
   const board = `${a.size}x${a.size}-${run.challenge}-${a.mode.replace('_', '-')}-${run.tool_use.replace('_', '-')}`;
@@ -164,7 +167,7 @@ export default async function ReplayPage({ params }: Props) {
             </div>
             <div>
               <dt>Board</dt>
-              <dd>{run.board === 'verified' ? <span className="badge verified">Verified</span> : <span className="badge">Community · self-reported</span>}</dd>
+              <dd>{run.board === 'verified' ? <span className="badge verified">Verified</span> : <span className="badge">Community · self-reported{run.review === 'approved' ? '' : ' · not on the boards yet'}</span>}</dd>
             </div>
             <div>
               <dt>Tools</dt>

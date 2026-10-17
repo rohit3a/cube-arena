@@ -4565,6 +4565,28 @@ table.wanted td.cmd {
   font-weight: 600;
 }
 
+/* /community/review: one card per community result. */
+.review-item {
+  margin-top: 36px;
+}
+
+.review-item h2 {
+  margin: 0;
+  font-size: 1.25rem;
+}
+
+.review-item h2 small {
+  margin-left: 6px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--text-3);
+}
+
+.review-item .facts dd {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
 /* Coding benchmark: one cell per hidden cube, and the in-progress list. */
 .case-grid {
   display: grid;

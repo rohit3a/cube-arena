@@ -5,7 +5,7 @@
 import { unstable_cache } from 'next/cache';
 import { catalogCost, harnessLabel, topEffort } from './catalog';
 import { clientLabel } from './clients';
-import { type SuiteRow, type Usage, UUID, withDb } from './db';
+import { type Review, type SuiteRow, type Usage, UUID, withDb } from './db';
 import { contributorSlug } from './invites';
 import { estimateCost, makerOf, slugOf, splitLabel } from './makers';
 import { gradeSuites } from './suite-data';
@@ -37,6 +37,8 @@ export interface SuiteEntry {
   kind: SuiteKind;
   version: string;
   board: 'verified' | 'community';
+  /** Community only: the operator's review; only approved ones reach the boards. */
+  review: Review;
   /** The name on the boards, e.g. "GPT-6-Luna (max)". */
   label: string;
   /** Without the effort, e.g. "GPT-6-Luna". */
@@ -159,6 +161,7 @@ async function suiteEntriesQuery(): Promise<SuiteEntry[]> {
         maker: maker.name,
         color: maker.color,
         display_name: s.display_name,
+        review: s.review,
         status: s.status,
         created_at: new Date(s.created_at).toISOString(),
         finished_at: s.finished_at ? new Date(s.finished_at).toISOString() : null,
@@ -202,7 +205,13 @@ async function suiteEntriesQuery(): Promise<SuiteEntry[]> {
 
 const cachedEntries = unstable_cache(suiteEntriesQuery, ['cube-arena', 'suiteEntries'], { revalidate: 30 });
 
+/** What the public pages show: Verified suites, and Community ones the operator approved. */
 export async function suiteEntries(): Promise<SuiteEntry[]> {
+  return (await allSuiteEntries()).filter((e) => e.board === 'verified' || e.review === 'approved');
+}
+
+/** Every suite that isn't hidden, reviewed or not: for the operator's review. */
+export async function allSuiteEntries(): Promise<SuiteEntry[]> {
   const real = await cachedEntries();
   if (process.env.NODE_ENV !== 'production' && process.env.CUBE_DEMO_INDEX) {
     const { demoEntries } = await import('./demo-index');

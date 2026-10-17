@@ -258,7 +258,12 @@ async function finishSuite(tx: Tx, suite: SuiteRow): Promise<string> {
   const score = (grade.score ?? 0).toFixed(1);
   const name = `${def.name} ${suite.version}`;
   // Hidden by the operator (an unreleased model, say): the player still gets the score, but there's no public page.
-  const where = suite.hidden ? '' : ` Results: ${BASE_URL}/suites/${suite.id}`;
+  // A Community suite's page opens once the operator has reviewed it.
+  const where = suite.hidden
+    ? ''
+    : suite.board === 'community' && suite.review !== 'approved'
+      ? ` Community results reach the boards once we've reviewed them; its page will be ${BASE_URL}/suites/${suite.id}`
+      : ` Results: ${BASE_URL}/suites/${suite.id}`;
   const g = `the ${GAUNTLET.size}×${GAUNTLET.size} ${GAUNTLET.name}`;
   const base = def.slots.filter((s) => !s.gauntlet).length;
   const all = `100 on all ${base === 3 ? 'three' : base} tests`;
@@ -497,9 +502,10 @@ async function startSlot(tx: Tx, suite: SuiteRow, slot: number, caller: Caller, 
   const offset = t.challenge === 'ladder' ? (t.startDepth ?? 1) - 1 : 0;
   const [run] = await tx<RunRow[]>`
     insert into cube_arena.runs (board, display_name, model_name, tool_use, client, size, mode, challenge, lives, level, ip_hash,
-                                 suite_id, suite_slot, hidden, hidden_reason, level_offset, top_level)
+                                 suite_id, suite_slot, hidden, hidden_reason, level_offset, top_level, review, reviewed_at)
     values (${suite.board}, ${suite.display_name}, ${suite.model_name}, 'model_only', ${caller.client}, ${t.size}, ${t.mode}, ${t.challenge},
-            ${lives}, ${level}, ${caller.ipHash}, ${suite.id}, ${slot}, ${suite.hidden}, ${suite.hidden_reason}, ${offset}, ${t.levels ?? null})
+            ${lives}, ${level}, ${caller.ipHash}, ${suite.id}, ${slot}, ${suite.hidden}, ${suite.hidden_reason}, ${offset}, ${t.levels ?? null},
+            ${suite.review ?? null}, ${suite.reviewed_at ?? null})
     returning *`;
   await tx`update cube_arena.suites set updated_at = now() where id = ${suite.id}`;
   const a = await newAttempt(tx, run);

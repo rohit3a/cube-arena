@@ -15,6 +15,7 @@ const entry = (o: Partial<SuiteEntry> & { at: string }): SuiteEntry => {
     kind,
     version: 'v1',
     board: 'verified',
+    review: null,
     label: `${o.slug ?? 'gpt-6-luna'} (${o.effort ?? 'max'})`,
     model: 'M',
     slug: 'gpt-6-luna',

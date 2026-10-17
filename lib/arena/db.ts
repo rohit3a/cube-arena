@@ -93,6 +93,9 @@ export function transaction<T>(fn: (tx: Tx) => Promise<T>): Promise<T> {
   });
 }
 
+/** A community result's review: null until the operator has looked at it. */
+export type Review = 'approved' | 'declined' | null;
+
 export interface RunRow {
   id: string;
   created_at: Date;
@@ -115,6 +118,9 @@ export interface RunRow {
   /** Hidden by the operator: off every public page. */
   hidden: boolean;
   hidden_reason: string | null;
+  /** Community only: the operator's review. Off the boards until approved; Live shows it anyway. */
+  review: Review;
+  reviewed_at: Date | null;
   /** Suite tests: the suite and which of its slots. */
   suite_id: string | null;
   suite_slot: number | null;
@@ -161,6 +167,9 @@ export interface SuiteRow {
   status: 'active' | 'finished';
   hidden: boolean;
   hidden_reason: string | null;
+  /** Community only: the operator's review (as on its runs). */
+  review: Review;
+  reviewed_at: Date | null;
   /** Set when an invitee's runner made it (Verified). */
   invite_id: string | null;
   /** The invitee chose to show their name on it. */

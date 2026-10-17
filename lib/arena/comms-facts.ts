@@ -6,7 +6,7 @@
 import { gunzipSync } from 'node:zlib';
 import { bestPerModel, indexPool } from './aggregate';
 import { catalogModel } from './catalog';
-import { type AttemptRow, type RunRow, withDb } from './db';
+import { type AttemptRow, type Review, type RunRow, withDb } from './db';
 import { type SuiteEntry, suiteEntries } from './index-data';
 import { effortRank } from './makers';
 import { levelDepth, topLevel } from './rules';
@@ -209,10 +209,14 @@ async function runsOf(suiteIds: string[]): Promise<Map<string, RunRow[]>> {
 function summary(e: SuiteEntry, entries: SuiteEntry[]): Omit<SuiteFacts, 'field' | 'rounds' | 'notes'> {
   const def = SUITES[e.kind];
   const weights = testWeights(def);
-  const { rank, of } = rankOf(entries, e.slug, e.kind, e.version);
-  const mine = entries
-    .filter((x) => x.slug === e.slug && x.kind === e.kind && x.version === e.version && x.status === 'finished' && x.board === 'verified')
-    .sort((a, b) => effortRank(a.effort) - effortRank(b.effort));
+  // A Community result isn't on the Index, and isn't one of the model's efforts that we ran.
+  const community = e.board === 'community';
+  const { rank, of } = community ? { rank: null, of: rankOf(entries, e.slug, e.kind, e.version).of } : rankOf(entries, e.slug, e.kind, e.version);
+  const mine = community
+    ? []
+    : entries
+        .filter((x) => x.slug === e.slug && x.kind === e.kind && x.version === e.version && x.status === 'finished' && x.board === 'verified')
+        .sort((a, b) => effortRank(a.effort) - effortRank(b.effort));
   return {
     suite: {
       id: e.id,
@@ -359,6 +363,7 @@ export interface WorkSuite {
   kind: SuiteKind;
   version: string;
   board: 'verified' | 'community';
+  review: Review;
   slug: string;
   model: string;
   effort: string | null;
@@ -387,6 +392,7 @@ export async function workList(): Promise<WorkSuite[]> {
     kind: e.kind,
     version: e.version,
     board: e.board,
+    review: e.review,
     slug: e.slug,
     model: e.model,
     effort: e.effort,

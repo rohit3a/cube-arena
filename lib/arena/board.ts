@@ -95,6 +95,9 @@ export const scrambleOrder = (a: ScrambleRow, b: ScrambleRow) =>
   fewer(a.median_secs, b.median_secs) ||
   verifiedFirst(a, b);
 
+/** SQL: run `r` may be on the boards: Verified, or a Community result the operator approved. */
+export const shown = (sql: Tx) => sql`(r.board = 'verified' or r.review = 'approved')`;
+
 /** SQL: run `r` is over, and so is its suite if it has one. */
 const finished = (sql: Tx) => sql`(
   r.status = 'finished'
@@ -118,7 +121,7 @@ async function allBoardsQuery(): Promise<BoardSection[]> {
           from cube_arena.attempts a where a.run_id = r.id
         ) t on true
         -- Gauntlet ladders (their own top level; the old ones also started 7 moves from solved) stay on the Index.
-        where r.challenge = 'ladder' and r.level_offset = 0 and r.top_level is null and not r.hidden and ${finished(sql)}
+        where r.challenge = 'ladder' and r.level_offset = 0 and r.top_level is null and not r.hidden and ${shown(sql)} and ${finished(sql)}
       )
       select size, mode, tool_use, board, model_name, display_name,
              max(best_level)::int as best, count(*)::int as runs, max(updated_at) as last,
@@ -140,7 +143,7 @@ async function allBoardsQuery(): Promise<BoardSection[]> {
                filter (where a.status = 'solved'))[1] as best_attempt,
              coalesce((array_agg(r.client order by a.move_count) filter (where a.status = 'solved'))[1], max(r.client)) as client
       from cube_arena.runs r join cube_arena.attempts a on a.run_id = r.id
-      where r.challenge = 'scramble' and not r.hidden and ${finished(sql)}
+      where r.challenge = 'scramble' and not r.hidden and ${shown(sql)} and ${finished(sql)}
       group by r.size, r.mode, r.tool_use, r.board, r.model_name, r.display_name`;
     return [l, s] as const;
   });
@@ -191,13 +194,15 @@ const playing = (sql: Tx) => sql`(
 
 async function statsQuery(): Promise<Stats> {
   const [s] = await withDb((sql) => sql<Stats[]>`
-    with r as (select * from cube_arena.runs where not hidden),
-         a as (select a.* from cube_arena.attempts a join r on r.id = a.run_id)
+    with r as (select * from cube_arena.runs r where not hidden and ${shown(sql)}),
+         a as (select a.* from cube_arena.attempts a join r on r.id = a.run_id),
+         -- Live counts every cube being played, reviewed or not.
+         la as (select a.* from cube_arena.attempts a join cube_arena.runs lr on lr.id = a.run_id where not lr.hidden and a.status = 'active')
     select (select count(*) from r)::int as runs,
            (select count(*) from a where status = 'solved')::int as solves,
            (select count(distinct lower(model_name)) from r)::int as models,
            coalesce((select max(best_level) from r where size = 3 and challenge = 'ladder'), 0)::int as best3,
-           (select count(*) from a where status = 'active' and ${playing(sql)})::int as live`);
+           (select count(*) from la a where ${playing(sql)})::int as live`);
   return s;
 }
 
@@ -224,7 +229,7 @@ async function recentFinishedQuery(limit = 12): Promise<FeedItem[]> {
     select a.id, a.status, a.size, a.mode, a.level, a.move_count, a.finished_at, a.created_at,
            r.model_name, r.display_name, r.board, r.tool_use, r.challenge, r.top_level is not null as gauntlet
     from cube_arena.attempts a join cube_arena.runs r on r.id = a.run_id
-    where a.status in ('solved', 'failed', 'invalid') and not r.hidden
+    where a.status in ('solved', 'failed', 'invalid') and not r.hidden and ${shown(sql)}
     order by a.finished_at desc nulls last limit ${limit}`);
 }
 
