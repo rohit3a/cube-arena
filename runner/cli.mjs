@@ -23,7 +23,7 @@ import { commandFor } from './command.mjs';
 import { cursorBin, cursorModels, cursorSignedIn, cursorSlug } from './cursor.mjs';
 import { playSuite } from './play-suite.mjs';
 
-const VERSION = '0.6.2';
+const VERSION = '0.6.3';
 const DEFAULT_URL = 'https://cube.krnl.studio/mcp';
 const HOME = process.env.CUBE_ARENA_HOME || join(homedir(), '.cube-arena');
 const CONFIG = join(HOME, 'config.json');
@@ -47,6 +47,7 @@ play options:
   --base-url <url>         with --via api: an OpenAI-compatible endpoint, e.g. https://api.x.ai/v1
   --api-key-env <NAME>     with --via api: the environment variable holding its key
   --api-model <id>         with --via api: the model's id on that endpoint
+  --max-output <tokens>    with --via api: the most the model can write in one reply, when the endpoint doesn't list it
   --codex-home <dir>       a Codex home just for this (default ~/.cube-arena/codex)
   --cursor-home <dir>      Cursor's config and data for the runner (default ~/.cube-arena/cursor)
   --resume <suite id>      carry on a suite that stopped part way, or play the Gauntlet a suite unlocked
@@ -153,6 +154,7 @@ const { values: opt, positionals } = parseArgs({
     'base-url': { type: 'string' },
     'api-key-env': { type: 'string' },
     'api-model': { type: 'string' },
+    'max-output': { type: 'string' },
     'codex-home': { type: 'string' },
     'deny-read': { type: 'string' },
     'cursor-home': { type: 'string' },
@@ -315,7 +317,14 @@ async function play() {
     if (!process.env[keyEnv]) fail(`${keyEnv} is not set.`);
     const host = new URL(baseUrl).host;
     harness = `api:${host}`;
-    session = { agent: 'api', model: apiModel, effort, api: { baseUrl: baseUrl.replace(/\/$/, ''), apiKey: process.env[keyEnv], provider: host === 'openrouter.ai' ? 'openrouter' : 'openai-compatible' } };
+    const maxOutput = opt['max-output'] === undefined ? undefined : Number(opt['max-output']);
+    if (maxOutput !== undefined && !(Number.isInteger(maxOutput) && maxOutput > 0)) fail('--max-output takes a number of tokens, e.g. 131072.');
+    session = {
+      agent: 'api',
+      model: apiModel,
+      effort,
+      api: { baseUrl: baseUrl.replace(/\/$/, ''), apiKey: process.env[keyEnv], provider: host === 'openrouter.ai' ? 'openrouter' : 'openai-compatible', maxOutput },
+    };
   }
 
   const call = operator(url, token);

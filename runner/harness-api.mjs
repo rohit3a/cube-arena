@@ -57,6 +57,28 @@ export function sameModel(asked, got, provider) {
   return g.startsWith(a) && /^[-@](\d{2,8}([-.:]\d{1,4})*|v\d+([-.:]\d+)*)$/.test(g.slice(a.length));
 }
 
+/**
+ * The most a model can write in one reply, from the endpoint's model list (OpenRouter's top_provider, or the common
+ * names other endpoints use), or null when it doesn't say. Without it a provider applies its own default, which can be
+ * far below the model's limit.
+ * @param {string} base
+ * @param {string} model
+ * @param {Record<string, string>} headers
+ * @returns {Promise<number | null>}
+ */
+export async function outputLimit(base, model, headers) {
+  try {
+    const res = await fetch(`${base}/models`, { headers, signal: AbortSignal.timeout(30_000) });
+    if (!res.ok) return null;
+    const list = (await res.json())?.data;
+    const m = Array.isArray(list) ? list.find((x) => x?.id === model) : null;
+    const n = m?.top_provider?.max_completion_tokens ?? m?.max_completion_tokens ?? m?.max_output_tokens ?? m?.limit?.output;
+    return Number.isInteger(n) && n > 0 ? n : null;
+  } catch {
+    return null;
+  }
+}
+
 class ApiError extends Error {
   /** @param {number} status 0 for a network error @param {string} message */
   constructor(status, message) {
@@ -151,9 +173,10 @@ function forgetOldPictures(messages) {
  * Plays one session over the API.
  * @param {{ model: string, effort?: string | null, prompt: string, headers: Record<string, string>,
  *   url: string, token: string, logPath: string,
- *   api: { baseUrl: string, apiKey: string, provider?: 'openrouter' | 'openai-compatible' } }} s
+ *   api: { baseUrl: string, apiKey: string, headers?: Record<string, string>, provider?: 'openrouter' | 'openai-compatible', maxOutput?: number } }} s
+ *   `api.maxOutput`: the most the model can write in one reply; looked up from the endpoint when not given.
  * @returns {Promise<{ runId: string | null, runOver: boolean, last: any, calls: number, breach: string | null,
- *   stopReason: string | null, quit: boolean, final: string | null, usage: Record<string, number>, code: number | null,
+ *   stopReason: string | null, apiError: string | null, quit: boolean, final: string | null, usage: Record<string, number>, code: number | null,
  *   minutes: number, events: { t: number, kind: 'say' | 'think' | 'call' | 'result' | 'error', tool?: string, text: string }[] }>}
  */
 export async function playApiSession(s) {
@@ -164,7 +187,7 @@ export async function playApiSession(s) {
   const openrouter = provider === 'openrouter';
 
   /** @type {Awaited<ReturnType<typeof playApiSession>>} */
-  const out = { runId: null, runOver: false, last: null, calls: 0, breach: null, stopReason: null, quit: false, final: null, usage: {}, code: null, minutes: 0, events: [] };
+  const out = { runId: null, runOver: false, last: null, calls: 0, breach: null, stopReason: null, apiError: null, quit: false, final: null, usage: {}, code: null, minutes: 0, events: [] };
   const log = createWriteStream(s.logPath);
   const write = (type, data) => log.write(`${slim(JSON.stringify({ t: secs(), type, ...data }))}\n`);
   const note = (kind, text, tool) => out.events.push(tool === undefined ? { t: secs(), kind, text } : { t: secs(), kind, tool, text });
@@ -202,7 +225,7 @@ export async function playApiSession(s) {
     add('cost_usd', u.cost);
   }
 
-  const apiHeaders = { Authorization: `Bearer ${s.api.apiKey}`, 'Content-Type': 'application/json', 'Accept-Encoding': 'identity' };
+  const apiHeaders = { ...s.api.headers, Authorization: `Bearer ${s.api.apiKey}`, 'Content-Type': 'application/json', 'Accept-Encoding': 'identity' };
   if (openrouter) Object.assign(apiHeaders, { 'HTTP-Referer': 'https://cube.krnl.studio', 'X-Title': 'Cube Arena' });
 
   /** One completion, retrying rate limits, server errors and dropped connections. */
@@ -277,6 +300,12 @@ export async function playApiSession(s) {
 
     const extra = {};
     if (s.effort) Object.assign(extra, openrouter ? { reasoning: { effort: s.effort } } : { reasoning_effort: s.effort });
+    // Every reply may be as long as the model allows, as the CLI agents ask for. Left unset, a provider applies its own
+    // default (65,536 or 131,072 tokens), which can cut a model off long before its limit.
+    const maxOutput = s.api.maxOutput ?? (await outputLimit(base, s.model, apiHeaders));
+    if (maxOutput) extra.max_tokens = maxOutput;
+    else console.log(`  (no output limit known for ${s.model}: the provider's default applies, and a reply it cuts short is retried)`);
+    write('limits', { max_output: maxOutput });
     // Only providers that honour every parameter (the effort above), so none can quietly drop it.
     if (openrouter) Object.assign(extra, { usage: { include: true }, provider: { require_parameters: true } });
 
@@ -313,7 +342,7 @@ export async function playApiSession(s) {
       const calls = Array.isArray(msg.tool_calls) ? msg.tool_calls : [];
       const kept = { role: 'assistant', content: msg.content ?? null };
       if (calls.length) kept.tool_calls = calls;
-      for (const k of ['reasoning', 'reasoning_details']) if (msg[k] != null) kept[k] = msg[k];
+      for (const k of ['reasoning', 'reasoning_details', 'reasoning_content']) if (msg[k] != null) kept[k] = msg[k];
       messages.push(kept);
 
       const think = reasoningText(msg);
@@ -323,6 +352,21 @@ export async function playApiSession(s) {
         out.final = said;
         console.log(`  [${secs()}s] says: ${said.replace(/\s+/g, ' ').slice(0, 160)}`);
         note('say', said);
+      }
+      if (!calls.length && data.choices[0].finish_reason === 'length') {
+        const wrote = data.usage?.completion_tokens;
+        if (maxOutput && Number.isFinite(wrote) && wrote >= maxOutput * 0.98) {
+          // A reply over the model's own output limit is its doing, as with Claude Code's output cap: the test ends here.
+          stop("a reply over the model's output token limit");
+          out.quit = true;
+        } else {
+          // Cut short below the model's limit (a provider's default, say): not the model's doing. The cube waits and a
+          // fresh session picks it up.
+          out.apiError = `the provider cut a reply at ${wrote ?? 'an unknown number of'} output tokens, ${maxOutput ? `below the model's ${maxOutput}` : "and the model's limit is unknown"}`;
+          stop(out.apiError);
+          note('error', out.apiError);
+        }
+        break;
       }
       if (!calls.length) {
         // An answer with no tool call: the model chose to stop.

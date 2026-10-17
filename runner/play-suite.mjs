@@ -91,7 +91,7 @@ async function playSlots(p, slots, label) {
     for (let tries = 0; ; tries++) {
       const started = new Date();
       if (lostFrom)
-        await call('/api/admin/suites', { id: suite.id, lost: { from: lostFrom.toISOString(), to: started.toISOString() } })
+        await call('/api/admin/suites', { id: suite.id, lost: { from: lostFrom.toISOString(), to: started.toISOString(), slot: i } })
           .then((x) => x.lost && console.log(`  ${Math.round(x.lost.secs / 60)} min left out of the cube's time (not the model's doing)`))
           .catch((e) => console.log(`  (could not leave the lost time out: ${e.message})`));
       lostFrom = null;

@@ -455,8 +455,8 @@ export async function nextTest(suiteId: string, caller: Caller): Promise<Reply> 
     const only = caller.operator?.suiteSlot;
     const runs = await tx<RunRow[]>`select * from cube_arena.runs where suite_id = ${suite.id} order by suite_slot`;
 
-    const active = runs.find((r) => r.status === 'active');
-    if (active && (only === undefined || active.suite_slot === only)) {
+    const active = runs.find((r) => r.status === 'active' && (only === undefined || r.suite_slot === only));
+    if (active) {
       const [a] = await tx<AttemptRow[]>`select * from cube_arena.attempts where run_id = ${active.id} and status = 'active' order by seq desc limit 1 for update`;
       if (a) return presentAttempt(active, a, [`Suite ${slotLabel(def, active.suite_slot ?? 0)} is in progress:`]);
     }
@@ -748,20 +748,57 @@ export async function heartbeat(suiteId: string): Promise<boolean> {
 /**
  * Operator only: a session ended through no fault of the model (an API error, a safeguard flag) and a fresh one picked
  * the cube up. The time from `from` (the lost session's start) to `to` (the next one's start) is added to the waiting
- * cube's paused time, which every time shown leaves out. Returns the cube and the seconds added, or null with no cube
- * waiting.
+ * cube's paused time, which every time shown leaves out. The cube is that test's (`slot`), else the suite's latest.
+ * Returns the cube and the seconds added, or null with no cube waiting.
  */
-export async function addLostTime(suiteId: string, from: Date, to: Date): Promise<{ attempt: string; secs: number } | null> {
+export async function addLostTime(suiteId: string, from: Date, to: Date, slot?: number): Promise<{ attempt: string; secs: number } | null> {
   if (!UUID.test(suiteId) || !(to > from)) return null;
   return transaction(async (tx) => {
     const [a] = await tx<{ id: string; created_at: Date }[]>`
       select a.id, a.created_at from cube_arena.attempts a join cube_arena.runs r on r.id = a.run_id
-      where r.suite_id = ${suiteId} and a.status = 'active' order by a.created_at desc limit 1 for update of a`;
+      where r.suite_id = ${suiteId} and a.status = 'active' and (${slot ?? null}::int is null or r.suite_slot = ${slot ?? null}::int)
+      order by a.created_at desc limit 1 for update of a`;
     if (!a) return null;
     const start = Math.max(from.getTime(), new Date(a.created_at).getTime());
     const secs = Math.min(24 * 3600, Math.max(0, Math.round((to.getTime() - start) / 1000)));
     if (secs) await tx`update cube_arena.attempts set paused_secs = paused_secs + ${secs} where id = ${a.id}`;
     return { attempt: a.id, secs };
+  });
+}
+
+/**
+ * Operator only: a test that ended through a fault of ours, not the model's (a runner that took a reply cut short for
+ * the model stopping), picks up where it was. Its last cube is open again with the run's level and lives as they were,
+ * and its suite and claim with it; a runner then plays it on, and the time in between is left out the way a lost
+ * session's is. The give-up stays in the cube's events as a record. Returns the cube reopened, or null if the run
+ * didn't end by giving up or being stopped.
+ */
+export async function reopenRun(id: string): Promise<{ run: string; attempt: string } | null> {
+  if (!UUID.test(id)) return null;
+  return transaction(async (tx) => {
+    const [run] = await tx<RunRow[]>`select * from cube_arena.runs
+      where id = coalesce((select run_id from cube_arena.attempts where id = ${id}), ${id}::uuid) for update`;
+    if (!run || run.status !== 'finished' || (run.end_reason !== 'gave_up' && run.end_reason !== 'stopped')) return null;
+    const [a] = await tx<AttemptRow[]>`select * from cube_arena.attempts where run_id = ${run.id} order by seq desc limit 1 for update`;
+    if (!a || a.status !== run.end_reason) return null;
+    await tx`update cube_arena.attempts set status = 'active', detail = null, finished_at = null where id = ${a.id}`;
+    await tx`update cube_arena.runs set status = 'active', end_reason = null, updated_at = now() where id = ${run.id}`;
+    if (run.suite_id) {
+      // A suite closed as incomplete over this test is whole again.
+      const [suite] = await tx<SuiteRow[]>`
+        update cube_arena.suites set status = 'active', finished_at = null, updated_at = now(),
+          hidden = case when hidden_reason like 'incomplete%' then false else hidden end,
+          hidden_reason = case when hidden_reason like 'incomplete%' then null else hidden_reason end
+        where id = ${run.suite_id} returning *`;
+      if (!suite.hidden) {
+        await tx`update cube_arena.runs set hidden = false, hidden_reason = null where suite_id = ${suite.id} and hidden_reason like 'incomplete suite%'`;
+      }
+      await tx`
+        update cube_arena.claims c set released_at = null, expires_at = greatest(c.expires_at, now() + make_interval(hours => ${CLAIM_HOURS}))
+        where c.suite_id = ${suite.id} and c.released_at is not null and not exists (
+          select 1 from cube_arena.claims o where o.model_id = c.model_id and o.effort = c.effort and o.kind = c.kind and o.released_at is null)`;
+    }
+    return { run: run.id, attempt: a.id };
   });
 }
 

@@ -76,7 +76,14 @@ type Body = { model: string; messages: Msg[]; tools: { function: { name: string 
 type Reply = { status?: number; headers?: Record<string, string>; body: unknown; delayMs?: number };
 const requests: { path?: string; headers: IncomingHttpHeaders; body: Body }[] = [];
 let script: (body: Body, n: number) => Reply = () => ({ status: 500, body: { error: { message: 'no script' } } });
+// What GET /models lists (the harness looks up the model's output limit there); not counted in `requests`.
+let models: unknown[] = [];
 const api = createServer((req, res) => {
+  if (req.method === 'GET') {
+    res.writeHead(200, { 'content-type': 'application/json' });
+    res.end(JSON.stringify({ data: models }));
+    return;
+  }
   let raw = '';
   req.on('data', (c) => (raw += c));
   req.on('end', async () => {
@@ -92,12 +99,12 @@ const api = createServer((req, res) => {
 });
 
 const call = (id: string, name: string, args: unknown) => ({ id, type: 'function', function: { name, arguments: typeof args === 'string' ? args : JSON.stringify(args) } });
-const answer = (message: Record<string, unknown>, model = 'openai/gpt-6-astra-20260903', usage?: unknown): Reply => ({
+const answer = (message: Record<string, unknown>, model = 'openai/gpt-6-astra-20260903', usage?: unknown, finish?: string): Reply => ({
   body: {
     id: 'gen-1',
     object: 'chat.completion',
     model,
-    choices: [{ index: 0, finish_reason: message.tool_calls ? 'tool_calls' : 'stop', message: { role: 'assistant', content: null, ...message } }],
+    choices: [{ index: 0, finish_reason: finish ?? (message.tool_calls ? 'tool_calls' : 'stop'), message: { role: 'assistant', content: null, ...message } }],
     usage,
   },
 });
@@ -214,6 +221,58 @@ describe('Direct API harness', () => {
     expect(log).not.toContain(PNG.slice(0, 100));
     expect(log).toContain(`<${PNG.length} base64 chars>`);
     expect(log).not.toContain('sk-test');
+  });
+
+  it('preserves DeepSeek reasoning and provider session headers across tool calls at max effort', async () => {
+    script = (_body, i) =>
+      i === 1
+        ? answer({ tool_calls: [call('d1', 'get_rules', '{}')], reasoning_content: 'Read the cube rules first.' }, 'deepseek-v4.1-flash')
+        : answer({ content: 'Ready.' }, 'deepseek-v4.1-flash');
+
+    const out = await session(
+      { model: 'deepseek-v4.1-flash', effort: 'max' },
+      { provider: 'openai-compatible', headers: { 'x-opencode-session': 'cube-session', 'User-Agent': 'cube-arena-runner/0.6.2' } },
+    );
+
+    expect(out).toMatchObject({ calls: 1, breach: null, code: 0, final: 'Ready.' });
+    expect(requests).toHaveLength(2);
+    for (const request of requests) {
+      expect(request.body.reasoning_effort).toBe('max');
+      expect(request.headers).toMatchObject({ 'x-opencode-session': 'cube-session', 'user-agent': 'cube-arena-runner/0.6.2' });
+    }
+    expect(requests[1].body.messages.find((m) => m.role === 'assistant')).toMatchObject({ reasoning_content: 'Read the cube rules first.' });
+    expect(out.events).toContainEqual({ t: expect.any(Number), kind: 'think', text: 'Read the cube rules first.' });
+  });
+
+  it('asks for the output limit given, or the one the endpoint lists', async () => {
+    script = () => answer({ content: 'Done.' });
+    await session({}, { maxOutput: 131_072 });
+    expect(requests.at(-1)?.body.max_tokens).toBe(131_072);
+
+    models = [{ id: 'openai/gpt-6-astra', top_provider: { max_completion_tokens: 128_000 } }];
+    await session();
+    expect(requests.at(-1)?.body.max_tokens).toBe(128_000);
+
+    models = [];
+    await session();
+    expect(requests.at(-1)?.body.max_tokens).toBeUndefined();
+  });
+
+  it("ends the test on a reply cut at the model's own limit, as the CLI agents do", async () => {
+    script = () => answer({ content: null, reasoning: 'Thinking it through...' }, undefined, { prompt_tokens: 10, completion_tokens: 131_072 }, 'length');
+    const out = await session({}, { maxOutput: 131_072 });
+    expect(out).toMatchObject({ quit: true, apiError: null, stopReason: "a reply over the model's output token limit" });
+  });
+
+  it("retries a reply a provider cut short below the model's limit: not the model's doing", async () => {
+    script = () => answer({ content: null, reasoning: 'Thinking it through...' }, undefined, { prompt_tokens: 10, completion_tokens: 65_536 }, 'length');
+    const out = await session({}, { maxOutput: 131_072 });
+    expect(out.quit).toBe(false);
+    expect(out.apiError).toBe("the provider cut a reply at 65536 output tokens, below the model's 131072");
+
+    const unknown = await session();
+    expect(unknown.quit).toBe(false);
+    expect(unknown.apiError).toMatch(/limit is unknown/);
   });
 
   it('keeps only the 3 latest pictures, and uses reasoning_effort on other endpoints', async () => {

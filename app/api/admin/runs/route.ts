@@ -2,13 +2,14 @@
 //   GET  /api/admin/runs?limit=50&hidden=1      recent runs (or only hidden ones)            operator
 //   POST /api/admin/runs {id, hidden, reason}   hide or unhide a run (run id or attempt id)   operator; an invitee may hide its own
 //   POST /api/admin/runs {id, stop: true, quit?, reason} end an active run now            operator, or the invitee whose suite it is
+//   POST /api/admin/runs {id, reopen: true}      a test ended by a fault of ours picks up where it was   operator
 //   POST /api/admin/runs {id, model_name}        fix a run's model name                       operator
 //   POST /api/admin/runs {id, usage}             record the tokens and cost the runner measured   operator, or its invitee
 // Hiding a run that belongs to a suite (or passing a suite id) hides the whole suite.
 // scripts/moderate.mjs wraps these. Boards refresh within ~30 s (their cache).
 import { listRuns, rename, setHidden, setUsage, suiteOf } from '@/lib/arena/admin';
 import { authFrom, deny } from '@/lib/arena/auth';
-import { stopRun } from '@/lib/arena/service';
+import { reopenRun, stopRun } from '@/lib/arena/service';
 
 export const dynamic = 'force-dynamic';
 
@@ -23,7 +24,16 @@ export async function GET(req: Request) {
 export async function POST(req: Request) {
   const { auth, bad } = await authFrom(req);
   if (!auth) return deny(bad);
-  const body = (await req.json().catch(() => null)) as { id?: unknown; hidden?: unknown; stop?: unknown; quit?: unknown; reason?: unknown; model_name?: unknown; usage?: unknown } | null;
+  const body = (await req.json().catch(() => null)) as {
+    id?: unknown;
+    hidden?: unknown;
+    stop?: unknown;
+    quit?: unknown;
+    reopen?: unknown;
+    reason?: unknown;
+    model_name?: unknown;
+    usage?: unknown;
+  } | null;
   const id = typeof body?.id === 'string' ? body.id.trim() : '';
   const reason = typeof body?.reason === 'string' ? body.reason.slice(0, 200) : null;
   // An invitee's runner may end, annotate or hide (never unhide or rename) runs in its own suites.
@@ -31,6 +41,10 @@ export async function POST(req: Request) {
     const owner = await suiteOf(id);
     const allowed = owner?.inviteId === auth.invite.id && (body?.stop === true || !!body?.usage || body?.hidden === true);
     if (!allowed) return Response.json({ error: 'not allowed' }, { status: 403 });
+  }
+  if (body?.reopen === true) {
+    const open = await reopenRun(id);
+    return open ? Response.json({ reopened: open }) : Response.json({ error: 'no run that gave up or was stopped with that id' }, { status: 404 });
   }
   if (body?.stop === true) return Response.json({ stopped: await stopRun(id, reason ?? 'stopped by the operator', body.quit === true) });
   if (body?.usage && typeof body.usage === 'object') {
