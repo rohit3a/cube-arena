@@ -155,6 +155,37 @@ for (const b of bases.values()) {
   });
 }
 
+// New models Artificial Analysis doesn't list yet, added by hand until it does.
+// OpenRouter's route is used once it lists a paid one (its ":free" ones are
+// rate-limited and may train on the cubes); until then they run with --via api
+// on the maker's own endpoint, at the maker's list price.
+const NOT_ON_AA = {
+  'minimax-m3-1-flash': {
+    name: 'MiniMax-M3.1-Flash',
+    maker: 'MiniMax',
+    released: '2026-10-19',
+    openrouter: 'minimax/minimax-m3.1-flash',
+    efforts: ['low', 'medium', 'high', 'xhigh', 'max'],
+    price: { input: 0.15, output: 0.6, cached: 0.015 },
+  },
+};
+for (const [id, extra] of Object.entries(NOT_ON_AA)) {
+  if (entries.has(id)) continue;
+  const orm = byId.get(extra.openrouter);
+  const viaOr = usable(orm) ? orm.id : null;
+  entries.set(id, {
+    id,
+    name: extra.name,
+    maker: extra.maker,
+    released: extra.released,
+    wanted: true,
+    efforts: viaOr ? orEfforts(orm) : extra.efforts,
+    via: viaOr ? { openrouter: viaOr } : {},
+    price: viaOr ? { input: perMillion(orm.pricing.prompt), output: perMillion(orm.pricing.completion), cached: perMillion(orm.pricing.input_cache_read) } : extra.price,
+    aa: null,
+  });
+}
+
 // Older Claude and GPT models Rohit's own sweep still runs, so their names match too.
 for (const id of SWEEP_MODELS) {
   if (entries.has(id)) continue;

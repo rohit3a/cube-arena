@@ -11,6 +11,7 @@
 // The caller makes the operator calls afterwards (end an open run, record
 // usage, hide a breach), as playSession does for itself.
 
+import { randomUUID } from 'node:crypto';
 import { createWriteStream } from 'node:fs';
 import http from 'node:http';
 import https from 'node:https';
@@ -173,7 +174,7 @@ function forgetOldPictures(messages) {
  * Plays one session over the API.
  * @param {{ model: string, effort?: string | null, prompt: string, headers: Record<string, string>,
  *   url: string, token: string, logPath: string,
- *   api: { baseUrl: string, apiKey: string, headers?: Record<string, string>, provider?: 'openrouter' | 'openai-compatible', maxOutput?: number } }} s
+ *   api: { baseUrl: string, apiKey: string, headers?: Record<string, string>, provider?: 'openrouter' | 'opencode' | 'openai-compatible', maxOutput?: number } }} s
  *   `api.maxOutput`: the most the model can write in one reply; looked up from the endpoint when not given.
  * @returns {Promise<{ runId: string | null, runOver: boolean, last: any, calls: number, breach: string | null,
  *   stopReason: string | null, apiError: string | null, quit: boolean, final: string | null, usage: Record<string, number>, code: number | null,
@@ -227,6 +228,8 @@ export async function playApiSession(s) {
 
   const apiHeaders = { ...s.api.headers, Authorization: `Bearer ${s.api.apiKey}`, 'Content-Type': 'application/json', 'Accept-Encoding': 'identity' };
   if (openrouter) Object.assign(apiHeaders, { 'HTTP-Referer': 'https://cube.krnl.studio', 'X-Title': 'Cube Arena' });
+  // OpenCode Go routes and caches by conversation: one session id for each.
+  if (provider === 'opencode') apiHeaders['x-opencode-session'] = randomUUID();
 
   /** One completion, retrying rate limits, server errors and dropped connections. */
   async function complete(body) {

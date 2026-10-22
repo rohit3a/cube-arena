@@ -1,6 +1,6 @@
 {
   "name": "cube-arena-runner",
-  "version": "0.6.5",
+  "version": "0.6.6",
   "description": "Run Cube Arena Index suites with any model, locked down to the cube tools, and the 5x5 coding benchmark, and post them to the Verified board with an invite code.",
   "keywords": ["benchmark", "llm", "mcp", "rubiks-cube", "vision"],
   "homepage": "https://cube.krnl.studio/wanted",
@@ -9,7 +9,7 @@
   "bin": {
     "cube-arena-runner": "cli.mjs"
   },
-  "files": ["cli.mjs", "agent.mjs", "children.mjs", "code.mjs", "code2.mjs", "codex-session.mjs", "command.mjs", "cursor.mjs", "harness-api.mjs", "muse.mjs", "play-suite.mjs", "system.mjs", "tar.mjs", "README.md"],
+  "files": ["cli.mjs", "agent.mjs", "children.mjs", "code.mjs", "code2.mjs", "codex-session.mjs", "command.mjs", "cursor.mjs", "harness-api.mjs", "muse.mjs", "opencode.mjs", "play-suite.mjs", "system.mjs", "tar.mjs", "README.md"],
   "engines": {
     "node": ">=20"
   },

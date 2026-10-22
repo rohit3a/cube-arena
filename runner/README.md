@@ -58,6 +58,7 @@ the model leaves running in the background is ended when its session ends.
 | `cursor` | what your Cursor plan has: Claude, GPT, Gemini, Grok, Kimi, Composer… | [Cursor's CLI](https://cursor.com/cli), signed in with `cursor-agent login` (macOS or Linux) |
 | `muse` | Meta's Muse models | [Muse Code](https://dev.meta.ai), signed in with `muse login` |
 | `openrouter` | almost everything | `OPENROUTER_API_KEY` |
+| `opencode-go` | what [OpenCode Go](https://opencode.ai/docs/go/) serves over Chat Completions: Kimi, DeepSeek, GLM, MiMo, Qwen, Step, MiniMax… | an OpenCode Go plan: `OPENCODE_API_KEY`, or OpenCode signed in on the machine (Node 22.5+) |
 | `api` | anything with an OpenAI-compatible API | `--base-url`, `--api-key-env`, `--api-model` |
 
 On Windows, sign Codex in from PowerShell: `$env:CODEX_HOME="$HOME\.cube-arena\codex"; codex login; Remove-Item Env:CODEX_HOME`.

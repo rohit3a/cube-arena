@@ -21,13 +21,14 @@ import { claimMachine, claudeSandboxProblem, playCoding, setUpWorkspace, waitFor
 import { playCoding2 } from './code2.mjs';
 import { commandFor } from './command.mjs';
 import { cursorBin, cursorModels, cursorSignedIn, cursorSlug } from './cursor.mjs';
+import { GO_BASE, goKey, goModelId, goModels, goOutputLimit } from './opencode.mjs';
 import { playSuite } from './play-suite.mjs';
 
-const VERSION = '0.6.5';
+const VERSION = '0.6.6';
 const DEFAULT_URL = 'https://cube.krnl.studio/mcp';
 const HOME = process.env.CUBE_ARENA_HOME || join(homedir(), '.cube-arena');
 const CONFIG = join(HOME, 'config.json');
-const VIA = ['claude-code', 'codex', 'cursor', 'muse', 'openrouter', 'api'];
+const VIA = ['claude-code', 'codex', 'cursor', 'muse', 'openrouter', 'opencode-go', 'api'];
 
 const HELP = `cube-arena-runner ${VERSION}: run Cube Arena Index suites for the Verified board.
 
@@ -43,11 +44,11 @@ const HELP = `cube-arena-runner ${VERSION}: run Cube Arena Index suites for the 
 play options:
   --effort <level>         low, medium, high, xhigh or max (what the model takes; see wanted)
   --suite fast|thorough    default fast (three ladders, then the 4×4 Gauntlet after a perfect 100); thorough is every test (many hours)
-  --via <how>              claude-code, codex, cursor, muse, openrouter or api (default: the first you have)
+  --via <how>              claude-code, codex, cursor, muse, openrouter, opencode-go or api (default: the first you have)
   --base-url <url>         with --via api: an OpenAI-compatible endpoint, e.g. https://api.x.ai/v1
   --api-key-env <NAME>     with --via api: the environment variable holding its key
-  --api-model <id>         with --via api: the model's id on that endpoint
-  --max-output <tokens>    with --via api: the most the model can write in one reply, when the endpoint doesn't list it
+  --api-model <id>         with --via api or opencode-go: the model's id on that endpoint
+  --max-output <tokens>    with --via api or opencode-go: the most the model can write in one reply, when the endpoint doesn't list it
   --codex-home <dir>       a Codex home just for this (default ~/.cube-arena/codex)
   --cursor-home <dir>      Cursor's config and data for the runner (default ~/.cube-arena/cursor)
   --resume <suite id>      carry on a suite that stopped part way, or play the Gauntlet a suite unlocked
@@ -286,6 +287,8 @@ async function play() {
   // How to reach the model: what you asked for, else the first that works here.
   const via = opt.via ?? (opt['base-url'] ? 'api' : pickVia(model));
   if (!VIA.includes(via)) fail(`--via must be one of ${VIA.join(', ')}`);
+  const maxOutput = opt['max-output'] === undefined ? undefined : Number(opt['max-output']);
+  if (maxOutput !== undefined && !(Number.isInteger(maxOutput) && maxOutput > 0)) fail('--max-output takes a number of tokens, e.g. 131072.');
   let session;
   let harness = via;
   if (via === 'claude-code') {
@@ -309,6 +312,20 @@ async function play() {
     const apiKey = process.env.OPENROUTER_API_KEY;
     if (!apiKey) fail('Set OPENROUTER_API_KEY (https://openrouter.ai/keys).');
     session = { agent: 'api', model: model.via.openrouter, effort, api: { baseUrl: 'https://openrouter.ai/api/v1', apiKey, provider: 'openrouter' } };
+  } else if (via === 'opencode-go') {
+    const auth = await goKey();
+    if ('error' in auth) fail(auth.error);
+    const ids = await goModels().catch((e) => fail(e.message));
+    const apiModel = opt['api-model'] ?? goModelId(model.id, ids);
+    if (!apiModel || !ids.includes(apiModel)) fail(`${model.name} isn't on OpenCode Go (it has ${ids.join(', ')}). Name its Go id with --api-model.`);
+    console.log(`OpenCode Go model ${apiModel}, with ${auth.from}.`);
+    harness = `api:${new URL(GO_BASE).host}`;
+    session = {
+      agent: 'api',
+      model: apiModel,
+      effort,
+      api: { baseUrl: GO_BASE, apiKey: auth.key, provider: 'opencode', maxOutput: maxOutput ?? (await goOutputLimit(apiModel)) ?? undefined, headers: { 'User-Agent': `cube-arena-runner/${VERSION}` } },
+    };
   } else {
     const baseUrl = opt['base-url'];
     const keyEnv = opt['api-key-env'];
@@ -317,8 +334,6 @@ async function play() {
     if (!process.env[keyEnv]) fail(`${keyEnv} is not set.`);
     const host = new URL(baseUrl).host;
     harness = `api:${host}`;
-    const maxOutput = opt['max-output'] === undefined ? undefined : Number(opt['max-output']);
-    if (maxOutput !== undefined && !(Number.isInteger(maxOutput) && maxOutput > 0)) fail('--max-output takes a number of tokens, e.g. 131072.');
     session = {
       agent: 'api',
       model: apiModel,
@@ -502,5 +517,5 @@ function pickVia(model) {
   if (model.via.muse && has('muse')) return 'muse';
   if (model.via.openrouter && process.env.OPENROUTER_API_KEY) return 'openrouter';
   const ways = Object.keys(model.via).join(', ');
-  return fail(`No way to reach ${model.name} here. It runs via ${ways}: install that CLI, or set OPENROUTER_API_KEY, or use --via api.`);
+  return fail(`No way to reach ${model.name} here.${ways ? ` It runs via ${ways}: install that CLI, or set OPENROUTER_API_KEY.` : ''} Or use --via opencode-go or --via api.`);
 }

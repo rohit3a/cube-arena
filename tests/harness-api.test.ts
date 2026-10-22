@@ -244,6 +244,19 @@ describe('Direct API harness', () => {
     expect(out.events).toContainEqual({ t: expect.any(Number), kind: 'think', text: 'Read the cube rules first.' });
   });
 
+  it('gives each OpenCode Go conversation its own session id, kept across its requests', async () => {
+    script = (_body, i) => (i % 2 === 1 ? answer({ tool_calls: [call('o1', 'get_rules', '{}')] }, 'kimi-k3') : answer({ content: 'Ready.' }, 'kimi-k3'));
+    const api = { provider: 'opencode', headers: { 'User-Agent': 'cube-arena-runner/0.6.6' } };
+    await session({ model: 'kimi-k3' }, api);
+    await session({ model: 'kimi-k3' }, api);
+
+    const ids = requests.map((r) => r.headers['x-opencode-session']);
+    expect(ids).toHaveLength(4);
+    expect(ids[0]).toMatch(/^[0-9a-f-]{36}$/);
+    expect([ids[1], ids[2], ids[3]]).toEqual([ids[0], expect.not.stringMatching(String(ids[0])), ids[2]]);
+    for (const r of requests) expect(r.headers['user-agent']).toBe('cube-arena-runner/0.6.6');
+  });
+
   it('asks for the output limit given, or the one the endpoint lists', async () => {
     script = () => answer({ content: 'Done.' });
     await session({}, { maxOutput: 131_072 });
