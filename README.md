@@ -136,6 +136,29 @@ ones. Claude models only get the efforts they support (Opus 4.5: low to high; So
 Codex runs use their own `CODEX_HOME` (`~/.codex-bench`, signed in once with `CODEX_HOME=~/.codex-bench codex login --device-auth`).
 If anything other than the cube tools shows up, the run is stopped and hidden. Transcripts are saved to `runner/out/`.
 
+### Published runner on Windows
+
+The invite-code runner is published separately from this repository; get its current install link from [the wanted page](https://cube.krnl.studio/wanted).
+
+If PowerShell says `cube-arena-runner` is not recognized after installing it globally, add npm's configured global prefix to the current session's `PATH`:
+
+```powershell
+$prefix = (npm config get prefix).Trim()
+$env:PATH = "$prefix;$env:PATH"
+```
+
+To make the command available in new PowerShell windows, add the same prefix to your user `PATH` in Windows Environment Variables, then open a new window. The prefix can differ from the usual `%APPDATA%\npm` directory, so use the value printed by `npm config get prefix`.
+
+Before signing Codex into the runner's isolated home for the first time, create that directory:
+
+```powershell
+$codexHome = "$HOME\.cube-arena\codex"
+New-Item -ItemType Directory -Force -Path $codexHome | Out-Null
+$env:CODEX_HOME = $codexHome
+codex login
+Remove-Item Env:CODEX_HOME
+```
+
 ### Moderation
 
 ```bash
